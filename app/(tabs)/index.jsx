@@ -1,40 +1,55 @@
-import React from 'react';
-import { SafeAreaView, StyleSheet, Text, View,FlatList } from 'react-native';
+import React, { useState } from 'react';
+import { FlatList, View } from 'react-native';
+import { LocationHeader } from '../../componets/locationfilter'; // Filter at the top
+import SharedCard from '../../componets/sharecard'; // Cards for Shared Room
+import PGCard from '../../componets/pgcard'; // Cards for PG/Hostel
+import FlatCard from '../../componets/flatcard'; // Cards for Flats/Home
 import SafeWrapper from '../../services/Safewrapper';
+import { dummyListings } from '../../services/dummyListings'; 
 
-import {LocationHeader} from '../../componets/locationfilter'
-import { StatusBar } from 'expo-status-bar';
-import {PropertyCard }from '../../componets/propertycard';
-import { properties } from '../../services/prpertydata';
+const filterMap = {
+  "All": "all",
+  "Shared Rooms": "shared",
+  "PG/Hostels": "pg_hostel",
+  "Rental Property": "flat_home"
+};
 
-export default function TabTwoScreen() {
+const HomeScreen = () => {
+  const [activeFilter, setActiveFilter] = useState('All'); // Default is 'All'
+
+  const filteredListings = dummyListings.filter((listing) => {
+    const selectedCategory = filterMap[activeFilter];
+    return selectedCategory === "all" ? true : listing.category === selectedCategory;
+  });
+
+  console.log("Active Filter:", activeFilter);
+  console.log(filteredListings, "filteredListings:");
+
+  // ✅ Properly defined renderItem function
+  const renderItem = ({ item }) => {
+    if (item.category === 'shared') {
+      return <SharedCard data={item} activeFilter={activeFilter} />;
+    } else if (item.category === 'pg_hostel') {
+      return <PGCard data={item} activeFilter={activeFilter} />;
+    } else if (item.category === 'flat_home') {
+      return <FlatCard data={item} activeFilter={activeFilter} />;
+    }
+    return null; // If category doesn't match
+  };
+
   return (
-    <>
-  <StatusBar style="dark" backgroundColor="white" />
-    <SafeWrapper style={{flex: 1}}>
-
-   
-<LocationHeader/>
-<FlatList
-  data={properties}
-  keyExtractor={(item) => item.id}
-  renderItem={({ item }) => <PropertyCard property={item} />}
-  contentContainerStyle={{ flexGrow: 1, paddingBottom: 0 }} // ADD THIS LINE
-  ListFooterComponent={<View style={{ height: 300 }} />} // Optional extra space for tab bar
-  showsVerticalScrollIndicator={false}
-/>
-
-   
+    <SafeWrapper>
+      <View style={{ flex: 1 }}>
+        <LocationHeader setActiveFilter={setActiveFilter} activeFilter={activeFilter} />
+        <FlatList
+          data={filteredListings}
+          renderItem={renderItem}
+          keyExtractor={(item) => item._id}
+          contentContainerStyle={{ padding: 5 }}
+        />
+      </View>
     </SafeWrapper>
-    </>
   );
-}
+};
 
-const styles = StyleSheet.create({
-  headerImage: {
-    color: 'white',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
-  },
-});
+export default HomeScreen;

@@ -245,7 +245,7 @@ console.log(modalVisible,"============================");
   const renderSearchItem = ({ item }) => (
     <TouchableOpacity style={styles.searchResultItem}  onPress={() => handleLocationSelect(item)}>
       
-      <Feather name="map-pin" size={20} color="#673AB7" style={styles.locationIcon} />
+      <Feather name="map-pin" size={20} color="#7A5AF8" style={styles.locationIcon} />
       <View style={styles.resultTextContainer}>
         <Text style={styles.resultTitle}>{item.formatted}</Text>
         <Text style={styles.resultAddress}>
@@ -418,10 +418,12 @@ console.log(modalVisible,"============================");
 
         {/* Rest of the UI remains the same */}
         <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#673AB7" style={styles.searchIcon} />
+          <Ionicons name="search" size={20} color="#7A5AF8" style={styles.searchIcon} />
           <TextInput
+           
   style={styles.searchInput}
   placeholder="Enter a location, e.g., Edapally"
+  placeholderTextColor="#888" 
   value={searchQuery}
   onChangeText={handleSearch}
   autoCorrect={false}
@@ -436,7 +438,7 @@ console.log(modalVisible,"============================");
 
        {searchQuery.length > 0 && (
           <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
-            <Feather name="x" size={16} color="#673AB7" />
+            <Feather name="x" size={16} color="#7A5AF8" />
           </TouchableOpacity>
         )}
         </View>
@@ -446,9 +448,9 @@ console.log(modalVisible,"============================");
         onPress={handleGetLocation}
         disabled={loading}
         >
-          <Ionicons name="navigate" size={22} color="#673AB7" style={styles.navIcon} />
+          <MaterialIcons name="my-location" size={22} color="#7A5AF8" style={styles.navIcon} />
           <Text style={styles.currentLocationText}>{loading ? 'Detecting Location...' : 'Get Current Location'}</Text>
-          <MaterialIcons name="keyboard-arrow-right" size={24} color="#673AB7" />
+          <MaterialIcons name="keyboard-arrow-right" size={24} color="#7A5AF8" />
           {/* <Text className="" >hhh</Text> */}
         </TouchableOpacity>
         {/* {loading && <ActivityIndicator size="large" color="#6200ee" />} */}
@@ -512,7 +514,7 @@ console.log(modalVisible,"============================");
 
         {isSearching && (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#673AB7" />
+            <ActivityIndicator size="large" color="#7A5AF8" />
           </View>
         )}
 
@@ -612,14 +614,14 @@ const styles = StyleSheet.create({
   },
   settingsButton: {
     flex: 1,
-    backgroundColor: '#673AB7',
+    backgroundColor: '#7A5AF8',
     borderRadius: 8,
     padding: 12,
     alignItems: 'center',
     marginLeft: 8,
   },
   cancelButtonText: {
-    color: '#673AB7',
+    color: '#7A5AF8',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -649,7 +651,7 @@ const styles = StyleSheet.create({
     height: phraseHeight,
     fontSize: 16,
     fontWeight: '600',
-    color: '#673AB7',
+    color: '#7A5AF8',
     marginTop:'0.5%'
   },
   staticText:{
@@ -671,7 +673,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 25,
     borderWidth: 1,
-    borderColor: '#673AB7',
+    borderColor: '#7A5AF8',
     marginTop:10
     
   },
@@ -719,7 +721,7 @@ const styles = StyleSheet.create({
   currentLocationText: {
     flex: 1,
     fontSize: 16,
-    color: '#673AB7',
+    color: '#7A5AF8',
     fontWeight: '500',
   },
   divider: {

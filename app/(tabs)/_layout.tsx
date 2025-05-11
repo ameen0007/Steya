@@ -1,92 +1,85 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, Pressable, Dimensions, Text, View, StatusBar } from 'react-native';
+import React, { useRef } from 'react';
+import { View, Text, Dimensions, StatusBar, Pressable } from 'react-native';
 import { Tabs } from 'expo-router';
-import { Entypo, Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { FontAwesome6, Ionicons, MaterialIcons, Octicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { useSharedValue, withSpring } from 'react-native-reanimated';
 
-const { width } = Dimensions.get("window");
+const { width } = Dimensions.get('window');
 
 export default function TabLayout() {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-
+  // const scaleAnim = useRef(new Animated.Value(1)).current;
   const insets = useSafeAreaInsets();
-    console.log('====================================');
-    console.log(insets,);
-    console.log('====================================');
+  const mainbg = '#7A5AF8';
+
+  const scale = useSharedValue(1);
 
   const handlePressIn = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 0.9,
-      useNativeDriver: true,
-    }).start();
+    scale.value = withSpring(0.9);
+  };
+  
+  const handlePressOut = () => {
+    scale.value = withSpring(1);
   };
 
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      friction: 3,
-      tension: 40,
-      useNativeDriver: true,
-    }).start();
-  };
 
   return (
+    <>
+      <StatusBar translucent backgroundColor="transparent" />
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarShowLabel: false,
+          tabBarStyle: {
+            height: 60 + insets.bottom,
+            paddingBottom: insets.bottom,
+            backgroundColor: 'white',
+            borderTopWidth: 0.5,
+            borderTopColor: '#ddd',
+          },
+          tabBarButton: (props) => (
+            <Pressable
+              {...props}
+              android_ripple={{
+                color: 'rgba(0, 0, 0, 0.2)', // Swiggy-style ripple
+                radius: 35,
   
+              }}
   
-    <Tabs
-    screenOptions={{
-      headerShown: false,
-      tabBarShowLabel: false,
-     
-      tabBarButton: (props) => (
-        <Pressable
-          {...props}
-          android_ripple={{
-            color: 'rgba(0, 0, 0, 0.2)', // Swiggy-style ripple
-            radius: 35,
-   
-          }}
-          
-            style={({ pressed }) => [
-              {
+              style={{
                 flex: 1,
-                borderRadius: 999,         // Round corners to match ripple
                 alignItems: 'center',
                 justifyContent: 'center',
-                // Make sure ripple has space to grow without clipping:
-                padding: pressed ? 6 : 0,  // Adjust the padding when pressed to create space
-              },
-    ]}
-        />
-      ),
-      tabBarStyle: {
-        backgroundColor: "white",
- 
-     
-      }
-    }}
-  >
+                paddingVertical: 4,
+              }}
+            />
+          )
+        }}
+      >
 
-      <Tabs.Screen
+<Tabs.Screen
         name="index"
         options={{
           tabBarIcon: ({ focused }) => (
             <View style={{
               alignItems: "center",
-              marginTop:3,
-              width: width / 5
+              marginTop: 3,
+              width: width / 5,
+             
+
             }}>
-              <Ionicons
-                name={focused ? "home-sharp" : "home-outline"}
-                color={focused ? "#673AB7" : "gray"}
-                size={24}
-              />
+              {focused ? (
+                <FontAwesome6 name="house" size={24} color={mainbg} />
+              ) : (
+                <Octicons name="home" size={24} color="gray" />
+              )}
+
               <Text style={{
-                color: focused ? "#673AB7" : "gray",
-              
+                color: focused ? mainbg : "gray",
+
                 fontSize: 10,
-               
-                fontFamily:"Poppinssm"
+
+                fontFamily: "Poppinssm"
               }}>
                 Home
               </Text>
@@ -99,29 +92,29 @@ export default function TabLayout() {
         name="add"
         options={{
           tabBarIcon: ({ focused }) => (
-           
+
             <View style={{
               alignItems: "center",
-              marginTop:3,
+              marginTop: 3,
               width: width / 5
             }}>
-               {/* <Pressable></Pressable> */}
+              {/* <Pressable></Pressable> */}
               <Ionicons
                 name={focused ? "chatbox-ellipses" : "chatbox-ellipses-outline"}
-                color={focused ? "#673AB7" : "gray"}
+                color={focused ? mainbg : "gray"}
                 size={24}
               />
               <Text style={{
-                color: focused ? "#673AB7" : "gray",
+                color: focused ? mainbg : "gray",
                 fontSize: 10,
-              
-                fontFamily:"Poppinssm"
+
+                fontFamily: "Poppinssm"
               }}>
                 Chat
               </Text>
-           
+
             </View>
-            
+
           )
         }}
       />
@@ -131,18 +124,19 @@ export default function TabLayout() {
         options={{
           tabBarIcon: () => (
             <Pressable
-              onPressIn={handlePressIn}
-              onPressOut={handlePressOut}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+          
               style={{ alignItems: 'center', justifyContent: 'center' }}
             >
               <Animated.View style={{
-                transform: [{ scale: scaleAnim }],
+              transform: [{ scale }],
                 height: 60,
                 width: 60,
                 alignItems: 'center',
                 justifyContent: 'center',
                 borderRadius: 99999,
-                backgroundColor: '#673AB7',
+                backgroundColor: mainbg,
                 marginBottom: 30
               }}>
                 <Ionicons name="add" color="white" size={24} />
@@ -158,21 +152,21 @@ export default function TabLayout() {
           tabBarIcon: ({ focused }) => (
             <View style={{
               alignItems: "center",
-              marginTop:3,
+              marginTop: 3,
               width: width / 5
             }}>
               <MaterialIcons
                 name={focused ? "favorite" : "favorite-outline"}
-                color={focused ? "#673AB7" : "gray"}
+                color={focused ? mainbg : "gray"}
                 size={24}
               />
               <Text style={{
-                color: focused ? "#673AB7" : "gray",
+                color: focused ? mainbg : "gray",
                 fontSize: 10,
-              
-                fontFamily:"Poppinssm"
+
+                fontFamily: "Poppinssm"
               }}>
-               Saved
+                Saved
               </Text>
             </View>
           )
@@ -185,29 +179,29 @@ export default function TabLayout() {
           tabBarIcon: ({ focused }) => (
             <View style={{
               alignItems: "center",
-              marginTop:3,
+              marginTop: 3,
               width: width / 5
             }}>
               <Ionicons
                 name={focused ? "person" : "person-outline"}
-                color={focused ? "#673AB7" : "gray"}
+                color={focused ? mainbg : "gray"}
                 size={24}
               />
               <Text style={{
-                color: focused ? "#673AB7" : "gray",
+                color: focused ? mainbg : "gray",
                 fontSize: 10,
-              
-                fontFamily:"Poppinssm"
+
+                fontFamily: "Poppinssm"
               }}>
-               Profile
+                Profile
               </Text>
             </View>
           )
         }}
       />
 
-    </Tabs>
 
-  
+      </Tabs>
+    </>
   );
 }
