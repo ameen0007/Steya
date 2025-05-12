@@ -8,6 +8,7 @@ import SafeWrapper from '../../services/Safewrapper'; // Adjust this path if nee
 const { width } = Dimensions.get('window');
 import  StaticMap  from '../../componets/map'; 
 import TopFadeGradient from '../../componets/topgradient';
+import { StatusBar } from 'expo-status-bar';
 
 
 const DetailsPage = () => {
@@ -253,7 +254,7 @@ console.log('====================================');
 //       </ScrollView>
 
 //       {/* Bottom Buttons */}
-//       <View style={{
+//       {/* <View style={{
 //   flexDirection: 'row',
 //   justifyContent: 'space-between',
 //   padding: 16,
@@ -294,7 +295,7 @@ console.log('====================================');
 //     <Feather name="phone-call" size={20} color="white" />
 //     <Text style={{ color: 'white', marginLeft: 8 }}>Call</Text>
 //   </TouchableOpacity>
-// </View>
+// </View> */}
 
 
 //       {/* Image Modal */}
@@ -357,9 +358,13 @@ console.log('====================================');
 //         </View>
 //       </Modal>
 //     </SafeWrapper>
-<View>
-<Text>hai</Text>
+
+ <SafeWrapper>
+   <StatusBar style="dark" />
+   <View>
+<Text>hai sr</Text>
 </View>
+</SafeWrapper>
   );
 };
 const greybg = '#FBFAFF';
