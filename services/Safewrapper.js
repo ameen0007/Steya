@@ -23,7 +23,7 @@ const SafeWrapper = ({ children, style }) => {
             flex: 1,
             backgroundColor: '#FFFFFF', // Ensures white background under status bar
             paddingTop: insets.top,
-            // paddingBottom: insets.bottom,
+            paddingBottom: insets.bottom,
             paddingLeft: insets.left,
             paddingRight: insets.right,
           },

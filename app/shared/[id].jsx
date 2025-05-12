@@ -70,293 +70,296 @@ console.log('====================================');
   });
 
   return (
-    <SafeWrapper>
-      <ScrollView>
-        {/* Image Carousel */}
-        <FlatList
-          data={item.images}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={(imageUrl, index) => index.toString()}
-          onMomentumScrollEnd={(e) => {
-            const index = Math.floor(e.nativeEvent.contentOffset.x / width);
-            setCurrentImage(index); // Update the current image index here
-          }}
-          renderItem={({ item: imageUrl, index }) => (
-            <View style={{ width, justifyContent: 'center', alignItems: 'center' }}>
-              <TouchableOpacity activeOpacity={0.8} onPress={() => openImageModal(index)}>
-                <Image source={{ uri: imageUrl }} style={{ width, height: 250 }} resizeMode="cover" />
- <TopFadeGradient />
-                <View style={{
-                  position: 'absolute',
-                  bottom: 10,
-                  right: 10,
-                  backgroundColor: '#0009',
-                  paddingHorizontal: 10,
-                  paddingVertical: 5,
-                  borderRadius: 12
-                }}>
-                  <Text style={{ color: 'white', fontSize: 12 }}>
-                    {index === currentImage ? currentImage + 1 : index + 1}/{item.images.length}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            </View>
-          )}
-        />
+//     <SafeWrapper>
+//       <ScrollView>
+//         {/* Image Carousel */}
+//         <FlatList
+//           data={item.images}
+//           horizontal
+//           pagingEnabled
+//           showsHorizontalScrollIndicator={false}
+//           keyExtractor={(imageUrl, index) => index.toString()}
+//           onMomentumScrollEnd={(e) => {
+//             const index = Math.floor(e.nativeEvent.contentOffset.x / width);
+//             setCurrentImage(index); // Update the current image index here
+//           }}
+//           renderItem={({ item: imageUrl, index }) => (
+//             <View style={{ width, justifyContent: 'center', alignItems: 'center' }}>
+//               <TouchableOpacity activeOpacity={0.8} onPress={() => openImageModal(index)}>
+//                 {/* <Image source={{ uri: imageUrl }} style={{ width, height: 250 }} resizeMode="cover" /> */}
+//  {/* <TopFadeGradient /> */}
+//                 <View style={{
+//                   position: 'absolute',
+//                   bottom: 10,
+//                   right: 10,
+//                   backgroundColor: '#0009',
+//                   paddingHorizontal: 10,
+//                   paddingVertical: 5,
+//                   borderRadius: 12
+//                 }}>
+//                   <Text style={{ color: 'white', fontSize: 12 }}>
+//                     {index === currentImage ? currentImage + 1 : index + 1}/{item.images.length}
+//                   </Text>
+//                 </View>
+//               </TouchableOpacity>
+//             </View>
+//           )}
+//         />
 
 
  
 
 
-<View style={styles.container}>
-<View style={styles.rowBetween}>
-        <View style={styles.priceContainer}>
-          <Text style={styles.priceText}>₹{item.monthlyRent}/month</Text>
-        </View>
-        <View style={styles.locationContainer}>
-          <Ionicons name="location-sharp" size={16} color="#7A5AF8" />
-          <Text style={styles.locationText}>{item.location.fullAddress}</Text>
-        </View>
-      </View>
-      {/* Header with Title */}
-      <Text style={styles.title}>{item.title}</Text>
+// <View style={styles.container}>
+// <View style={styles.rowBetween}>
+//         <View style={styles.priceContainer}>
+//           <Text style={styles.priceText}>₹{item.monthlyRent}/month</Text>
+//         </View>
+//         <View style={styles.locationContainer}>
+//           <Ionicons name="location-sharp" size={16} color="#7A5AF8" />
+//           <Text style={styles.locationText}>{item.location.fullAddress}</Text>
+//         </View>
+//       </View>
+//       {/* Header with Title */}
+//       <Text style={styles.title}>{item.title}</Text>
       
-      {/* Price and Location row */}
+//       {/* Price and Location row */}
     
       
-      {/* Description */}
-      <View style={styles.descriptionContainer}>
-        <Text style={styles.descriptionText}>{item.description}</Text>
-      </View>
+//       {/* Description */}
+//       <View style={styles.descriptionContainer}>
+//         <Text style={styles.descriptionText}>{item.description}</Text>
+//       </View>
       
-      {/* Room Details Section */}
-      <Text style={styles.sectionTitle}>Room Details</Text>
-      <View style={styles.detailsContainer}>
-        {/* Row 1 */}
-        <View style={styles.detailsRow}>
-          <View style={styles.detailBox}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="home-outline" size={16} color="#ffffff" />
-            </View>
-            <View style={styles.detailContent}>
-              <Text style={styles.detailLabel}>Room Type</Text>
-              <Text style={styles.detailValue}>{item.category.charAt(0).toUpperCase() + item.category.slice(1)}</Text>
-            </View>
-          </View>
+//       {/* Room Details Section */}
+//       <Text style={styles.sectionTitle}>Room Details</Text>
+//       <View style={styles.detailsContainer}>
+//         {/* Row 1 */}
+//         <View style={styles.detailsRow}>
+//           <View style={styles.detailBox}>
+//             <View style={styles.iconCircle}>
+//               <Ionicons name="home-outline" size={16} color="#ffffff" />
+//             </View>
+//             <View style={styles.detailContent}>
+//               <Text style={styles.detailLabel}>Room Type</Text>
+//               <Text style={styles.detailValue}>{item.category.charAt(0).toUpperCase() + item.category.slice(1)}</Text>
+//             </View>
+//           </View>
           
-          <View style={styles.detailBox}>
-            <View style={styles.iconCircle}>
-              <MaterialCommunityIcons name="account-multiple-outline" size={16} color="#ffffff" />
-            </View>
-            <View style={styles.detailContent}>
-              <Text style={styles.detailLabel}>Vacancy</Text>
-              <Text style={styles.detailValue}>{item.roommatesWanted} Available</Text>
-            </View>
-          </View>
-        </View>
+//           <View style={styles.detailBox}>
+//             <View style={styles.iconCircle}>
+//               <MaterialCommunityIcons name="account-multiple-outline" size={16} color="#ffffff" />
+//             </View>
+//             <View style={styles.detailContent}>
+//               <Text style={styles.detailLabel}>Vacancy</Text>
+//               <Text style={styles.detailValue}>{item.roommatesWanted} Available</Text>
+//             </View>
+//           </View>
+//         </View>
         
-        {/* Row 2 */}
-        <View style={styles.detailsRow}>
-          <View style={styles.detailBox}>
-            <View style={styles.iconCircle}>
-              <MaterialIcons name="person" size={16} color="#ffffff" />
-            </View>
-            <View style={styles.detailContent}>
-              <Text style={styles.detailLabel}>Gender Pref</Text>
-              <Text style={styles.detailValue}>{item.genderPreference.charAt(0).toUpperCase() + item.genderPreference.slice(1)}</Text>
-            </View>
-          </View>
+//         {/* Row 2 */}
+//         <View style={styles.detailsRow}>
+//           <View style={styles.detailBox}>
+//             <View style={styles.iconCircle}>
+//               <MaterialIcons name="person" size={16} color="#ffffff" />
+//             </View>
+//             <View style={styles.detailContent}>
+//               <Text style={styles.detailLabel}>Gender Pref</Text>
+//               <Text style={styles.detailValue}>{item.genderPreference.charAt(0).toUpperCase() + item.genderPreference.slice(1)}</Text>
+//             </View>
+//           </View>
           
-          <View style={styles.detailBox}>
-            <View style={styles.iconCircle}>
-              <FontAwesome5 name="user-graduate" size={14} color="#ffffff" />
-            </View>
-            <View style={styles.detailContent}>
-              <Text style={styles.detailLabel}>For</Text>
-              <Text style={styles.detailValue}>
-                {item.purpose.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(', ')}
-              </Text>
-            </View>
-          </View>
-        </View>
+//           <View style={styles.detailBox}>
+//             <View style={styles.iconCircle}>
+//               <FontAwesome5 name="user-graduate" size={14} color="#ffffff" />
+//             </View>
+//             <View style={styles.detailContent}>
+//               <Text style={styles.detailLabel}>For</Text>
+//               <Text style={styles.detailValue}>
+//                 {item.purpose.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(', ')}
+//               </Text>
+//             </View>
+//           </View>
+//         </View>
         
-        {/* Row 3 */}
-        <View style={styles.detailsRow}>
-          <View style={[styles.detailBox, { flex: 1 }]}>
-            <View style={styles.iconCircle}>
-              <MaterialCommunityIcons name="dumbbell" size={16} color="#ffffff" />
-            </View>
-            <View style={styles.detailContent}>
-              <Text style={styles.detailLabel}>Habit Preferences</Text>
-              <Text style={styles.detailValue}>
-                {item.habitPreferences.map(h => h.charAt(0).toUpperCase() + h.slice(1)).join(', ')}
-              </Text>
-            </View>
-          </View>
-        </View>
-      </View>
+//         {/* Row 3 */}
+//         <View style={styles.detailsRow}>
+//           <View style={[styles.detailBox, { flex: 1 }]}>
+//             <View style={styles.iconCircle}>
+//               <MaterialCommunityIcons name="dumbbell" size={16} color="#ffffff" />
+//             </View>
+//             <View style={styles.detailContent}>
+//               <Text style={styles.detailLabel}>Habit Preferences</Text>
+//               <Text style={styles.detailValue}>
+//                 {item.habitPreferences.map(h => h.charAt(0).toUpperCase() + h.slice(1)).join(', ')}
+//               </Text>
+//             </View>
+//           </View>
+//         </View>
+//       </View>
 
-      <Text style={styles.sectionTitle}>Posted By</Text>
-      {/* Posted By Section */}
-      <View style={styles.postedByContainer}>
-        <Image 
-          source={{ uri: item.postedBy.profileImage }} 
-          style={styles.profileImage} 
-        />
-        <View style={styles.posterInfo}>
-          <Text style={styles.posterName}>{item.postedBy.name}</Text>
-          <Text style={styles.postedDate}>
-            Posted on {format(new Date(item.createdAt), 'dd MMM yyyy')}
-          </Text>
-        </View>
-      </View>
-    </View>
+//       <Text style={styles.sectionTitle}>Posted By</Text>
+//       {/* Posted By Section */}
+//       <View style={styles.postedByContainer}>
+//         <Image 
+//           source={{ uri: item.postedBy.profileImage }} 
+//           style={styles.profileImage} 
+//         />
+//         <View style={styles.posterInfo}>
+//           <Text style={styles.posterName}>{item.postedBy.name}</Text>
+//           <Text style={styles.postedDate}>
+//             Posted on {format(new Date(item.createdAt), 'dd MMM yyyy')}
+//           </Text>
+//         </View>
+//       </View>
+//     </View>
 
 
         
-        {/* Back Button */}
-        <View style={{
-          position: 'absolute', 
-          top: 10, 
-          left: 10, 
-          zIndex: 10,
-          paddingHorizontal: 15,
-          backgroundColor: 'rgba(0, 0, 0, 0.2)',
-          padding: 10,
-          borderRadius: 50,
-        }}>
-          <TouchableOpacity onPress={handleBackPress} accessible={true} accessibilityLabel="Back Button">
-            <FontAwesome5 name="chevron-left" size={20} color="white" />
-          </TouchableOpacity>
-        </View>
+//         {/* Back Button */}
+//         <View style={{
+//           position: 'absolute', 
+//           top: 10, 
+//           left: 10, 
+//           zIndex: 10,
+//           paddingHorizontal: 15,
+//           backgroundColor: 'rgba(0, 0, 0, 0.2)',
+//           padding: 10,
+//           borderRadius: 50,
+//         }}>
+//           <TouchableOpacity onPress={handleBackPress} accessible={true} accessibilityLabel="Back Button">
+//             <FontAwesome5 name="chevron-left" size={20} color="white" />
+//           </TouchableOpacity>
+//         </View>
 
-        {/* Favorite Button */}
-        <View style={{
-          position: 'absolute', 
-          top: 10, 
-          right: 10, 
-          zIndex: 10,
-          paddingHorizontal: 10,
-          backgroundColor: 'rgba(0, 0, 0, 0.2)',
+//         {/* Favorite Button */}
+//         <View style={{
+//           position: 'absolute', 
+//           top: 10, 
+//           right: 10, 
+//           zIndex: 10,
+//           paddingHorizontal: 10,
+//           backgroundColor: 'rgba(0, 0, 0, 0.2)',
 
-          padding: 8,
-          borderRadius: 50,
-        }}>
-          <TouchableOpacity onPress={toggleFavorite}>
-            <Ionicons name={isFavorite ? 'heart' : 'heart-outline' } size={25} color={isFavorite ? '#FF4081' : 'white'}/> 
-          </TouchableOpacity>
-        </View>
-        <StaticMap latitude={item?.location?.latitude} longitude={item?.location?.longitude} />
+//           padding: 8,
+//           borderRadius: 50,
+//         }}>
+//           <TouchableOpacity onPress={toggleFavorite}>
+//             <Ionicons name={isFavorite ? 'heart' : 'heart-outline' } size={25} color={isFavorite ? '#FF4081' : 'white'}/> 
+//           </TouchableOpacity>
+//         </View>
+//         <StaticMap latitude={item?.location?.latitude} longitude={item?.location?.longitude} />
 
-      </ScrollView>
+//       </ScrollView>
 
-      {/* Bottom Buttons */}
-      <View style={{
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  padding: 16,
-  borderTopWidth: 1,
-  borderColor: '#eee',
-  backgroundColor: '#fff'
-}}>
-  <TouchableOpacity
-    style={{
-      flex: 1,
-      flexDirection: 'row', // horizontal
-      backgroundColor: '#7A5AF8',
-      padding: 14,
-      borderRadius: 10,
-      alignItems: 'center',
-      justifyContent: 'center', // center both icon and text
-      marginRight: 10
-    }}
-    onPress={() => console.log('Chat clicked')}
-  >
-    <Feather name="message-circle" size={20} color="white" />
-    <Text style={{ color: 'white', marginLeft: 8 }}>Chat</Text>
-  </TouchableOpacity>
+//       {/* Bottom Buttons */}
+//       <View style={{
+//   flexDirection: 'row',
+//   justifyContent: 'space-between',
+//   padding: 16,
+//   borderTopWidth: 1,
+//   borderColor: '#eee',
+//   backgroundColor: '#fff'
+// }}>
+//   <TouchableOpacity
+//     style={{
+//       flex: 1,
+//       flexDirection: 'row', // horizontal
+//       backgroundColor: '#7A5AF8',
+//       padding: 14,
+//       borderRadius: 10,
+//       alignItems: 'center',
+//       justifyContent: 'center', // center both icon and text
+//       marginRight: 10
+//     }}
+//     onPress={() => console.log('Chat clicked')}
+//   >
+//     <Feather name="message-circle" size={20} color="white" />
+//     <Text style={{ color: 'white', marginLeft: 8 }}>Chat</Text>
+//   </TouchableOpacity>
 
-  <TouchableOpacity
-    disabled={!item.showPhonePublic}
-    onPress={() => console.log('Calling:', item.contactPhone)}
-    style={{
-      flex: 1,
-      flexDirection: 'row', // horizontal
-      backgroundColor: item.showPhonePublic ? '#7A5AF8' : '#ccc',
-      padding: 14,
-      borderRadius: 10,
-      alignItems: 'center',
-      justifyContent: 'center'
-    }}
-  >
-    <Feather name="phone-call" size={20} color="white" />
-    <Text style={{ color: 'white', marginLeft: 8 }}>Call</Text>
-  </TouchableOpacity>
+//   <TouchableOpacity
+//     disabled={!item.showPhonePublic}
+//     onPress={() => console.log('Calling:', item.contactPhone)}
+//     style={{
+//       flex: 1,
+//       flexDirection: 'row', // horizontal
+//       backgroundColor: item.showPhonePublic ? '#7A5AF8' : '#ccc',
+//       padding: 14,
+//       borderRadius: 10,
+//       alignItems: 'center',
+//       justifyContent: 'center'
+//     }}
+//   >
+//     <Feather name="phone-call" size={20} color="white" />
+//     <Text style={{ color: 'white', marginLeft: 8 }}>Call</Text>
+//   </TouchableOpacity>
+// </View>
+
+
+//       {/* Image Modal */}
+//       <Modal visible={isModalVisible} transparent={true} animationType="fade" onRequestClose={closeImageModal}>
+//         <View style={{
+//           flex: 1,
+//           justifyContent: 'center',
+//           alignItems: 'center',
+//           backgroundColor: 'black',
+//         }}>
+//           <TouchableOpacity onPress={closeImageModal} style={{
+//             position: 'absolute', 
+//             top: 20, 
+//             right: 15, 
+//             zIndex: 10,
+//             paddingHorizontal: 10,
+//             backgroundColor: 'rgba(255, 255, 255, 0.2)',
+//             padding: 8,
+//             borderRadius: 50,
+//           }} accessible={true} accessibilityLabel="Close Image Modal">
+//             <Feather name="x" size={20} color="white" />
+//           </TouchableOpacity>
+
+//           {/* Image Modal with FlatList - Fixed with getItemLayout and ref */}
+//           <FlatList
+//             ref={modalFlatListRef}
+//             data={item.images}
+//             horizontal
+//             pagingEnabled
+//             showsHorizontalScrollIndicator={false}
+//             getItemLayout={getItemLayout}
+//             initialScrollIndex={modalCurrentImage}
+//             onMomentumScrollEnd={(event) => {
+//               const newIndex = Math.round(event.nativeEvent.contentOffset.x / width);
+//               setModalCurrentImage(newIndex); // Update the modal's current image index
+//             }}
+//             renderItem={({ item, index }) => (
+//               <View style={{ width, justifyContent: 'center', alignItems: 'center' }}>
+//                 <Image source={{ uri: item }} style={{ width, height: 400 }} resizeMode="contain" />
+//               </View>
+//             )}
+//             keyExtractor={(item, index) => index.toString()}
+//           />
+
+//           {/* Image Indicator */}
+//           <View style={{
+//             flexDirection: 'row',
+//             justifyContent: 'center',
+//             alignItems: 'center',
+//             backgroundColor: '#0009',
+//             paddingHorizontal: 10,
+//             paddingVertical: 5,
+//             borderRadius: 12,
+//             paddingBottom: '10%'
+//           }}>
+//             <Text style={{ color: 'white', fontSize: 12 }}>
+//               {modalCurrentImage + 1}/{item.images?.length}
+//             </Text>
+//           </View> 
+//         </View>
+//       </Modal>
+//     </SafeWrapper>
+<View>
+<Text>hai</Text>
 </View>
-
-
-      {/* Image Modal */}
-      <Modal visible={isModalVisible} transparent={true} animationType="fade" onRequestClose={closeImageModal}>
-        <View style={{
-          flex: 1,
-          justifyContent: 'center',
-          alignItems: 'center',
-          backgroundColor: 'black',
-        }}>
-          <TouchableOpacity onPress={closeImageModal} style={{
-            position: 'absolute', 
-            top: 20, 
-            right: 15, 
-            zIndex: 10,
-            paddingHorizontal: 10,
-            backgroundColor: 'rgba(255, 255, 255, 0.2)',
-            padding: 8,
-            borderRadius: 50,
-          }} accessible={true} accessibilityLabel="Close Image Modal">
-            <Feather name="x" size={20} color="white" />
-          </TouchableOpacity>
-
-          {/* Image Modal with FlatList - Fixed with getItemLayout and ref */}
-          <FlatList
-            ref={modalFlatListRef}
-            data={item.images}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            getItemLayout={getItemLayout}
-            initialScrollIndex={modalCurrentImage}
-            onMomentumScrollEnd={(event) => {
-              const newIndex = Math.round(event.nativeEvent.contentOffset.x / width);
-              setModalCurrentImage(newIndex); // Update the modal's current image index
-            }}
-            renderItem={({ item, index }) => (
-              <View style={{ width, justifyContent: 'center', alignItems: 'center' }}>
-                <Image source={{ uri: item }} style={{ width, height: 400 }} resizeMode="contain" />
-              </View>
-            )}
-            keyExtractor={(item, index) => index.toString()}
-          />
-
-          {/* Image Indicator */}
-          <View style={{
-            flexDirection: 'row',
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: '#0009',
-            paddingHorizontal: 10,
-            paddingVertical: 5,
-            borderRadius: 12,
-            paddingBottom: '10%'
-          }}>
-            <Text style={{ color: 'white', fontSize: 12 }}>
-              {modalCurrentImage + 1}/{item.images?.length}
-            </Text>
-          </View> 
-        </View>
-      </Modal>
-    </SafeWrapper>
   );
 };
 const greybg = '#FBFAFF';
