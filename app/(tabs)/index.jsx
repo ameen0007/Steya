@@ -6,6 +6,7 @@ import PGCard from '../../componets/pgcard'; // Cards for PG/Hostel
 import FlatCard from '../../componets/flatcard'; // Cards for Flats/Home
 import SafeWrapper from '../../services/Safewrapper';
 import { dummyListings } from '../../services/dummyListings'; 
+import { StatusBar } from 'expo-status-bar';
 
 const filterMap = {
   "All": "all",
@@ -39,6 +40,7 @@ const HomeScreen = () => {
 
   return (
     <SafeWrapper>
+ <StatusBar style="dark" />
       <View style={{ flex: 1 }}>
         <LocationHeader setActiveFilter={setActiveFilter} activeFilter={activeFilter} />
         <FlatList
