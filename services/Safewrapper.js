@@ -8,13 +8,13 @@ const SafeWrapper = ({ children, style }) => {
   return (
     <>
       {/* Android Status Bar (requires explicit background) */}
-      {Platform.OS === 'android' && (
+      {/* {Platform.OS === 'android' && (
         <StatusBar 
           backgroundColor="white" 
          style="dark"
           translucent={false}
         />
-      )}
+      )} */}
 
       {/* iOS Status Bar (controlled by SafeAreaView) */}
       <View
