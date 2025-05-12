@@ -27,12 +27,59 @@ const postedDate = new Date(createdAt).toLocaleDateString("en-IN", {
     <TouchableOpacity
       style={styles.cardWrapper}
       activeOpacity={0.8} 
+onPress={() => {
+  try {
+    if (!id) {
+      console.warn("ID is missing");
+      Alert.alert("Missing ID", "No ID was found for this item.");
+      return;
+    }
+    
+    console.log(`Attempting to navigate to /shared/${id}`);
+    
+    // Log the pathname and params for debugging
+    const navigationParams = {
+      pathname: "/shared/[id]",
+      params: { id }
+    };
+    console.log("Navigation params:", JSON.stringify(navigationParams));
 
-    onPress={() => router.push({
-  pathname: "/shared/[id]",
-  params: {id}
-  
-})}
+    // Debug the router.push attempt
+    console.log("Calling router.push()...");
+    router.push(navigationParams);
+    console.log("router.push() called successfully");
+
+  } catch (error) {
+    // Detailed error logging
+    console.error("Navigation error:", error);
+    console.error("Error stack:", error?.stack);
+
+    // Show detailed alert
+    Alert.alert(
+      "Navigation Failed",
+      `Unable to open the detail page.\n\nPath: /shared/${id}\nError: ${error?.message || String(error)}`,
+      [
+        {
+          text: "OK",
+          style: "cancel"
+        },
+        {
+          text: "Try Alternate Route",
+          onPress: () => {
+            // Fallback navigation attempt with direct string path
+            try {
+              console.log("Attempting fallback navigation...");
+              router.push(`/shared/${id}`);
+            } catch (fallbackError) {
+              console.error("Fallback navigation failed:", fallbackError);
+              Alert.alert("Fallback Failed", String(fallbackError));
+            }
+          }
+        }
+      ]
+    );
+  }
+}}
 
     >
       <View style={styles.cardContainer}>

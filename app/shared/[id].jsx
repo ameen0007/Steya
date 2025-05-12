@@ -11,8 +11,12 @@ import TopFadeGradient from '../../componets/topgradient';
 
 
 const DetailsPage = () => {
+  console.log("✅ DetailsPage loaded");
+
   const { id } = useLocalSearchParams();
+  console.log("📥 Received ID from route:", id);
   const item = dummyListings.find((item) => item._id === id);
+  console.log(item,'item------------------------------------------------------');
   const router = useRouter();
   const modalFlatListRef = useRef(null);
   const [currentImage, setCurrentImage] = useState(0);

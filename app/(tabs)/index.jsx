@@ -22,8 +22,8 @@ const HomeScreen = () => {
     return selectedCategory === "all" ? true : listing.category === selectedCategory;
   });
 
-  console.log("Active Filter:", activeFilter);
-  console.log(filteredListings, "filteredListings:");
+  // console.log("Active Filter:", activeFilter);
+  // console.log(filteredListings, "filteredListings:");
 
   // ✅ Properly defined renderItem function
   const renderItem = ({ item }) => {

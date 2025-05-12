@@ -19,6 +19,8 @@
       "edgeToEdgeEnabled": true,
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
       "package": "com.ameen007.Steya"
@@ -60,7 +62,12 @@
       "eas": {
         "projectId": "c4e857a3-fd54-40ba-bc0a-0a1bce49b3b0"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/c4e857a3-fd54-40ba-bc0a-0a1bce49b3b0"
     }
   }
-} 
-
+}
