@@ -5,6 +5,7 @@ export default function MyProfile() {
   return (
     <View style={styles.container}>
       <Text style={styles.text}>My Profile Screen</Text>
+      
     </View>
   );
 }

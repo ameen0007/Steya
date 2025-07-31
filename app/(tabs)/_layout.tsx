@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { View, Text, Dimensions, StatusBar, Pressable } from 'react-native';
-import { Tabs } from 'expo-router';
-import { FontAwesome6, Ionicons, MaterialIcons, Octicons } from '@expo/vector-icons';
+import { router, Tabs } from 'expo-router';
+import { FontAwesome6, Ionicons, MaterialIcons, Octicons, SimpleLineIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { useSharedValue, withSpring } from 'react-native-reanimated';
 
@@ -15,6 +15,7 @@ export default function TabLayout() {
   const scale = useSharedValue(1);
 
   const handlePressIn = () => {
+    
     scale.value = withSpring(0.9);
   };
   
@@ -25,7 +26,7 @@ export default function TabLayout() {
 
   return (
     <>
-      <StatusBar translucent backgroundColor="transparent" />
+
       <Tabs
         screenOptions={{
           headerShown: false,
@@ -71,7 +72,7 @@ export default function TabLayout() {
               {focused ? (
                 <FontAwesome6 name="house" size={24} color={mainbg} />
               ) : (
-                <Octicons name="home" size={24} color="gray" />
+                <SimpleLineIcons name="home" size={21} color="gray" />
               )}
 
               <Text style={{
@@ -119,32 +120,36 @@ export default function TabLayout() {
         }}
       />
 
-      <Tabs.Screen
-        name="explore"
-        options={{
-          tabBarIcon: () => (
-            <Pressable
-            onPressIn={handlePressIn}
-            onPressOut={handlePressOut}
-          
-              style={{ alignItems: 'center', justifyContent: 'center' }}
-            >
-              <Animated.View style={{
-              transform: [{ scale }],
-                height: 60,
-                width: 60,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: 99999,
-                backgroundColor: mainbg,
-                marginBottom: 30
-              }}>
-                <Ionicons name="add" color="white" size={24} />
-              </Animated.View>
-            </Pressable>
-          )
-        }}
-      />
+    <Tabs.Screen
+  name="explore"
+  options={{
+    tabBarButton: (props) => (
+      <Pressable
+        onPress={() => router.push('../Listingpage')}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+      >
+        <Animated.View
+          style={{
+            transform: [{ scale: scale.value }],
+            height: 60,
+            width: 60,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: 99999,
+            backgroundColor: mainbg,
+            marginBottom: 30,
+          }}
+        >
+          <Ionicons name="add" color="white" size={24} />
+        </Animated.View>
+      </Pressable>
+    ),
+    tabBarIcon: () => null, // disable default icon
+  }}
+/>
+
 
       <Tabs.Screen
         name="likes"

@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, ImageBackground } from
 import { SplashScreen, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect } from 'react';
-import { BlurView } from 'expo-blur';
+
 // import Svg, { Path } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { ForeignObject, G, Path, Defs, ClipPath } from "react-native-svg"
@@ -26,8 +26,7 @@ export default function Login() {
   return (
     <>
       <StatusBar
-        translucent // Makes status bar transparent
-        backgroundColor="transparent" // Fully transparent status bar
+      
       />
       <ImageBackground
         source={require('../assets/images/home.png')} // Your background image

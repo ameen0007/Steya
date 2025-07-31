@@ -287,7 +287,7 @@ const FlatHomeDetailsPage = () => {
             <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={25} color={isFavorite ? '#FF4081' : 'white'}/> 
           </TouchableOpacity>
         </View>
-        <StaticMap latitude={item?.location?.latitude} longitude={item?.location?.longitude} />
+        <StaticMap latitude={item?.location?.latitude} longitude={item?.location?.longitude} placeName={item.location.fullAddress} />
       </ScrollView>
 
       {/* Bottom Buttons */}
@@ -401,6 +401,7 @@ const greybg = '#FBFAFF';
 const maintext = '#212121';
 const lighttext = '#757575';
 const mainbg = '#7A5AF8';
+
 const styles = StyleSheet.create({
   container: {
    

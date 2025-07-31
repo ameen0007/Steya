@@ -1,0 +1,737 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Alert,
+  Image,
+} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+// Input Field Component
+export const InputField = ({ 
+  label, 
+  value, 
+  onChangeText, 
+  placeholder, 
+  multiline = false,
+  keyboardType = 'default',
+  required = false,
+  maxLength,
+}) => {
+  return (
+    <View style={styles.inputContainer}>
+      <Text style={styles.inputLabel}>
+        {label} {required && <Text style={styles.required}>*</Text>}
+      </Text>
+      <TextInput
+        style={[
+          styles.textInput,
+          multiline && styles.multilineInput
+        ]}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor="#999999"
+        multiline={multiline}
+        numberOfLines={multiline ? 4 : 1}
+        keyboardType={keyboardType}
+        maxLength={maxLength}
+      />
+      {maxLength && (
+        <Text style={styles.charCount}>
+          {value?.length || 0}/{maxLength}
+        </Text>
+      )}
+    </View>
+  );
+};
+
+// Selection Button Component
+export const SelectionButton = ({ 
+  options, 
+  selectedValue, 
+  onSelect, 
+  label, 
+  required = false,
+  multiSelect = false 
+}) => {
+  const handleSelect = (value) => {
+    if (multiSelect) {
+      const currentValues = selectedValue || [];
+      if (currentValues.includes(value)) {
+        onSelect(currentValues.filter(item => item !== value));
+      } else {
+        onSelect([...currentValues, value]);
+      }
+    } else {
+      onSelect(value);
+    }
+  };
+
+  const isSelected = (value) => {
+    if (multiSelect) {
+      return selectedValue?.includes(value) || false;
+    }
+    return selectedValue === value;
+  };
+
+  return (
+    <View style={styles.selectionContainer}>
+      <Text style={styles.inputLabel}>
+        {label} {required && <Text style={styles.required}>*</Text>}
+      </Text>
+      <View style={styles.optionsContainer}>
+        {options.map((option) => (
+          <TouchableOpacity
+            key={option.value}
+            style={[
+              styles.optionButton,
+              isSelected(option.value) && styles.selectedOption
+            ]}
+            onPress={() => handleSelect(option.value)}
+          >
+            <Text style={[
+              styles.optionText,
+              isSelected(option.value) && styles.selectedOptionText
+            ]}>
+              {option.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+};
+
+// Number Picker Component
+export const NumberPicker = ({ 
+  label, 
+  value, 
+  onValueChange, 
+  min = 0, 
+  max = 10, 
+  required = false 
+}) => {
+  return (
+    <View style={styles.inputContainer}>
+      <Text style={styles.inputLabel}>
+        {label} {required && <Text style={styles.required}>*</Text>}
+      </Text>
+      <View style={styles.numberPickerContainer}>
+        <TouchableOpacity
+          style={[
+            styles.numberButton,
+            value <= min && styles.disabledButton
+          ]}
+          onPress={() => value > min && onValueChange(value - 1)}
+          disabled={value <= min}
+        >
+          <Text style={[
+            styles.numberButtonText,
+            value <= min && styles.disabledButtonText
+          ]}>-</Text>
+        </TouchableOpacity>
+        
+        <View style={styles.numberDisplay}>
+          <Text style={styles.numberText}>{value}</Text>
+        </View>
+        
+        <TouchableOpacity
+          style={[
+            styles.numberButton,
+            value >= max && styles.disabledButton
+          ]}
+          onPress={() => value < max && onValueChange(value + 1)}
+          disabled={value >= max}
+        >
+          <Text style={[
+            styles.numberButtonText,
+            value >= max && styles.disabledButtonText
+          ]}>+</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
+// Price Range Component
+export const PriceRangeInput = ({ 
+  label, 
+  minValue, 
+  maxValue, 
+  onMinChange, 
+  onMaxChange, 
+  required = false 
+}) => {
+  return (
+    <View style={styles.inputContainer}>
+      <Text style={styles.inputLabel}>
+        {label} {required && <Text style={styles.required}>*</Text>}
+      </Text>
+      <View style={styles.priceRangeContainer}>
+        <View style={styles.priceInputContainer}>
+          <Text style={styles.priceLabel}>Min</Text>
+          <TextInput
+            style={styles.priceInput}
+            value={minValue?.toString() || ''}
+            onChangeText={(text) => onMinChange(parseInt(text) || 0)}
+            placeholder="0"
+            keyboardType="numeric"
+            placeholderTextColor="#999999"
+          />
+        </View>
+        
+        <Text style={styles.priceSeparator}>to</Text>
+        
+        <View style={styles.priceInputContainer}>
+          <Text style={styles.priceLabel}>Max</Text>
+          <TextInput
+            style={styles.priceInput}
+            value={maxValue?.toString() || ''}
+            onChangeText={(text) => onMaxChange(parseInt(text) || 0)}
+            placeholder="0"
+            keyboardType="numeric"
+            placeholderTextColor="#999999"
+          />
+        </View>
+      </View>
+    </View>
+  );
+};
+
+// Location Section Component
+export const LocationSection = ({ 
+  locationData, 
+  onLocationChange, 
+  required = false 
+}) => {
+  const [storedLocation, setStoredLocation] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  React.useEffect(() => {
+    loadStoredLocation();
+  }, []);
+
+  const loadStoredLocation = async () => {
+    try {
+      setLoading(true);
+      const stored = await AsyncStorage.getItem('locationDetails');
+      if (stored) {
+        const locationDetails = JSON.parse(stored);
+        setStoredLocation(locationDetails.name);
+        console.log(locationDetails.name,"stored location details");
+        
+        // If no location data is provided, use stored location
+        if (!locationData || !locationData.fullAddress) {
+          onLocationChange(locationDetails);
+        }
+      }
+    } catch (error) {
+      console.log('Error loading stored location:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChangeLocation = () => {
+    Alert.alert(
+      'Change Location',
+      'Location change functionality will be implemented here',
+      [{ text: 'OK' }]
+    );
+  };
+
+  const displayLocation = locationData || storedLocation;
+  console.log(displayLocation, "display location details--");
+  
+  return (
+    <View style={styles.locationContainer}>
+      <Text style={styles.inputLabel}>
+        Location {required && <Text style={styles.required}>*</Text>}
+      </Text>
+      
+      {loading ? (
+        <View style={styles.locationCard}>
+          <Text style={styles.loadingText}>Loading location...</Text>
+        </View>
+      ) : displayLocation ? (
+        <View style={styles.locationCard}>
+          <View style={styles.locationInfo}>
+            <Text style={styles.locationIcon}>📍</Text>
+            <View style={styles.locationDetails}>
+              <Text style={styles.locationAddress}>
+                {displayLocation.name}
+              </Text>
+            
+            </View>
+          </View>
+          
+          <TouchableOpacity
+            style={styles.changeLocationButton}
+            onPress={handleChangeLocation}
+          >
+            <Text style={styles.changeLocationText}>Change</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={styles.addLocationButton}
+          onPress={handleChangeLocation}
+        >
+          <Text style={styles.addLocationIcon}>📍</Text>
+          <Text style={styles.addLocationText}>Add Location</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+};
+
+// Image Upload Component
+export const ImageUploadSection = ({ 
+  images, 
+  onImagesChange, 
+  maxImages = 5, 
+  required = false 
+}) => {
+  
+  const requestCameraPermission = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    
+    if (status !== 'granted') {
+      Alert.alert(
+        'Camera Permission Required',
+        'Please allow camera access to take photos.',
+        [{ text: 'OK' }]
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const requestGalleryPermission = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    
+    if (status !== 'granted') {
+      Alert.alert(
+        'Photo Library Permission Required',
+        'Please allow photo library access to choose images.',
+        [{ text: 'OK' }]
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const handleTakePhoto = async () => {
+    if (!images || images.length >= maxImages) {
+      Alert.alert('Limit Reached', `You can only upload up to ${maxImages} images.`);
+      return;
+    }
+
+    const hasPermission = await requestCameraPermission();
+    if (!hasPermission) return;
+
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const newImages = [...(images || []), result.assets[0].uri];
+        onImagesChange(newImages);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to take photo. Please try again.');
+    }
+  };
+
+  const handleChooseFromGallery = async () => {
+    if (!images || images.length >= maxImages) {
+      Alert.alert('Limit Reached', `You can only upload up to ${maxImages} images.`);
+      return;
+    }
+
+    const hasPermission = await requestGalleryPermission();
+    if (!hasPermission) return;
+
+    const remainingSlots = maxImages - (images?.length || 0);
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false, // Disable editing when multiple selection is enabled
+        quality: 0.8,
+        allowsMultipleSelection: true,
+        selectionLimit: remainingSlots, // Only allow selecting up to remaining slots
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const newImageUris = result.assets.map(asset => asset.uri);
+        const updatedImages = [...(images || []), ...newImageUris];
+        onImagesChange(updatedImages);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to select images. Please try again.');
+    }
+  };
+
+  const handleRemoveImage = (index) => {
+    const newImages = images.filter((_, i) => i !== index);
+    onImagesChange(newImages);
+  };
+
+  const canAddMore = !images || images.length < maxImages;
+
+  return (
+    <View style={styles.imageContainer}>
+      <Text style={styles.inputLabel}>
+        Property Images {required && <Text style={styles.required}>*</Text>}
+      </Text>
+      <Text style={styles.imageSubtext}>
+        Add up to {maxImages} photos to showcase your property
+      </Text>
+
+      {/* Image Previews */}
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false} 
+        style={styles.imageScrollView}
+      >
+        {images?.map((imageUri, index) => (
+          <View key={index} style={styles.imagePreview}>
+            <Image source={{ uri: imageUri }} style={styles.previewImage} />
+            <TouchableOpacity
+              style={styles.removeImageButton}
+              onPress={() => handleRemoveImage(index)}
+            >
+              <Text style={styles.removeImageText}>×</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+      </ScrollView>
+
+      {/* Action Buttons */}
+      {canAddMore && (
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity 
+            style={styles.actionButton} 
+            onPress={handleTakePhoto}
+          >
+            <Ionicons name="camera" size={24} color="#007AFF" />
+            <Text style={styles.buttonText}>Take Photo</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.actionButton} 
+            onPress={handleChooseFromGallery}
+          >
+            <Ionicons name="images" size={24} color="#007AFF" />
+            <Text style={styles.buttonText}>Choose from Gallery</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {!canAddMore && (
+        <Text style={styles.limitText}>
+          Maximum {maxImages} images reached
+        </Text>
+      )}
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  inputContainer: {
+    marginBottom: 24,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333333',
+    marginBottom: 8,
+  },
+  required: {
+    color: '#E74C3C',
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#333333',
+    backgroundColor: '#FFFFFF',
+  },
+  multilineInput: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  charCount: {
+    fontSize: 12,
+    color: '#999999',
+    textAlign: 'right',
+    marginTop: 4,
+  },
+  selectionContainer: {
+    marginBottom: 24,
+  
+  },
+  optionsContainer: {
+flexWrap: 'wrap',
+    flexDirection: 'row',
+   
+    gap: 8,
+  },
+  optionButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  selectedOption: {
+    backgroundColor: '#7A5AF8',
+    borderColor: '#7A5AF8',
+  },
+  optionText: {
+    fontSize: 14,
+    color: '#666666',
+  },
+  selectedOptionText: {
+    color: '#FFFFFF',
+    fontWeight: '500',
+  },
+  numberPickerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+  },
+  numberButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#7A5AF8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  disabledButton: {
+    backgroundColor: '#E0E0E0',
+  },
+  numberButtonText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  disabledButtonText: {
+    color: '#999999',
+  },
+  numberDisplay: {
+    width: 60,
+    height: 44,
+    marginHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+  },
+  numberText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333333',
+  },
+  priceRangeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  priceInputContainer: {
+    flex: 1,
+  },
+  priceLabel: {
+    fontSize: 14,
+    color: '#666666',
+    marginBottom: 4,
+  },
+  priceInput: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#333333',
+    backgroundColor: '#FFFFFF',
+  },
+  priceSeparator: {
+    fontSize: 14,
+    color: '#666666',
+    marginHorizontal: 16,
+    marginTop: 20,
+  },
+  locationContainer: {
+    marginBottom: 24,
+  },
+  locationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+  },
+  locationInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  locationIcon: {
+    fontSize: 20,
+    marginRight: 12,
+  },
+  locationDetails: {
+    flex: 1,
+  },
+  locationAddress: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333333',
+    marginBottom: 2,
+  },
+  locationSubtext: {
+    fontSize: 14,
+    color: '#666666',
+  },
+  changeLocationButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#7A5AF8',
+    borderRadius: 20,
+  },
+  changeLocationText: {
+    fontSize: 14,
+    color: '#7A5AF8',
+    fontWeight: '500',
+  },
+  addLocationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    backgroundColor: '#FAFAFA',
+  },
+  addLocationIcon: {
+    fontSize: 24,
+    marginRight: 8,
+  },
+  addLocationText: {
+    fontSize: 16,
+    color: '#666666',
+    fontWeight: '500',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666666',
+    textAlign: 'center',
+  },
+  imageContainer: {
+    marginBottom: 24,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333333',
+    marginBottom: 4,
+  },
+  required: {
+    color: '#E74C3C',
+  },
+  imageSubtext: {
+    fontSize: 14,
+    color: '#666666',
+    marginBottom: 12,
+  },
+  imageScrollView: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  imagePreview: {
+    marginTop: 8,
+    width: 100,
+    height: 100,
+    borderRadius: 12,
+    backgroundColor: '#F0F0F0',
+    marginRight: 12,
+    position: 'relative',
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#E74C3C',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  removeImageText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    backgroundColor: '#FAFAFA',
+    gap: 8,
+  },
+  buttonText: {
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '500',
+  },
+  limitText: {
+    textAlign: 'center',
+    fontSize: 14,
+    color: '#666666',
+    fontStyle: 'italic',
+  },
+});

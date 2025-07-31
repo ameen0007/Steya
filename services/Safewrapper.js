@@ -1,4 +1,4 @@
-import { StatusBar } from 'expo-status-bar';
+
 import { View, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -6,17 +6,7 @@ const SafeWrapper = ({ children, style }) => {
   const insets = useSafeAreaInsets();
 
   return (
-    <>
-      {/* Android Status Bar (requires explicit background) */}
-      {/* {Platform.OS === 'android' && (
-        <StatusBar 
-          backgroundColor="white" 
-         style="dark"
-          translucent={false}
-        />
-      )} */}
-
-      {/* iOS Status Bar (controlled by SafeAreaView) */}
+    
       <View
         style={[
           {
@@ -32,7 +22,7 @@ const SafeWrapper = ({ children, style }) => {
       >
         {children}
       </View>
-    </>
+   
   );
 };
 

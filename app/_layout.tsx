@@ -6,6 +6,7 @@ import { LocationProvider } from '../context/LocationContext';
 import '@/global.css'
 
 export default function RootLayout() {
+  
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
@@ -22,8 +23,10 @@ export default function RootLayout() {
           <Stack.Screen name="index" />
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="login" />
-        
-         
+        <Stack.Screen name="Listingpage" />
+         <Stack.Screen name="homeform" />
+        <Stack.Screen name="pghostelform" />
+        <Stack.Screen name="sharedroomform" />
           <Stack.Screen name="locationScreen"/>
         </Stack>
         </LocationProvider>

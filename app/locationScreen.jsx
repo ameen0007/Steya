@@ -467,7 +467,7 @@ console.log(modalVisible,"============================");
           
         <View>
 
-        {/* <StatusBar style="light" /> */}
+    
       <Modal
         visible={modalVisible}
         animationType="fade"

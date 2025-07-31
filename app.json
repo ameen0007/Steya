@@ -12,6 +12,7 @@
       "supportsTablet": true
     },
     "android": {
+      "runtimeVersion": "1.0.0",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/applogo.png",
         "backgroundColor": "#ffffff"

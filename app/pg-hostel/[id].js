@@ -296,7 +296,7 @@ export default function PgHostelDetails() {
             <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={25} color={isFavorite ? "#FF4081" : 'white'}/> 
           </TouchableOpacity>
         </View>
-        <StaticMap latitude={item?.location?.latitude} longitude={item?.location?.longitude} />
+        <StaticMap latitude={item?.location?.latitude} longitude={item?.location?.longitude} placeName={item.location.fullAddress}  />
       </ScrollView>
 
       {/* Bottom Buttons */}
