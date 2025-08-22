@@ -3,25 +3,91 @@ import { SplashScreen, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect } from 'react';
 
-// import Svg, { Path } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { ForeignObject, G, Path, Defs, ClipPath } from "react-native-svg"
 
+
+ import {
+  GoogleSignin,
+  GoogleSigninButton,
+  statusCodes,
+} from '@react-native-google-signin/google-signin';
+
+import axios from "axios";
+// Required for Expo authentication
+
+
+
 export default function Login() {
 
+GoogleSignin.configure();
+
   const router = useRouter();
-  useEffect(() => {
-    SplashScreen.hideAsync(); // Ensure it's hidden when this screen loads
-  }, []);
-  const handleDummyGoogleLogin = async () => {
-    try {
-      await AsyncStorage.setItem('user_token', 'abcd');
-      console.log('Login successful, token stored');
-      router.replace('/locationScreen'); // Navigate to home after login
-    } catch (error) {
-      console.error('Error storing token:', error);
+   
+
+ 
+
+
+  // useEffect(() => {
+
+  //   SplashScreen.hideAsync();
+
+  //   if (response?.type === "success") {
+     
+
+  //     if (token) {
+  //       console.log("✅ Google Token:", token);
+
+  //       // send token to backend
+  //       axios.post("http://your-backend.com/auth/google", { token })
+  //         .then(res => {
+  //           console.log("Backend response:", res.data);
+
+  //           // Save your app's own auth token (not Google’s)
+  //           AsyncStorage.setItem("user_token", res.data.appToken);
+  //           AsyncStorage.setItem("user", JSON.stringify(res.data.user));
+
+  //           // redirect to next screen
+  //           router.replace("/locationScreen");
+  //         })
+  //         .catch(err => console.error("Backend error:", err.response?.data || err.message));
+  //     }
+  //   }
+  // }, [response]);
+
+
+  // 👇 Button handler
+
+  const handleGoogleLogin = async () => {
+  try {
+    await GoogleSignin.hasPlayServices();
+    const userInfo = await GoogleSignin.signIn();
+
+    // Assuming isSuccessResponse checks the response validity
+    if (isSuccessResponse(userInfo)) {
+      setState({ userInfo }); // No need for userInfo.data
+    } else {
+      // Sign in was cancelled by user
+      console.log('Google sign-in cancelled');
     }
-  };
+  } catch (error) {
+    if (isErrorWithCode(error)) {
+      switch (error.code) {
+        case statusCodes.IN_PROGRESS:
+          console.log('Google sign-in in progress');
+          break;
+        case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
+          console.log('Google Play Services not available or outdated');
+          break;
+        default:
+          console.log('Some other Google sign-in error:', error);
+      }
+    } else {
+      console.log('Non-Google sign-in error:', error);
+    }
+  }
+};
+
 
   return (
     <>
@@ -87,7 +153,7 @@ export default function Login() {
  <View  style={styles.btncontainer}>
                <TouchableOpacity
       style={styles.googleButton}
-      onPress={handleDummyGoogleLogin}
+      onPress={handleGoogleLogin}
     >
       <Image
         source={{ uri: 'https://cdn-icons-png.flaticon.com/512/2991/2991148.png' }}

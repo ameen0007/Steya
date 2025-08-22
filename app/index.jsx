@@ -33,7 +33,7 @@ export default function Index() {
   useEffect(() => {
     
     const prepareAndNavigate = async () => {
-        // await AsyncStorage.clear();
+        await AsyncStorage.clear();
       if (fontsLoaded && isLoggedIn !== null) {
         try {
           let targetRoute = '/login'; // Default to login
