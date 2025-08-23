@@ -1,7 +1,7 @@
-import { View, Text, StyleSheet, TouchableOpacity, Image, ImageBackground } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ImageBackground, ScrollView } from 'react-native';
 import { SplashScreen, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect } from 'react';
+import { use, useCallback, useEffect, useState } from 'react';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { ForeignObject, G, Path, Defs, ClipPath } from "react-native-svg"
@@ -10,21 +10,27 @@ import Svg, { ForeignObject, G, Path, Defs, ClipPath } from "react-native-svg"
  import {
   GoogleSignin,
   GoogleSigninButton,
+  isErrorWithCode,
+  isSuccessResponse,
   statusCodes,
 } from '@react-native-google-signin/google-signin';
 
 import axios from "axios";
-// Required for Expo authentication
+
 
 
 
 export default function Login() {
 
-GoogleSignin.configure();
+GoogleSignin.configure({
+  webClientId: "593177901144-ttbib4ng7ff5trbq1csuhhec9m8ddmi5.apps.googleusercontent.com",
+  offlineAccess: true,
+});
+
 
   const router = useRouter();
    
-
+const [user, setUser] = useState(null);
  
 
 
@@ -58,14 +64,31 @@ GoogleSignin.configure();
 
   // 👇 Button handler
 
+  useEffect(() => {
+    const signOut = async () => {
+  try {
+    await GoogleSignin.signOut();
+   
+  } catch (error) {
+    console.error(error);
+  }
+};
+signOut()
+  }, [])
+
   const handleGoogleLogin = async () => {
   try {
+
     await GoogleSignin.hasPlayServices();
     const userInfo = await GoogleSignin.signIn();
 
-    // Assuming isSuccessResponse checks the response validity
+console.log(userInfo, 'userInfo');
+
+  
     if (isSuccessResponse(userInfo)) {
-      setState({ userInfo }); // No need for userInfo.data
+      setUser(userInfo)
+        router.replace("/locationScreen");
+   
     } else {
       // Sign in was cancelled by user
       console.log('Google sign-in cancelled');
@@ -104,9 +127,16 @@ GoogleSignin.configure();
 
 
           <View style={styles.inner1}>
-            <Text style={styles.title}>Steya</Text>
 
 
+
+            {/* <Text style={styles.title}>Steya</Text> */}
+     <Image 
+  source={require('../assets/images/splash.png')} 
+  style={styles.logo} 
+  resizeMode="contain" 
+/>
+            
 
             <Text style={styles.description}>
               Say goodbye to room-hunting stress!
@@ -260,7 +290,11 @@ paddingHorizontal:30,
 // backgroundColor:'green'
 
 },
-
+logo: {
+  width: 150,   // adjust as needed
+  height: 150,  // adjust as needed
+  marginBottom: 20,
+},
   title: {
     color: 'white',
     fontSize: 48,
