@@ -60,9 +60,7 @@ const DetailsPage = () => {
     setCurrentImage(modalCurrentImage);
     setIsModalVisible(false);
   };
-console.log('====================================');
-console.log(item?.location,'==============================================================================ationitem.location');
-console.log('====================================');
+
   // This is required for initialScrollIndex to work properly
   const getItemLayout = (data, index) => ({
     length: width,

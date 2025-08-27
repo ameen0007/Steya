@@ -1,11 +1,11 @@
-import { View, Text, StyleSheet, TouchableOpacity, Image, ImageBackground, ScrollView } from 'react-native';
-import { SplashScreen, useRouter } from 'expo-router';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ImageBackground, ScrollView, BackHandler } from 'react-native';
+import { SplashScreen, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { use, useCallback, useEffect, useState } from 'react';
+import { use, useCallback, useEffect, useLayoutEffect, useState } from 'react';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { ForeignObject, G, Path, Defs, ClipPath } from "react-native-svg"
-
+import { setUserData } from './Redux/userSlice';
 
  import {
   GoogleSignin,
@@ -16,9 +16,10 @@ import Svg, { ForeignObject, G, Path, Defs, ClipPath } from "react-native-svg"
 } from '@react-native-google-signin/google-signin';
 
 import axios from "axios";
+import { preventDoubleTap } from '../services/debounfunc';
 
 
-
+  import { useDispatch, useSelector } from 'react-redux';
 
 export default function Login() {
 
@@ -27,68 +28,75 @@ GoogleSignin.configure({
   offlineAccess: true,
 });
 
-
+const dispatch = useDispatch();
   const router = useRouter();
    
-const [user, setUser] = useState(null);
- 
 
-
-  // useEffect(() => {
-
-  //   SplashScreen.hideAsync();
-
-  //   if (response?.type === "success") {
-     
-
-  //     if (token) {
-  //       console.log("✅ Google Token:", token);
-
-  //       // send token to backend
-  //       axios.post("http://your-backend.com/auth/google", { token })
-  //         .then(res => {
-  //           console.log("Backend response:", res.data);
-
-  //           // Save your app's own auth token (not Google’s)
-  //           AsyncStorage.setItem("user_token", res.data.appToken);
-  //           AsyncStorage.setItem("user", JSON.stringify(res.data.user));
-
-  //           // redirect to next screen
-  //           router.replace("/locationScreen");
-  //         })
-  //         .catch(err => console.error("Backend error:", err.response?.data || err.message));
-  //     }
-  //   }
-  // }, [response]);
-
-
-  // 👇 Button handler
+  const { from } = useLocalSearchParams(); // get flag
 
   useEffect(() => {
-    const signOut = async () => {
-  try {
-    await GoogleSignin.signOut();
+    if (from === "protected") {
+      const backAction = () => {
+        router.replace("(tabs)"); // 👈 go Home ONLY if redirected
+        return true;
+      };
+
+      const backHandler = BackHandler.addEventListener("hardwareBackPress", backAction);
+      return () => backHandler.remove();
+    }
+  }, [from]);
+
+
+
+//   useEffect(() => {
+//     const signOut = async () => {
+//   try {
+//     await GoogleSignin.signOut();
    
+//   } catch (error) {
+//     console.error(error);
+//   }
+// };
+// signOut()
+//   }, [])
+
+ const handleGuestLogin = async () => {
+  try {
+    // Save Guest user flag
+   await AsyncStorage.setItem('userType', 'GuestUser'); // or user type
+// mark first launch completed
+ await AsyncStorage.setItem('isFirstLaunch', 'true'); 
+    // Navigate
+    console.log("--------in login");
+    
+    router.push("/locationScreen");
   } catch (error) {
-    console.error(error);
+    console.log("Error saving guest user:", error);
   }
 };
-signOut()
-  }, [])
+
+useLayoutEffect(() => {
+  handleGoogleLogin();
+}, []);
+
 
   const handleGoogleLogin = async () => {
-  try {
+     preventDoubleTap(async () => {
+    try {
 
     await GoogleSignin.hasPlayServices();
     const userInfo = await GoogleSignin.signIn();
 
-console.log(userInfo, 'userInfo');
+
 
   
     if (isSuccessResponse(userInfo)) {
-      setUser(userInfo)
+       await AsyncStorage.removeItem("userType");
+       await AsyncStorage.setItem('isFirstLaunch', 'true'); 
+       dispatch(setUserData(userInfo));
+       console.log("--------in google login");
         router.replace("/locationScreen");
-   
+  
     } else {
       // Sign in was cancelled by user
       console.log('Google sign-in cancelled');
@@ -109,13 +117,15 @@ console.log(userInfo, 'userInfo');
       console.log('Non-Google sign-in error:', error);
     }
   }
+  });
+
 };
 
 
   return (
     <>
       <StatusBar
-      
+      style="dark"
       />
       <ImageBackground
         source={require('../assets/images/home.png')} // Your background image
@@ -191,15 +201,24 @@ console.log(userInfo, 'userInfo');
       />
       <Text style={styles.googleButtonText}>Login with google</Text>
     </TouchableOpacity>
+  <View style={styles.orContainer}>
+    <View style={styles.line} />
+    <Text style={styles.orText}>OR</Text>
+    <View style={styles.line} />
+  </View>
     <TouchableOpacity
       style={styles.googleButton}
-      onPress={() => router.push('/locationScreen')}
+     onPress={() =>
+    preventDoubleTap(() => {
+      handleGuestLogin();
+    })
+  }
     >
       <Image
      source={{ uri: 'https://cdn-icons-png.flaticon.com/128/14591/14591158.png' }}
         style={styles.googleIcon}
       />
-      <Text style={styles.googleButtonText}>Uhh... not now</Text>
+      <Text style={styles.googleButtonText}> Continue as guest </Text>
     </TouchableOpacity>
     </View>
 
@@ -320,6 +339,21 @@ logo: {
 ,   paddingHorizontal:20
 ,    fontFamily:'Poppinssm'
   },
+  orContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginVertical: 15,
+},
+line: {
+  flex: 1,
+  height: 1,
+  backgroundColor: '#ccc',
+},
+orText: {
+  marginHorizontal: 10,
+  fontSize: 14,
+  color: 'white',
+},
   googleButton: {
     flexDirection: 'row',
     backgroundColor: 'white',
@@ -329,7 +363,7 @@ logo: {
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    marginBottom: 24,
+    // marginBottom: 24,
     // fontFamily:'Poppinssm'
     // opacity:'1',
     // position:'absolute',
@@ -342,7 +376,7 @@ logo: {
     marginRight: 12,
   },
   googleButtonText: {
-    color: '#090909',
+    color: '#333333',
     fontSize: 16,
     fontWeight:'700',
     // fontFamily:'Poppinssm'

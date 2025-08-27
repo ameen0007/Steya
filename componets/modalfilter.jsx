@@ -351,7 +351,7 @@ const FilterModal = ({ visible, onClose, activeFilter, onApplyFilters, appliedFi
       visible={visible}
       onRequestClose={onClose}
     >
-      <StatusBar style="dark" backgroundColor="transparent" />
+      <StatusBar style="dark" translucent  />
       <View style={styles.modalContainer}>
         <View style={styles.modalContent}>
           <View style={styles.header}>

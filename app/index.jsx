@@ -1,67 +1,81 @@
-
-
-
-import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
 import { router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import useCustomFonts from '../CustomFonts/fonts';
 
-SplashScreen.preventAutoHideAsync();
-
 export default function Index() {
-  const [isLoggedIn, setIsLoggedIn] = useState(null);
   const fontsLoaded = useCustomFonts();
+  const user = useSelector((state) => state.user.userData);
+  const locationData = useSelector((state) => state.location.locationData);
+  
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    const checkAuthStatus = async () => {
+    const navigate = async () => {
+      if (!fontsLoaded || isNavigating) return;
+      
+      setIsNavigating(true);
+      
       try {
-        const token = await AsyncStorage.getItem('user_token');
-        setIsLoggedIn(!!token);
-      } catch (error) {
-        console.error('Auth check failed:', error);
-        setIsLoggedIn(false);
-      }
-    };
-
-    if (fontsLoaded) {
-      checkAuthStatus();
-    }
-  }, [fontsLoaded]);
-
-  useEffect(() => {
-    
-    const prepareAndNavigate = async () => {
-        await AsyncStorage.clear();
-      if (fontsLoaded && isLoggedIn !== null) {
-        try {
-          let targetRoute = '/login'; // Default to login
-
-          if (isLoggedIn) {
-            // Check for location details
-            const locationDetails = await AsyncStorage.getItem('locationDetails');
-            targetRoute = locationDetails ? '/(tabs)' : '/locationScreen';
-          }
-
-          // Optional: Add a small delay if needed for splash screen
+        // Get AsyncStorage values directly
+        const firstLaunchFlag = await AsyncStorage.getItem('isFirstLaunch');
+        const type = await AsyncStorage.getItem('userType');
+        
+        const isFirst = firstLaunchFlag === 'true';
+        const userType = type; // can be null or 'GuestUser'
+        
+       
+        
+        // 1️⃣ First time open AND user not selected → login
+        if (!isFirst && !user && userType !== 'GuestUser') {
+          console.log('Navigating to login:', isFirst, user, userType);
           await SplashScreen.hideAsync();
-          router.replace(targetRoute);
-        } catch (error) {
-          console.error('Navigation error:', error);
-          await SplashScreen.hideAsync();
-          router.replace('/loginScreen');
+          router.replace('/login');
+          return;
         }
+        
+        // 2️⃣ Guest or user with location → home
+        if ((user || userType === 'GuestUser') && locationData) {
+          console.log('Navigating to home:', isFirst, user, userType, locationData);
+          await SplashScreen.hideAsync();
+          router.replace('/(tabs)');
+          return;
+        }
+        
+        // 3️⃣ Guest or user without location → location
+        if ((user || userType === 'GuestUser') && !locationData) {
+          console.log('Navigating to location:', isFirst, user, userType, locationData);
+          await SplashScreen.hideAsync();
+           console.log("--------index to location");
+          router.replace('/locationScreen');
+          return;
+        }
+        
+        console.log("Fallback to home");
+        // 4️⃣ fallback → home
+        await SplashScreen.hideAsync();
+        router.replace('/(tabs)');
+        
+      } catch (error) {
+        console.error('Navigation error:', error);
+        // Fallback navigation
+        await SplashScreen.hideAsync();
+        router.replace('/(tabs)');
       }
     };
 
-    prepareAndNavigate();
-  }, [fontsLoaded, isLoggedIn]);
+    navigate();
+  }, [fontsLoaded, user, locationData, isNavigating]);
 
-  if (!fontsLoaded || isLoggedIn === null) {
+  // Show nothing while fonts are loading or navigation is in progress
+  if (!fontsLoaded || isNavigating) {
     return null;
   }
 
-  return <View style={{ flex: 1 }} />;
+  // This should rarely render since navigation happens before this point
+  return <View style={{ flex: 1, backgroundColor: '#ffffff' }} />;
 }
-

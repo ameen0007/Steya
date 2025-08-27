@@ -90,7 +90,7 @@ const HomeScreen = () => {
 
   return (
     <>
-      <StatusBar style="dark" backgroundColor="transparent" />
+      <StatusBar style="dark" translucent  />
       <SafeWrapper>
         <View style={{ flex: 1 }}>
           <LocationHeader 

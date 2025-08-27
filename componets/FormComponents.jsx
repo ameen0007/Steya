@@ -425,7 +425,7 @@ export const ImageUploadSection = ({
             style={styles.actionButton} 
             onPress={handleTakePhoto}
           >
-            <Ionicons name="camera" size={24} color="#007AFF" />
+            <Ionicons name="camera" size={20} color="#7A5AF8" />
             <Text style={styles.buttonText}>Take Photo</Text>
           </TouchableOpacity>
 
@@ -433,7 +433,7 @@ export const ImageUploadSection = ({
             style={styles.actionButton} 
             onPress={handleChooseFromGallery}
           >
-            <Ionicons name="images" size={24} color="#007AFF" />
+            <Ionicons name="images" size={20} color="#7A5AF8" />
             <Text style={styles.buttonText}>Choose from Gallery</Text>
           </TouchableOpacity>
         </View>
@@ -718,14 +718,14 @@ flexWrap: 'wrap',
     paddingVertical: 16,
     paddingHorizontal: 20,
     borderRadius: 12,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: '#E0E0E0',
-    backgroundColor: '#FAFAFA',
+    // backgroundColor: '#FAFAFA',
     gap: 8,
   },
   buttonText: {
-    fontSize: 16,
-    color: '#007AFF',
+    fontSize: 14,
+    color: '#7A5AF8',
     fontWeight: '500',
   },
   limitText: {

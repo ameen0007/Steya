@@ -31,6 +31,9 @@ import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useLocation } from '../context/LocationContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { setLocationData } from './Redux/LocationSlice';
+import { useDispatch } from 'react-redux';
+import { preventDoubleTap } from '../services/debounfunc';
 
 
 // Constants
@@ -81,6 +84,7 @@ export default function LocationScreen() {
  const [modalVisible, setModalVisible] = useState(false); 
   const [location, setLocation] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
+const dispatch = useDispatch();
 
   useEffect(() => {
     const checkLocationStatus = async () => {
@@ -134,20 +138,21 @@ export default function LocationScreen() {
   }));
 
   
-  const handleLocationSelect = async (location) => {
+ const handleLocationSelect = (location) => {
+  preventDoubleTap(async () => {
     try {
-      await AsyncStorage.setItem('locationDetails', JSON.stringify({
-        name: location.formatted,
-        lat: location.lat,
-        lon: location.lon
-      }));
-      
-      await refreshLocation(); // Now uses top-level refreshLocation
-      router.replace('/(tabs)');
+      console.log(location.formatted, "selected location");
+
+      dispatch(setLocationData(location.formatted));
+
+      await refreshLocation(); // call your top-level refresh function
+
+      router.replace("/(tabs)");
     } catch (error) {
-      Alert.alert('Error', 'Failed to save location');
+      console.error("Error selecting location:", error);
     }
-  };
+  }, 1000); // optional delay (ms)
+};
 
  // Move debounce function BEFORE its usage
  const latestQueryRef = useRef('');
@@ -235,7 +240,7 @@ const debouncedSearch = useMemo(() => debounce(performSearch, 300), []);
 
 //  console.log(location,"Location");
  
-console.log(modalVisible,"============================");
+
 
 
  
@@ -298,6 +303,7 @@ console.log(modalVisible,"============================");
   const closeModal = () => {
     setModalVisible(false);
   };
+
   const handleGetLocation = async () => {
     console.log('[Location] HandleGetLocation triggered');
     setErrorMsg(null);
@@ -371,9 +377,9 @@ console.log(modalVisible,"============================");
         lon: location.coords.longitude,
       };
   
-      console.log(locationData, 'locationData');
-  
-      await AsyncStorage.setItem('locationDetails', JSON.stringify(locationData));
+      console.log(locationData, 'locationData-------');
+  // 
+     dispatch(setLocationData(locationData.name));
       await refreshLocation();
       router.push('/(tabs)');
       

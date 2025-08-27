@@ -1,32 +1,34 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { FontAwesome5,MaterialCommunityIcons, Ionicons ,Entypo,FontAwesome6 } from '@expo/vector-icons';
 import { useLocation } from '../context/LocationContext';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import FilterModal from '../componets/modalfilter';
+import { useSelector } from 'react-redux';
 
 
 export const LocationHeader = ({ setActiveFilter, activeFilter }) => {
-  const { locationDetails } = useLocation();
+  // const { locationDetails } = useLocation();
+const user = useSelector((state) => state.user.userData);
   const filters = ['All', 'Shared Rooms', 'PG/Hostels', 'Rental Property'];
 const [contentWidth, setContentWidth] = useState(0);
   const [scrollViewWidth, setScrollViewWidth] = useState(0);
   const isScrollable = contentWidth > scrollViewWidth;
-  const displayText = locationDetails?.name || 'Select location';
+  // const displayText = locationDetails?.name || 'Select location';
 const [appliedFilters, setAppliedFilters] = useState({});
 const [activeCategory, setActiveCategory] = useState("shared");
  const [showModal, setShowModal] = useState(false);
  const [Onlyfilterdata , setOnlyfilterdata] = useState([]);
-  const [activeFiltersCount, setActiveFiltersCount] = useState(0);
-
+  const [activeFiltersCouDnt, setActiveFiltersCount] = useState(0);
+ const locationData = useSelector((state) => state.location.locationData);
   const handleLocationPress = () => {
+     console.log("--------in in press");
     router.push('/locationScreen');
   };
 
-console.log(Onlyfilterdata, 'Onlyfilterdata');
 
-   
+
 
   const getFilterIcon = (filterName) => {
     switch(filterName) {
@@ -88,6 +90,9 @@ const handleApplyFilters = (filters) => {
     setActiveFiltersCount(0); // Reset active filters count
     setShowModal(false); // Close the modal when changing the main filter
   }
+
+   const hasNotification = true; // or from redux state
+
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
@@ -97,13 +102,25 @@ const handleApplyFilters = (filters) => {
             <Text style={styles.locatingText}>Locating...</Text>
           </View>
           <Text style={styles.addressText} numberOfLines={1}>
-            {displayText}...
+            {locationData}...
           </Text>
         </TouchableOpacity>
 
-        <View style={styles.profileIcon}>
-          <Ionicons name="person-circle-outline" size={45} color="#282C3F" />
-        </View>
+    <View style={styles.rightIcons}>
+    {/* Notifications */}
+    <TouchableOpacity style={styles.iconButton}>
+      <Ionicons name="notifications-outline" size={24} color="#282C3F" />
+      {hasNotification && (
+        <View style={styles.badge} />
+      )}
+    </TouchableOpacity>
+
+    {/* Saved Ads (for now disabled) */}
+    <TouchableOpacity style={styles.iconButton}>
+      <Ionicons name="heart-outline" size={24} color="#282C3F" />
+    </TouchableOpacity>
+  </View>
+
       </View>
 
       <View style={styles.filterContainer}>
@@ -183,8 +200,8 @@ const handleApplyFilters = (filters) => {
             </View>
            
          
- {activeFiltersCount > 0 && (
-                  <Text style={styles.badgeText}>{activeFiltersCount}</Text>
+ {activeFiltersCouDnt > 0 && (
+                  <Text style={styles.badgeText}>{activeFiltersCouDnt}</Text>
                 )}
             </View>
           </TouchableOpacity>
@@ -260,6 +277,24 @@ const styles = StyleSheet.create({
     paddingLeft: 0,
   
   },
+  rightIcons: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginRight: 5,
+},
+iconButton: {
+  marginLeft: 15,
+},
+badge: {
+  position: 'absolute',
+  top: 4,
+  right: 4,
+  backgroundColor: 'red',
+  borderRadius: 6,
+  width: 8,
+  height: 8,
+},
+
   filterPill: {
     paddingHorizontal: 14,
     paddingVertical: 5,
