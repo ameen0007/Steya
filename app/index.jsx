@@ -13,6 +13,7 @@ export default function Index() {
   
   const [isNavigating, setIsNavigating] = useState(false);
   const [isReady, setIsReady] = useState(false);
+console.log("its come----------- ");
 
   useEffect(() => {
     const navigate = async () => {

@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, TouchableOpacity, Image, ImageBackground, ScrollView, BackHandler } from 'react-native';
-import { SplashScreen, useLocalSearchParams, useRouter } from 'expo-router';
+import { SplashScreen, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { use, useCallback, useEffect, useLayoutEffect, useState } from 'react';
 
@@ -22,7 +22,7 @@ import { preventDoubleTap } from '../services/debounfunc';
   import { useDispatch, useSelector } from 'react-redux';
 
 export default function Login() {
-
+const [isReady, setIsReady] = useState(false);
 GoogleSignin.configure({
   webClientId: "593177901144-ttbib4ng7ff5trbq1csuhhec9m8ddmi5.apps.googleusercontent.com",
   offlineAccess: true,
@@ -30,7 +30,7 @@ GoogleSignin.configure({
 
 const dispatch = useDispatch();
   const router = useRouter();
-   
+       const locationData = useSelector((state) => state.location.locationData);
 
   const { from } = useLocalSearchParams(); // get flag
 
@@ -60,65 +60,104 @@ const dispatch = useDispatch();
 // signOut()
 //   }, [])
 
- const handleGuestLogin = async () => {
+const handleGuestLogin = async () => {
   try {
-    // Save Guest user flag
-   await AsyncStorage.setItem('userType', 'GuestUser'); // or user type
-// mark first launch completed
- await AsyncStorage.setItem('isFirstLaunch', 'true'); 
-    // Navigate
-    console.log("--------in login");
+  
+
+
+    // Check if user is already a guest
+    const userType = await AsyncStorage.getItem("userType");
     
-    router.push("/locationScreen");
+    // Set guest user flag if not already
+    if (userType !== "GuestUser") {
+      await AsyncStorage.setItem("userType", "GuestUser");
+    }
+
+    // Set isFirstLaunch only if not set before
+    const isFirstLaunch = await AsyncStorage.getItem("isFirstLaunch");
+    if (!isFirstLaunch) {
+      await AsyncStorage.setItem("isFirstLaunch", "true");
+    }
+
+    // Navigate based on location data
+    if (locationData) {
+      router.replace("(tabs)");
+    } else {
+      console.log("======================in guest location");
+      
+      router.push("/locationScreen");
+    }
+
   } catch (error) {
-    console.log("Error saving guest user:", error);
+    console.log("Error handling guest login:", error);
   }
 };
 
-useLayoutEffect(() => {
-  handleGoogleLogin();
+useEffect(() => {
+  setIsReady(true);
 }, []);
 
+useFocusEffect(
+  useCallback(() => {
+    if (!isReady) return; // wait until mounted
+    handleGoogleLogin();
+  }, [isReady])
+);
 
-  const handleGoogleLogin = async () => {
-     preventDoubleTap(async () => {
+const handleGoogleLogin = async () => {
+  preventDoubleTap(async () => {
     try {
+      await GoogleSignin.hasPlayServices();
+      const userInfo = await GoogleSignin.signIn();
 
-    await GoogleSignin.hasPlayServices();
-    const userInfo = await GoogleSignin.signIn();
+      if (isSuccessResponse(userInfo)) {
 
+        const isFirstLaunch = await AsyncStorage.getItem('isFirstLaunch');
 
+        // Remove guest flag if exists
+        const userType = await AsyncStorage.getItem('userType');
+        if (userType === 'GuestUser') {
+          await AsyncStorage.removeItem('userType');
+        }
 
-  
-    if (isSuccessResponse(userInfo)) {
-       await AsyncStorage.removeItem("userType");
-       await AsyncStorage.setItem('isFirstLaunch', 'true'); 
-       dispatch(setUserData(userInfo));
-       console.log("--------in google login");
-        router.replace("/locationScreen");
-  
-    } else {
-      // Sign in was cancelled by user
-      console.log('Google sign-in cancelled');
-    }
-  } catch (error) {
-    if (isErrorWithCode(error)) {
-      switch (error.code) {
-        case statusCodes.IN_PROGRESS:
-          console.log('Google sign-in in progress');
-          break;
-        case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
-          console.log('Google Play Services not available or outdated');
-          break;
-        default:
-          console.log('Some other Google sign-in error:', error);
+        // Set isFirstLaunch only if not already
+        if (!isFirstLaunch) {
+          await AsyncStorage.setItem('isFirstLaunch', 'true');
+        }
+
+        // Save user data in Redux
+        dispatch(setUserData(userInfo));
+        console.log("--------in Google login");
+
+        // Navigate based on location
+        if (locationData) {
+          router.replace("(tabs)");
+        } else {
+          console.log("======================in Google location");
+          router.replace("/locationScreen");
+        }
+
+      } else {
+        console.log('Google sign-in cancelled');
       }
-    } else {
-      console.log('Non-Google sign-in error:', error);
-    }
-  }
-  });
 
+    } catch (error) {
+      if (isErrorWithCode(error)) {
+        switch (error.code) {
+          case statusCodes.IN_PROGRESS:
+            console.log('Google sign-in in progress');
+            break;
+          case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
+            console.log('Google Play Services not available or outdated');
+            break;
+          default:
+            console.log('Some other Google sign-in error:', error);
+        }
+      } else {
+        console.log('Non-Google sign-in error:', error);
+      }
+    }
+  });
 };
 
 

@@ -32,7 +32,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useLocation } from '../context/LocationContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setLocationData } from './Redux/LocationSlice';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { preventDoubleTap } from '../services/debounfunc';
 
 
@@ -80,6 +80,7 @@ export default function LocationScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+//  const locationData = useSelector((state) => state.location.locationData);
 
  const [modalVisible, setModalVisible] = useState(false); 
   const [location, setLocation] = useState(false);
@@ -146,7 +147,7 @@ const dispatch = useDispatch();
       dispatch(setLocationData(location.formatted));
 
       await refreshLocation(); // call your top-level refresh function
-
+ router.dismissAll(); 
       router.replace("/(tabs)");
     } catch (error) {
       console.error("Error selecting location:", error);
@@ -381,7 +382,8 @@ const debouncedSearch = useMemo(() => debounce(performSearch, 300), []);
   // 
      dispatch(setLocationData(locationData.name));
       await refreshLocation();
-      router.push('/(tabs)');
+       router.dismissAll(); 
+      router.replace('/(tabs)');
       
     } catch (error) {
       console.log('Error getting location:', error);

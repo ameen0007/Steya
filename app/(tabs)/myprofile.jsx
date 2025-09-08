@@ -89,35 +89,50 @@ const ProfilePage = () => {
   ];
 
 
-const handleLogout = async () => {
-try {
-    // 1️⃣ Set temporary logout flag
-    await AsyncStorage.setItem("isLoggingOut", "true");
-   await AsyncStorage.removeItem('userType');
-    // 2️⃣ Navigate immediately to home
-    // router.dismissAll();
-    try {
-  router.dismissAll();
-} catch (e) {
-  console.log("⚠️ No screens to dismiss:", e.message);
-}
-    router.replace("(tabs)");
-
-    // 3️⃣ Clear Redux state + Google sign out
-    dispatch(clearUserData());
+ 
   
+
+const handleLogout = async () => {
+  try {
+   
+    console.log("🔹 Setting isLoggingOut flag to true");
+    await AsyncStorage.setItem("isLoggingOut", "true");
+  
+    // Verify it's set
+    const checkFlag = await AsyncStorage.getItem("isLoggingOut");
+    console.log("🔹 isLoggingOut after set:", checkFlag); // should print "true"
+
+
+
+    console.log("🔹 Navigating to home (/(tabs))");
+    router.replace("(tabs)");
+    
+    
+     
+   
+    console.log("🔹 Clearing Redux user data");
+    dispatch(clearUserData());
+
+    console.log("🔹 Signing out Google");
     await GoogleSignin.signOut();
 
-    // 4️⃣ Remove logout flag after navigation
+    console.log("🔹 Removing isLoggingOut flag");
     await AsyncStorage.removeItem("isLoggingOut");
 
-    console.log("✅ Logout completed - user at home");
+    // Verify it's removed
+    const removedFlag = await AsyncStorage.getItem("isLoggingOut");
+    console.log("🔹 isLoggingOut after remove:", removedFlag); // should print null
+
+    console.log("✅ Logout completed, user at home");
+     
   } catch (error) {
     console.error("❌ Logout error:", error);
     await AsyncStorage.removeItem("isLoggingOut");
     router.replace("(tabs)");
   }
 };
+
+
 
 
   const renderIcon = (iconName, iconType, color, size = 24) => {
