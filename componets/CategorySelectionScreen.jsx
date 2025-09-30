@@ -6,7 +6,7 @@ import {
   StyleSheet,
   SafeAreaView,
   ScrollView,
-  StatusBar,
+
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router'; // Changed from react-navigation
@@ -51,7 +51,7 @@ const CategorySelectionScreen = () => {
   const getCategoryIcon = (categoryId) => {
   switch (categoryId) {
     case 'shared':
-      return <Entypo name="slideshare" size={24} color="white" />;
+      return <Ionicons name="people" size={24} color="white" />;
     case 'pg_hostel':
       return < Ionicons name="business-sharp" size={24} color="white" />;
     case 'flat_home':

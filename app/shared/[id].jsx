@@ -3,28 +3,58 @@ import { useRef, useState, useEffect } from 'react';
 import { ScrollView, TouchableOpacity, Text, View, Image, Modal, Dimensions, Platform, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather, FontAwesome5, Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
-import { dummyListings } from '../../services/dummyListings';
-import { format } from 'date-fns';
+
+
 import SafeWrapper from '../../services/Safewrapper'; // Adjust this path if neededimport { WebView } from 'react-native-webview';
 const { width } = Dimensions.get('window');
 import  StaticMap  from '../../componets/map'; 
 import TopFadeGradient from '../../componets/topgradient';
 import { StatusBar } from 'expo-status-bar';
+import axios from 'axios';
+import SkeletonLoader from '../../componets/individualloader';
+const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 
 const DetailsPage = () => {
   console.log("✅ DetailsPage loaded");
 
   const { id } = useLocalSearchParams();
   console.log("📥 Received ID from route:", id);
-  const item = dummyListings.find((item) => item._id === id);
-  console.log(item,'item------------------------------------------------------');
+ 
+ 
   const router = useRouter();
   const modalFlatListRef = useRef(null);
+  const [item, setItem] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [currentImage, setCurrentImage] = useState(0);
   const [isFavorite, setIsFavorite] = useState(false); // Manage favorite state
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [initialImageIndex, setInitialImageIndex] = useState(0);
   
+      useEffect(() => {
+    const fetchRoomData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await axios.get(`${apiUrl}/api/singleroom/${id}`);
+        // console.log("🔍 Fetched room data:", response.data?.room);
+        setItem(response.data?.room);
+        console.log("✅ Room data fetched:", response.data?.room);
+      } catch (err) {
+        console.error("❌ Error fetching room data:", err);
+        setError(err.message || 'Failed to load room details');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchRoomData();
+    }
+  }, [id]);
+
+  
+
   const handleBackPress = () => {
     router.back(); // Go back to the previous screen
   };
@@ -67,47 +97,73 @@ const DetailsPage = () => {
     offset: width * index,
     index,
   });
+
+  const transformedItem = {
+  ...item,
+  images: item?.images ? item.images.map(img => img.originalUrl) : [],
+};
+
 // okay, now show me that com
   return (
     <>
      <StatusBar style="dark" />
-      {item ? (
+   {loading || !item ? (
+    <SkeletonLoader />
+  ) : (
     <SafeWrapper>
 
       <ScrollView>
    
-        <FlatList
-          data={item.images}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={(imageUrl, index) => index.toString()}
-          onMomentumScrollEnd={(e) => {
-            const index = Math.floor(e.nativeEvent.contentOffset.x / width);
-            setCurrentImage(index); // Update the current image index here
-          }}
-          renderItem={({ item: imageUrl, index }) => (
-            <View style={{ width, justifyContent: 'center', alignItems: 'center' }}>
-              <TouchableOpacity activeOpacity={0.8} onPress={() => openImageModal(index)}>
-                <Image source={{ uri: imageUrl }} style={{ width, height: 250 }} resizeMode="cover" /> 
- <TopFadeGradient />
-                <View style={{
-                  position: 'absolute',
-                  bottom: 10,
-                  right: 10,
-                  backgroundColor: '#0009',
-                  paddingHorizontal: 10,
-                  paddingVertical: 5,
-                  borderRadius: 12
-                }}>
-                  <Text style={{ color: 'white', fontSize: 12 }}>
-                    {index === currentImage ? currentImage + 1 : index + 1}/{item.images.length}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            </View>
-          )}
+<FlatList
+  data={item?.images}
+  horizontal
+  pagingEnabled
+  showsHorizontalScrollIndicator={false}
+  keyExtractor={(img, index) => img._id || index.toString()}
+  onMomentumScrollEnd={(e) => {
+    const index = Math.floor(e.nativeEvent.contentOffset.x / width);
+    setCurrentImage(index); // Update current image index
+  }}
+  renderItem={({ item: img, index }) => (
+    <View
+      style={{
+        width,
+        justifyContent: "center",
+        alignItems: "center"
+      }}
+    >
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={() => openImageModal(index)}
+      >
+        <Image
+          source={{ uri: img.originalUrl }}
+          style={{ width, height: 250 }}
+          resizeMode="cover"
         />
+        <TopFadeGradient />
+
+        {/* counter bottom right */}
+        <View
+          style={{
+            position: "absolute",
+            bottom: 10,
+            right: 10,
+            backgroundColor: "#0009",
+            paddingHorizontal: 10,
+            paddingVertical: 5,
+            borderRadius: 12
+          }}
+        >
+          <Text style={{ color: "white", fontSize: 12 }}>
+            {index + 1}/{item.images.length}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    </View>
+  )}
+/>
+
 
 
  
@@ -116,19 +172,19 @@ const DetailsPage = () => {
 <View style={styles.container}>
 <View style={styles.rowBetween}>
         <View style={styles.priceContainer}>
-          <Text style={styles.priceText}>₹{item.monthlyRent}/month</Text>
+          <Text style={styles.priceText}>₹{item?.monthlyRent}/month</Text>
         </View>
         <View style={styles.locationContainer}>
           <Ionicons name="location-sharp" size={16} color="#7A5AF8" />
-          <Text style={styles.locationText}>{item.location.fullAddress}</Text>
+          <Text style={styles.locationText}>{item?.location?.fullAddress}</Text>
         </View>
       </View>
 
-      <Text style={styles.title}>{item.title}</Text>
+      <Text style={styles.title}>{item?.title}</Text>
       
      
       <View style={styles.descriptionContainer}>
-        <Text style={styles.descriptionText}>{item.description}</Text>
+        <Text style={styles.descriptionText}>{item?.description}</Text>
       </View>
       
     
@@ -142,7 +198,7 @@ const DetailsPage = () => {
             </View>
             <View style={styles.detailContent}>
               <Text style={styles.detailLabel}>Room Type</Text>
-              <Text style={styles.detailValue}>{item.category.charAt(0).toUpperCase() + item.category.slice(1)}</Text>
+              <Text style={styles.detailValue}>{item?.category?.charAt(0).toUpperCase() + item?.category?.slice(1)}</Text>
             </View>
           </View>
           
@@ -152,7 +208,7 @@ const DetailsPage = () => {
             </View>
             <View style={styles.detailContent}>
               <Text style={styles.detailLabel}>Vacancy</Text>
-              <Text style={styles.detailValue}>{item.roommatesWanted} Available</Text>
+              <Text style={styles.detailValue}>{item?.roommatesWanted} Available</Text>
             </View>
           </View>
         </View>
@@ -165,7 +221,7 @@ const DetailsPage = () => {
             </View>
             <View style={styles.detailContent}>
               <Text style={styles.detailLabel}>Gender Pref</Text>
-              <Text style={styles.detailValue}>{item.genderPreference.charAt(0).toUpperCase() + item.genderPreference.slice(1)}</Text>
+              <Text style={styles.detailValue}>{item?.genderPreference?.charAt(0).toUpperCase() + item?.genderPreference?.slice(1)}</Text>
             </View>
           </View>
           
@@ -176,7 +232,7 @@ const DetailsPage = () => {
             <View style={styles.detailContent}>
               <Text style={styles.detailLabel}>For</Text>
               <Text style={styles.detailValue}>
-                {item.purpose.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(', ')}
+                {item?.purpose?.map(p => p.charAt(0).toUpperCase() + p?.slice(1)).join(', ')}
               </Text>
             </View>
           </View>
@@ -191,7 +247,7 @@ const DetailsPage = () => {
             <View style={styles.detailContent}>
               <Text style={styles.detailLabel}>Habit Preferences</Text>
               <Text style={styles.detailValue}>
-                {item.habitPreferences.map(h => h.charAt(0).toUpperCase() + h.slice(1)).join(', ')}
+                {item?.habitPreferences?.map(h => h?.charAt(0).toUpperCase() + h?.slice(1)).join(', ')}
               </Text>
             </View>
           </View>
@@ -202,14 +258,18 @@ const DetailsPage = () => {
      
       <View style={styles.postedByContainer}>
         <Image 
-          source={{ uri: item.postedBy.profileImage }} 
+          source={{ uri: item?.createdBy?.picture }} 
           style={styles.profileImage} 
         />
         <View style={styles.posterInfo}>
-          <Text style={styles.posterName}>{item.postedBy.name}</Text>
-          <Text style={styles.postedDate}>
-            Posted on {format(new Date(item.createdAt), 'dd MMM yyyy')}
-          </Text>
+          <Text style={styles.posterName}>{item?.createdBy?.name}</Text>
+    <Text style={styles.postedDate}>
+  {new Date(item.createdAt).toLocaleDateString('en-US', {
+    month: 'short',
+    day: '2-digit',
+  })}
+</Text>
+
         </View>
       </View>
     </View>
@@ -250,7 +310,12 @@ const DetailsPage = () => {
         </View>
        
        
-        <StaticMap latitude={item?.location?.latitude} longitude={item?.location?.longitude} placeName={item.location.fullAddress} />
+       <StaticMap
+  latitude={item?.location?.coordinates[1]}   // latitude
+  longitude={item?.location?.coordinates[0]}  // longitude
+  placeName={item?.location?.fullAddress}
+/>
+
 
       </ScrollView>
 
@@ -274,14 +339,21 @@ const DetailsPage = () => {
       justifyContent: 'center', // center both icon and text
       marginRight: 10
     }}
-    onPress={() => console.log('Chat clicked')}
+
+   
+onPress={() =>
+  router.push({
+    pathname: '/chat/[id]',
+    params: { id: item._id }, // key must match [id] in filename
+  })
+}
   >
     <Feather name="message-circle" size={20} color="white" />
     <Text style={{ color: 'white', marginLeft: 8 }}>Chat</Text>
   </TouchableOpacity>
 
   <TouchableOpacity
-    disabled={!item.showPhonePublic}
+    disabled={!item?.showPhonePublic}
     onPress={() => console.log('Calling:', item.contactPhone)}
     style={{
       flex: 1,
@@ -321,25 +393,26 @@ const DetailsPage = () => {
           </TouchableOpacity>
 
           
-          <FlatList
-            ref={modalFlatListRef}
-            data={item.images}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            getItemLayout={getItemLayout}
-            initialScrollIndex={modalCurrentImage}
-            onMomentumScrollEnd={(event) => {
-              const newIndex = Math.round(event.nativeEvent.contentOffset.x / width);
-              setModalCurrentImage(newIndex); // Update the modal's current image index
-            }}
-            renderItem={({ item, index }) => (
-              <View style={{ width, justifyContent: 'center', alignItems: 'center' }}>
-                <Image source={{ uri: item }} style={{ width, height: 400 }} resizeMode="contain" />
-              </View>
-            )}
-            keyExtractor={(item, index) => index.toString()}
-          />
+       <FlatList
+  ref={modalFlatListRef}
+  data={transformedItem.images}
+  horizontal
+  pagingEnabled
+  showsHorizontalScrollIndicator={false}
+  getItemLayout={getItemLayout}
+  initialScrollIndex={modalCurrentImage}
+  onMomentumScrollEnd={(event) => {
+    const newIndex = Math.round(event.nativeEvent.contentOffset.x / width);
+    setModalCurrentImage(newIndex);
+  }}
+  renderItem={({ item }) => (
+    <View style={{ width, justifyContent: "center", alignItems: "center" }}>
+      <Image source={{ uri: item }} style={{ width, height: 400 }} resizeMode="contain" />
+    </View>
+  )}
+  keyExtractor={(item, index) => index.toString()}
+/>
+
 
     
           <View style={{
@@ -353,7 +426,7 @@ const DetailsPage = () => {
             paddingBottom: '10%'
           }}>
             <Text style={{ color: 'white', fontSize: 12 }}>
-              {modalCurrentImage + 1}/{item.images?.length}
+              {modalCurrentImage + 1}/{transformedItem?.images?.length}
             </Text>
           </View> 
         </View>
@@ -361,12 +434,9 @@ const DetailsPage = () => {
 
 
     </SafeWrapper>
-    ) : (
-      <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color="#7A5AF8" />
-      <Text style={styles.loadingText}>Loading...</Text>
-    </View>
   )}
+     
+  
     </>
 
   )

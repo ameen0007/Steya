@@ -5,18 +5,7 @@ import { Ionicons, MaterialIcons,MaterialCommunityIcons, FontAwesome5, FontAweso
 
 const FlatHomeCard = ({ data, activeFilter }) => {
   // Extract data or provide defaults
-  const images = data.images && data.images.length > 0 
-    ? data.images 
-    : ["https://via.placeholder.com/300x200.png?text=No+Image"];
-  
-  const distance = data.distance || '2.5 km';
-  const bedrooms = data.bedrooms || 2;
-  const bathrooms = data.bathrooms || 2;
-  const propertyType = data.propertyType || 'flat';
-  const furnishedStatus = data.furnishedStatus || 'furnished';
-  const tenantPreference = data.tenantPreference || 'family';
-  const price = data.price || '₹20,000';
-  const id = data._id 
+    const id = data._id 
   return (
     <TouchableOpacity
       style={styles.cardWrapper}
@@ -29,11 +18,14 @@ onPress={() => router.push({
       <View style={styles.cardContainer}>
         {/* Top image section with distance and favorite button */}
         <View style={styles.imageContainer}>
-          <Image source={{ uri: images[0] }} style={styles.image} />
+          <Image source={{ uri: data?.thumbnail?.url }} style={styles.image} />
           <View style={styles.topOverlay}>
-            <View style={styles.distanceBadge}>
-              <Ionicons name="location-sharp" size={16} color="#7A5AF8" />
-              <Text style={styles.distanceText}>{distance}</Text>
+            <View >
+              {activeFilter === 'All' &&
+                         <View style={styles.categoryBadge}>
+                         <MaterialCommunityIcons name='home-city' size={16} color='#6ED5D0' /> 
+                        </View>
+                                    }
             </View>
             <TouchableOpacity style={styles.favoriteButton}>
               <Ionicons name="heart-outline" size={23} color="#FF4081" />
@@ -44,21 +36,17 @@ onPress={() => router.push({
         {/* Content section */}
         <View style={styles.contentContainer}>
           <View style={styles.headerRow}>
-            <Text numberOfLines={2} style={styles.title}>{data.title}</Text>
-             {
-                          activeFilter === 'All' && <View style={styles.categoryBadge}>
-                          <MaterialCommunityIcons 
-                               name='home-city' 
-                               size={16} 
-                               color='#7A5AF8'
-                           
-                             />
-                        </View>
-}
+            <Text numberOfLines={2} style={styles.title}>{data?.title}</Text>
+   <Text style={styles.postedDate}>
+          {new Date(data?.createdAt).toLocaleDateString("en-US", {
+            month: "short", 
+            day: "2-digit",
+          })}
+        </Text>
           </View>
           
           <Text style={styles.description} numberOfLines={2}>
-            {data.description}
+            {data?.description}
           </Text>
           
           {/* Property details */}
@@ -67,17 +55,17 @@ onPress={() => router.push({
           <View style={styles.detailItem}>
               <MaterialIcons name="label" size={16} color="#7A5AF8" />
               <Text style={styles.detailText}>
-              {propertyType.charAt(0).toUpperCase() + propertyType.slice(1)}
+              {data?.propertyType.charAt(0).toUpperCase() + data?.propertyType.slice(1)}
               </Text>
             </View>
             <View style={styles.detailItem}>
               <MaterialCommunityIcons name="bed" size={18} color="#7A5AF8" />
-              <Text style={styles.detailText}>{bedrooms} BR</Text>
+              <Text style={styles.detailText}>{data?.bedrooms} BR</Text>
             </View>
             
             <View style={styles.detailItem}>
               <FontAwesome6 name="bath" size={16} color="#7A5AF8" />
-              <Text style={styles.detailText}>{bathrooms} Bath</Text>
+              <Text style={styles.detailText}>{data?.bathrooms} Bath</Text>
             </View>
          
           </View>
@@ -87,7 +75,7 @@ onPress={() => router.push({
             <View style={styles.tenantBadge}>
 
               
-            {tenantPreference === 'family' ? (
+            {data?.tenantPreference === 'family' ? (
   <MaterialIcons name="family-restroom" size={18} color="#7A5AF8" />
 ) : (
   <FontAwesome6 name="people-group" size={17} color="#7A5AF8" />
@@ -95,19 +83,23 @@ onPress={() => router.push({
 
               <Text style={styles.tenantText}>
                 {
-                  tenantPreference === 'family' ? 'Only For ' : 'For '
+                  data?.tenantPreference === 'family' ? 'Only For ' : 'For '
                 }
-                 {tenantPreference.charAt(0).toUpperCase() + tenantPreference.slice(1)}
+                 {data?.tenantPreference.charAt(0).toUpperCase() + data?.tenantPreference.slice(1)}
               </Text>
             </View>
             
-            <Text style={styles.price}>{price}</Text>
+            <Text style={styles.price}>
+  {data?.monthlyRent?.toLocaleString()}
+</Text>
+
           </View>
           
         
         </View>
       </View>
     </TouchableOpacity>
+  
   );
 };
 
@@ -133,6 +125,11 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     position: 'relative',
+  },
+    postedDate: {
+    fontFamily: 'Poppinssm',
+    fontSize: 10,
+    color: lighttext
   },
   image: {
     width: '100%',
@@ -172,7 +169,7 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    // alignItems: 'center',
     marginBottom: 8,
   },
   title: {

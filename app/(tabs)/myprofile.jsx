@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   Image,
   SafeAreaView,
-  StatusBar,
+ 
 } from 'react-native';
 import { Ionicons, MaterialIcons, Feather } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
@@ -18,6 +18,7 @@ import { clearLocationData } from '../Redux/LocationSlice';
 import { clearUserData } from '../Redux/userSlice';
 import ProtectedRoute from '../protectedroute';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { StatusBar } from 'expo-status-bar';
 
 
 
@@ -29,6 +30,7 @@ const ProfilePage = () => {
   const user = useSelector((state) => state.user.userData);
 
       const dispatch = useDispatch();
+  // console.log(user.picture,'user===================');
   
   // Get initials from name
   const getInitials = (name) => {
@@ -108,7 +110,7 @@ const handleLogout = async () => {
     router.replace("(tabs)");
     
     
-     
+        await AsyncStorage.removeItem("authToken");
    
     console.log("🔹 Clearing Redux user data");
     dispatch(clearUserData());
@@ -164,7 +166,7 @@ const handleLogout = async () => {
   return (
     <ProtectedRoute>
     <SafeWrapper style={styles.container}>
-      <StatusBar barStyle="dark-content" translucent  />
+      <StatusBar style="dark" />
       
       {/* Header */}
       <View style={styles.header}>
@@ -189,9 +191,9 @@ const handleLogout = async () => {
         {/* Profile Section */}
         <View style={styles.profileSection}>
           <View style={styles.profileImageContainer}>
-            {user?.data?.user?.photo ? (
+            {user?.picture ? (
               <Image 
-                source={{ uri: user.data.user.photo }} 
+                source={{ uri: user?.picture }} 
                 style={styles.profileImagePhoto}
               />
             ) : (
@@ -208,10 +210,10 @@ const handleLogout = async () => {
           
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>
-              {user?.data?.user?.name || `${user?.data?.user?.givenName || ''} ${user?.data?.user?.familyName || ''}`.trim() || 'User Name'}
+              {user?.name || `${user?.data?.user?.givenName || ''} ${user?.data?.user?.familyName || ''}`.trim() || 'User Name'}
             </Text>
             <Text style={styles.profileEmail}>
-              {user?.data?.user?.email || 'email@example.com'}
+              {user?.email || 'email@example.com'}
             </Text>
             {user?.data?.user?.phone && (
               <Text style={styles.profilePhone}>

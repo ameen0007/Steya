@@ -10,6 +10,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import FormHeader from './FormHeader';
 import ProgressBar from './ProgressBar';
@@ -19,14 +20,23 @@ import {
   NumberPicker,
   LocationSection,
   ImageUploadSection,
+  PhoneInputField,
 } from './FormComponents';
 import SafeWrapper from '../services/Safewrapper';
 import { Animated, Dimensions } from 'react-native';
 import { useEffect, useRef } from 'react';
+import axios from 'axios';
 
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
+import * as FileSystem from "expo-file-system";
+import api from '../services/intercepter';
+import { useSelector } from 'react-redux';
+import { Ionicons } from '@expo/vector-icons';
+
+ const apiUrl = process.env.EXPO_PUBLIC_API_URL
 
 const SharedRoomForm = () => {
-
+ const locationData = useSelector((state) => state.location.locationData);
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 4;
 
@@ -42,6 +52,7 @@ const SharedRoomForm = () => {
     purpose: [],
     contactPhone: '',
     showPhonePublic: true,
+    category: 'shared',
   });
 
   const genderOptions = [
@@ -89,10 +100,148 @@ const SharedRoomForm = () => {
     }
   };
 
-  const handleSubmit = () => {
-    console.log('Shared Room Form Data:', formData);
-    Alert.alert('Success', 'Your shared room listing has been submitted for review!');
-  };
+
+
+const handleSubmit = async () => {
+  try {
+    console.log(locationData, "location--------");
+
+    // 1️⃣ Validate required fields
+    const errors = [];
+    if (!formData.images || formData.images.length === 0) errors.push("Please select at least one image.");
+    if (!formData.title?.trim()) errors.push("Title is required.");
+    if (!formData.description?.trim()) errors.push("Description is required.");
+    if (!formData.monthlyRent || isNaN(formData.monthlyRent)) errors.push("Monthly rent is required and must be a number.");
+    if (!formData.roommatesWanted || isNaN(formData.roommatesWanted)) errors.push("Roommates wanted is required and must be a number.");
+    if (!formData.contactPhone?.trim()) errors.push("Contact phone is required.");
+    if (!formData.category?.trim()) errors.push("Category is required.");
+    if (formData.purpose && !Array.isArray(formData.purpose)) errors.push("Please select at least one purpose.");
+    if (formData.habitPreferences && !Array.isArray(formData.habitPreferences)) errors.push("Please select at least one habit preference.");
+
+    if (errors.length > 0) {
+      Alert.alert("Validation Error", errors.join("\n"));
+      return;
+    }
+
+    // 2️⃣ Compress images & create thumbnail
+    const timestamp = Date.now();
+    const compressedImages = await Promise.all(
+      formData.images.map(async (img, i) => {
+        let context = ImageManipulator.manipulate(img);
+        context.resize({ width: 1280 });
+        let result = await context.renderAsync();
+        let manip = await result.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
+
+        const info = await FileSystem.getInfoAsync(manip.uri);
+        if (info.size > 1000000) {
+          const context2 = ImageManipulator.manipulate(manip.uri);
+          const result2 = await context2.renderAsync();
+          manip = await result2.saveAsync({ compress: 0.5, format: SaveFormat.JPEG });
+        }
+
+        // First image thumbnail
+        if (i === 0) {
+          const thumbContext = ImageManipulator.manipulate(manip.uri);
+          thumbContext.resize({ width: 300 });
+          const thumbResult = await thumbContext.renderAsync();
+          const thumb = await thumbResult.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
+          manip.thumbnail = thumb.uri;
+        }
+
+        return manip;
+      })
+    );
+
+    // 3️⃣ Prepare FormData
+    const uploadData = new FormData();
+
+    // Append normal fields (EXCLUDING images and location)
+    Object.entries(formData).forEach(([key, value]) => {
+      if (key === "images" || key === "location") return; // skip images and location
+      if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
+        uploadData.append(key, JSON.stringify(value));
+      } else {
+        uploadData.append(key, String(value));
+      }
+    });
+
+    // Append location ONLY if we have valid locationData
+    if (locationData?.lat && locationData?.lng && locationData?.name) {
+      const geoLocation = {
+        type: "Point",
+        coordinates: [locationData.lng, locationData.lat],
+        fullAddress: locationData.name,
+      };
+      uploadData.append("location", JSON.stringify(geoLocation));
+    }
+
+    // Append images
+    compressedImages.forEach((img, i) => {
+      uploadData.append("images", {
+        uri: img.uri,
+        name: `property_${timestamp}_${i}.jpg`,
+        type: "image/jpeg",
+      });
+    });
+
+    // Append first image thumbnail
+    if (compressedImages[0]?.thumbnail) {
+      uploadData.append("thumbnail", {
+        uri: compressedImages[0].thumbnail,
+        name: `thumbnail_${timestamp}.jpg`,
+        type: "image/jpeg",
+      });
+    }
+
+    // 4️⃣ Upload to API - React Native specific approach
+    console.log("API calling started...", uploadData);
+    console.log("API URL:", `${apiUrl}/api/rooms`);
+    console.log("Upload data size:", uploadData._parts?.length || 'unknown');
+    
+    const res = await api.post(`${apiUrl}/api/rooms`, uploadData, {
+      timeout: 60000, // Longer timeout for file uploads
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      transformRequest: (data, headers) => {
+        // React Native handles FormData differently, so we return it as-is
+        return data;
+      },
+      onUploadProgress: (progressEvent) => {
+        console.log("Upload progress:", Math.round((progressEvent.loaded / progressEvent.total) * 100) + "%");
+      },
+    });
+
+    console.log("✅ Uploaded successfully:", res.data);
+    Alert.alert("Success", "Your room listing has been submitted!");
+  } catch (err) {
+    console.error("❌ Upload failed:", err);
+    console.error("Error details:", err.response?.data || err.message);
+    console.error("Error status:", err.response?.status);
+    console.error("Error config:", err.config?.url);
+    console.error("Full error:", JSON.stringify(err, null, 2));
+    
+    let errorMessage = "Something went wrong while submitting your listing.";
+    if (err.code === 'NETWORK_ERROR') {
+      errorMessage = "Network connection failed. Please check your internet connection.";
+    } else if (err.response?.status) {
+      errorMessage = `Server error (${err.response.status}): ${err.response.data?.message || 'Unknown error'}`;
+    }
+    
+    Alert.alert("Error", errorMessage);
+  }
+};
+
+
+
+
+
+
+
+
+
+
+
 
   const renderStepContent = () => {
     switch (currentStep) {
@@ -189,7 +338,7 @@ const SharedRoomForm = () => {
       case 4:
         return (
           <View style={styles.stepContainer}>
-            <InputField
+            <PhoneInputField
               label="Contact Phone"
               value={formData.contactPhone}
               onChangeText={(value) => updateFormData('contactPhone', value)}
@@ -198,13 +347,37 @@ const SharedRoomForm = () => {
               required
             />
 
-            <SelectionButton
+
+   
+           <SelectionButton
               label="Phone Number Visibility"
-              options={phoneVisibilityOptions}
+              options={[
+                { label: 'Show ', value: true },
+                { label: 'Hide ', value: false },
+              ]}
               selectedValue={formData.showPhonePublic}
               onSelect={(value) => updateFormData('showPhonePublic', value)}
               required
             />
+                            {formData.showPhonePublic === true && formData.contactPhone.length === 10 && (
+  <View style={styles.visibilityDisclaimer}>
+    <Ionicons name="information-circle" size={16} color="#7A5AF8" />
+    <Text style={styles.disclaimerTextShow}>
+      This number will be public
+    </Text>
+  </View>
+)}
+
+{formData.showPhonePublic === false && formData.contactPhone.length === 10 && (
+  <View style={styles.visibilityDisclaimerHide}>
+    <Ionicons name="information-circle" size={16} color="#7A5AF8" /> 
+    <Text style={styles.disclaimerTextHide}>
+      Users must message to see it
+    </Text>
+  </View>
+)}
+ 
+
 
             <View style={styles.summaryContainer}>
               <Text style={styles.summaryTitle}>📋 Listing Summary</Text>
@@ -241,7 +414,6 @@ const SharedRoomForm = () => {
 
   return (
     <SafeWrapper>
-  
     <View style={styles.container}>
       <FormHeader title="Shared Room Listing" />
       <ProgressBar 
@@ -277,13 +449,15 @@ const SharedRoomForm = () => {
     </View>
 
     </SafeWrapper>
+
+
   );
 };
 
 // File: PGHostelForm.js
 
 const PGHostelForm = () => {
-  
+   const locationData = useSelector((state) => state.location.locationData);
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 4;
 
@@ -301,6 +475,7 @@ const PGHostelForm = () => {
     rules: [],
     contactPhone: '',
     showPhonePublic: true,
+      category: 'pg_hostel',
   });
 
   const genderCategoryOptions = [
@@ -359,9 +534,145 @@ const PGHostelForm = () => {
     }
   };
 
-  const handleSubmit = () => {
-    console.log('PG/Hostel Form Data:', formData);
-    Alert.alert('Success', 'Your PG/Hostel listing has been submitted for review!');
+const handleSubmit = async () => {
+  try {
+    console.log(locationData, "location--------");
+
+    // 1️⃣ Validate required fields
+    const errors = [];
+
+    if (!formData.images || formData.images.length === 0) 
+      errors.push("Please select at least one image.");
+
+    if (!formData.title?.trim()) 
+      errors.push("Title is required.");
+
+    if (!formData.description?.trim()) 
+      errors.push("Description is required.");
+
+    if (!formData.availableSpace || isNaN(formData.availableSpace)) 
+      errors.push("Available space is required and must be a number.");
+
+    if (!formData.contactPhone?.trim()) 
+      errors.push("Contact phone is required.");
+
+    if (!formData.pgGenderCategory?.trim()) 
+      errors.push("Gender category is required.");
+
+    if (formData.roomTypesAvailable && !Array.isArray(formData.roomTypesAvailable)) 
+      errors.push("Please select at least one room type.");
+
+    // ✅ Price range validation
+    const minPrice = parseFloat(formData.priceRange?.min);
+    const maxPrice = parseFloat(formData.priceRange?.max);
+
+    if (isNaN(minPrice) || isNaN(maxPrice)) 
+      errors.push("Price range min and max must be numbers.");
+    else if (minPrice < 0 || maxPrice < 0) 
+      errors.push("Price range values cannot be negative.");
+    else if (minPrice > maxPrice) 
+      errors.push("Price range min cannot be greater than max.");
+
+    if (errors.length > 0) {
+      Alert.alert("Validation Error", errors.join("\n"));
+      return;
+    }
+
+    // 2️⃣ Compress images & create thumbnail
+    const timestamp = Date.now();
+    const compressedImages = await Promise.all(
+      formData.images.map(async (img, i) => {
+        let context = ImageManipulator.manipulate(img);
+        context.resize({ width: 1280 });
+        let result = await context.renderAsync();
+        let manip = await result.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
+
+        const info = await FileSystem.getInfoAsync(manip.uri);
+        if (info.size > 1000000) {
+          const context2 = ImageManipulator.manipulate(manip.uri);
+          const result2 = await context2.renderAsync();
+          manip = await result2.saveAsync({ compress: 0.5, format: SaveFormat.JPEG });
+        }
+
+        // First image thumbnail
+        if (i === 0) {
+          const thumbContext = ImageManipulator.manipulate(manip.uri);
+          thumbContext.resize({ width: 300 });
+          const thumbResult = await thumbContext.renderAsync();
+          const thumb = await thumbResult.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
+          manip.thumbnail = thumb.uri;
+        }
+
+        return manip;
+      })
+    );
+
+    // 3️⃣ Prepare FormData
+    const uploadData = new FormData();
+
+    // Append normal fields (EXCLUDING images and location)
+    Object.entries(formData).forEach(([key, value]) => {
+      if (key === "images" || key === "location") return; // skip images and location
+      if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
+        uploadData.append(key, JSON.stringify(value));
+      } else {
+        uploadData.append(key, String(value));
+      }
+    });
+
+    // Append location ONLY if we have valid locationData
+    if (locationData?.lat && locationData?.lng && locationData?.name) {
+      const geoLocation = {
+        type: "Point",
+        coordinates: [locationData.lng, locationData.lat],
+        fullAddress: locationData.name,
+      };
+      uploadData.append("location", JSON.stringify(geoLocation));
+    }
+
+    // Append images
+    compressedImages.forEach((img, i) => {
+      uploadData.append("images", {
+        uri: img.uri,
+        name: `property_${timestamp}_${i}.jpg`,
+        type: "image/jpeg",
+      });
+    });
+
+    // Append first image thumbnail
+    if (compressedImages[0]?.thumbnail) {
+      uploadData.append("thumbnail", {
+        uri: compressedImages[0].thumbnail,
+        name: `thumbnail_${timestamp}.jpg`,
+        type: "image/jpeg",
+      });
+    }
+
+    // 4️⃣ Upload to API
+    console.log("API calling started...", uploadData);
+
+    const res = await api.post(`${apiUrl}/api/rooms`, uploadData, {
+      timeout: 60000,
+      headers: { 'Content-Type': 'multipart/form-data' },
+      transformRequest: (data) => data,
+      onUploadProgress: (progressEvent) => {
+        console.log("Upload progress:", Math.round((progressEvent.loaded / progressEvent.total) * 100) + "%");
+      },
+    });
+
+    console.log("✅ Uploaded successfully:", res.data);
+    Alert.alert("Success", "Your PG/Hostel listing has been submitted!");
+
+  } catch (err) {
+    console.error("❌ Upload failed:", err);
+    let errorMessage = "Something went wrong while submitting your listing.";
+    if (err.code === 'NETWORK_ERROR') {
+      errorMessage = "Network connection failed. Please check your internet connection.";
+    } else if (err.response?.status) {
+      errorMessage = `Server error (${err.response.status}): ${err.response.data?.message || 'Unknown error'}`;
+    }
+    Alert.alert("Error", errorMessage);
+  }
   };
 
   const renderStepContent = () => {
@@ -506,14 +817,15 @@ const PGHostelForm = () => {
               multiSelect
             />
 
-            <InputField
+            <PhoneInputField
               label="Contact Phone"
               value={formData.contactPhone}
               onChangeText={(value) => updateFormData('contactPhone', value)}
-              placeholder="+91 9876543210"
               keyboardType="phone-pad"
               required
             />
+
+ 
 
             <SelectionButton
               label="Phone Number Visibility"
@@ -525,6 +837,24 @@ const PGHostelForm = () => {
               onSelect={(value) => updateFormData('showPhonePublic', value)}
               required
             />
+
+                                                   {formData.showPhonePublic === true && formData.contactPhone.length === 10 &&  (
+  <View style={styles.visibilityDisclaimer}>
+    <Ionicons name="information-circle" size={16} color="#7A5AF8" />
+    <Text style={styles.disclaimerTextShow}>
+      This number will be public
+    </Text>
+  </View>
+)}
+
+{formData.showPhonePublic === false && formData.contactPhone.length === 10 && (
+  <View style={styles.visibilityDisclaimerHide}>
+    <Ionicons name="information-circle" size={16} color="#7A5AF8" /> 
+    <Text style={styles.disclaimerTextHide}>
+      Users must message to see it
+    </Text>
+  </View>
+)}
 
             <View style={styles.summaryContainer}>
               <Text style={styles.summaryTitle}>📋 Listing Summary</Text>
@@ -604,7 +934,7 @@ const PGHostelForm = () => {
 // File: FlatHomeForm.js
 
 const FlatHomeForm = () => {
- 
+   const locationData = useSelector((state) => state.location.locationData);
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 4;
 
@@ -627,6 +957,7 @@ const FlatHomeForm = () => {
     parking: '',
     contactPhone: '',
     showPhonePublic: true,
+    category:'flat_home',
   });
 
   const propertyTypeOptions = [
@@ -672,9 +1003,118 @@ const FlatHomeForm = () => {
     }
   };
 
-  const handleSubmit = () => {
-    console.log('Flat/Home Form Data:', formData);
-    Alert.alert('Success', 'Your property listing has been submitted for review!');
+  const handleSubmit = async () => {
+   try {
+    console.log(locationData, "location--------");
+
+    // 1️⃣ Validate required fields
+    const errors = [];
+    if (!formData.images || formData.images.length === 0) errors.push("Please select at least one image.");
+    if (!formData.title?.trim()) errors.push("Title is required.");
+    if (!formData.description?.trim()) errors.push("Description is required.");
+    if (!formData.monthlyRent || isNaN(formData.monthlyRent)) errors.push("Monthly rent is required and must be a number.");
+    if (!formData.securityDeposit || isNaN(formData.securityDeposit)) errors.push("Security deposit is required and must be a number.");
+    if (!formData.contactPhone?.trim()) errors.push("Contact phone is required.");
+
+    if (errors.length > 0) {
+      Alert.alert("Validation Error", errors.join("\n"));
+      return;
+    }
+
+    // 2️⃣ Compress images & create thumbnail
+    const timestamp = Date.now();
+    const compressedImages = await Promise.all(
+      formData.images.map(async (img, i) => {
+        let context = ImageManipulator.manipulate(img);
+        context.resize({ width: 1280 });
+        let result = await context.renderAsync();
+        let manip = await result.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
+
+        const info = await FileSystem.getInfoAsync(manip.uri);
+        if (info.size > 1000000) {
+          const context2 = ImageManipulator.manipulate(manip.uri);
+          const result2 = await context2.renderAsync();
+          manip = await result2.saveAsync({ compress: 0.5, format: SaveFormat.JPEG });
+        }
+
+        // First image thumbnail
+        if (i === 0) {
+          const thumbContext = ImageManipulator.manipulate(manip.uri);
+          thumbContext.resize({ width: 300 });
+          const thumbResult = await thumbContext.renderAsync();
+          const thumb = await thumbResult.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
+          manip.thumbnail = thumb.uri;
+        }
+
+        return manip;
+      })
+    );
+
+    // 3️⃣ Prepare FormData
+    const uploadData = new FormData();
+
+    // Append normal fields (EXCLUDING images and location)
+    Object.entries(formData).forEach(([key, value]) => {
+      if (key === "images" || key === "location") return;
+      if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
+        uploadData.append(key, JSON.stringify(value));
+      } else {
+        uploadData.append(key, String(value));
+      }
+    });
+
+    // Append location ONLY if we have valid locationData
+    if (locationData?.lat && locationData?.lng && locationData?.name) {
+      const geoLocation = {
+        type: "Point",
+        coordinates: [locationData.lng, locationData.lat],
+        fullAddress: locationData.name,
+      };
+      uploadData.append("location", JSON.stringify(geoLocation));
+    }
+
+    // Append images
+    compressedImages.forEach((img, i) => {
+      uploadData.append("images", {
+        uri: img.uri,
+        name: `property_${timestamp}_${i}.jpg`,
+        type: "image/jpeg",
+      });
+    });
+
+    // Append first image thumbnail
+    if (compressedImages[0]?.thumbnail) {
+      uploadData.append("thumbnail", {
+        uri: compressedImages[0].thumbnail,
+        name: `thumbnail_${timestamp}.jpg`,
+        type: "image/jpeg",
+      });
+    }
+
+    // 4️⃣ Upload to API
+    console.log("API calling started...", uploadData);
+    const res = await api.post(`${apiUrl}/api/rooms`, uploadData, {
+      timeout: 60000,
+      headers: { 'Content-Type': 'multipart/form-data' },
+      transformRequest: (data) => data,
+      onUploadProgress: (progressEvent) => {
+        console.log("Upload progress:", Math.round((progressEvent.loaded / progressEvent.total) * 100) + "%");
+      },
+    });
+
+    console.log("✅ Uploaded successfully:", res.data);
+    Alert.alert("Success", "Your flat/home listing has been submitted!");
+
+  } catch (err) {
+    console.error("❌ Upload failed:", err);
+    let errorMessage = "Something went wrong while submitting your listing.";
+    if (err.code === 'NETWORK_ERROR') {
+      errorMessage = "Network connection failed. Please check your internet connection.";
+    } else if (err.response?.status) {
+      errorMessage = `Server error (${err.response.status}): ${err.response.data?.message || 'Unknown error'}`;
+    }
+    Alert.alert("Error", errorMessage);
+  }
   };
 
   const renderStepContent = () => {
@@ -841,7 +1281,7 @@ const FlatHomeForm = () => {
               required
             />
 
-            <InputField
+            <PhoneInputField
               label="Contact Phone"
               value={formData.contactPhone}
               onChangeText={(value) => updateFormData('contactPhone', value)}
@@ -853,13 +1293,38 @@ const FlatHomeForm = () => {
             <SelectionButton
               label="Phone Number Visibility"
               options={[
-                { label: 'Show ', value: false },
-                { label: 'Hide ', value: true },
+                { label: 'Hide ', value: false },
+                { label: 'Show ', value: true },
               ]}
               selectedValue={formData.showPhonePublic}
               onSelect={(value) => updateFormData('showPhonePublic', value)}
               required
             />
+    
+
+                                                            {formData.showPhonePublic === true && formData.contactPhone.length === 10 &&  (
+  <View style={styles.visibilityDisclaimer}>
+    <Ionicons name="information-circle" size={16} color="#7A5AF8" />
+    <Text style={styles.disclaimerTextShow}>
+      This number will be public
+    </Text>
+  </View>
+)}
+
+{formData.showPhonePublic === false && formData.contactPhone.length === 10 && (
+  <View style={styles.visibilityDisclaimerHide}>
+    <Ionicons name="information-circle" size={16} color="#7A5AF8" /> 
+    <Text style={styles.disclaimerTextHide}>
+      Users must message to see it
+    </Text>
+  </View>
+)}
+
+
+
+
+
+
 
             <View style={styles.summaryContainer}>
               <Text style={styles.summaryTitle}>📋 Listing Summary</Text>
@@ -938,6 +1403,44 @@ const FlatHomeForm = () => {
 
 // Common Styles for all forms
 const styles = StyleSheet.create({
+  visibilityDisclaimer: {
+  flexDirection: 'row',
+  alignItems: 'flex-start',
+  backgroundColor: '#F3F0FF',
+  borderLeftWidth: 3,
+  borderLeftColor: '#7A5AF8',
+  paddingVertical: 12,
+  paddingHorizontal: 14,
+  borderRadius: 8,
+  marginTop: -10,
+  marginBottom: 20,
+  gap: 10,
+},
+disclaimerTextShow: {
+  flex: 1,
+  fontSize: 13,
+  // color: '#389E0D',
+  lineHeight: 18,
+},
+visibilityDisclaimerHide: {
+  flexDirection: 'row',
+  alignItems: 'flex-start',
+  backgroundColor: '#F3F0FF',
+  borderLeftWidth: 3,
+  borderLeftColor: '#7A5AF8',
+  paddingVertical: 12,
+  paddingHorizontal: 14,
+  borderRadius: 8,
+  marginTop: -10,
+  marginBottom: 20,
+  gap: 10,
+},
+disclaimerTextHide: {
+  flex: 1,
+  fontSize: 13,
+  // color: '#7A5AF8',
+  lineHeight: 18,
+},
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',

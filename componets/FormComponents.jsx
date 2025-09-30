@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { useSelector } from 'react-redux';
+import { router } from 'expo-router';
 // Input Field Component
 export const InputField = ({ 
   label, 
@@ -105,6 +107,71 @@ export const SelectionButton = ({
         ))}
       </View>
     </View>
+  );
+};
+
+ export const PhoneInputField = ({ 
+  label, 
+  value, 
+  onChangeText, 
+  required = false,
+  error = ''
+}) => {
+  const handlePhoneChange = (text) => {
+    // Remove any non-numeric characters
+    const numericValue = text.replace(/[^0-9]/g, '');
+    
+    // Limit to 10 digits
+    if (numericValue.length <= 10) {
+      onChangeText(numericValue);
+    }
+  };
+
+  const isValid = value.length === 10;
+  const showError = value.length > 0 && !isValid;
+
+  return (
+  <View style={styles.container}>
+  <Text style={styles.label}>
+    {label} {required && <Text style={styles.required}>*</Text>}
+  </Text>
+  
+  <View style={[
+    styles.inputContainer2,
+    showError && styles.inputContainerError
+  ]}>
+    <Text style={styles.prefixText}>🇮🇳  +91</Text>
+    
+    <TextInput
+      style={styles.input}
+      value={value}
+      onChangeText={handlePhoneChange}
+      placeholder="9876543210"
+      keyboardType="phone-pad"
+      maxLength={10}
+      placeholderTextColor="#999"
+    />
+    
+    <Text style={[
+      styles.counterText,
+      value.length === 10 && styles.counterComplete
+    ]}>
+      {value.length}/10
+    </Text>
+  </View>
+
+  {showError && (
+    <Text style={styles.errorText}>
+      Phone number must be exactly 10 digits
+    </Text>
+  )}
+
+  {/* {isValid && (
+    <Text style={styles.successText}>
+      ✓ Valid phone number
+    </Text>
+  )} */}
+</View>
   );
 };
 
@@ -206,47 +273,34 @@ export const PriceRangeInput = ({
 
 // Location Section Component
 export const LocationSection = ({ 
-  locationData, 
+ 
   onLocationChange, 
   required = false 
 }) => {
-  const [storedLocation, setStoredLocation] = useState(null);
+const locationData = useSelector(state => state.location.locationData);
+const [localLocation, setLocalLocation] = useState(locationData);
+
+// Sync only if Redux changed and user hasn't typed something
+useEffect(() => {
+  setLocalLocation(locationData);
+}, [locationData]);
+
   const [loading, setLoading] = useState(false);
 
-  React.useEffect(() => {
-    loadStoredLocation();
-  }, []);
 
-  const loadStoredLocation = async () => {
-    try {
-      setLoading(true);
-      const stored = await AsyncStorage.getItem('locationDetails');
-      if (stored) {
-        const locationDetails = JSON.parse(stored);
-        setStoredLocation(locationDetails.name);
-        console.log(locationDetails.name,"stored location details");
-        
-        // If no location data is provided, use stored location
-        if (!locationData || !locationData.fullAddress) {
-          onLocationChange(locationDetails);
-        }
-      }
-    } catch (error) {
-      console.log('Error loading stored location:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+
+
+
 
   const handleChangeLocation = () => {
-    Alert.alert(
-      'Change Location',
-      'Location change functionality will be implemented here',
-      [{ text: 'OK' }]
-    );
+   router.push({
+  pathname: "/locationScreen",
+  params: { returnTo: "/sharedroomform" ,fromForm: "true"}
+});
+    
   };
 
-  const displayLocation = locationData || storedLocation;
+  const displayLocation = localLocation?.name 
   console.log(displayLocation, "display location details--");
   
   return (
@@ -265,7 +319,7 @@ export const LocationSection = ({
             <Text style={styles.locationIcon}>📍</Text>
             <View style={styles.locationDetails}>
               <Text style={styles.locationAddress}>
-                {displayLocation.name}
+                {displayLocation}
               </Text>
             
             </View>
@@ -390,65 +444,139 @@ export const ImageUploadSection = ({
 
   const canAddMore = !images || images.length < maxImages;
 
+  
   return (
-    <View style={styles.imageContainer}>
-      <Text style={styles.inputLabel}>
-        Property Images {required && <Text style={styles.required}>*</Text>}
-      </Text>
-      <Text style={styles.imageSubtext}>
-        Add up to {maxImages} photos to showcase your property
-      </Text>
+<View style={styles.imageContainer}>
+  <Text style={styles.inputLabel}>
+    Property Images {required && <Text style={styles.required}>*</Text>}
+  </Text>
+  <Text style={styles.imageSubtext}>
+    Add up to {maxImages} photos to showcase your property
+  </Text>
+    <View style={styles.disclaimerContainer}>
+    <Ionicons name="information-circle" size={18} color="#7A5AF8" />
+    <Text style={styles.disclaimerText}>
+      First image will be used as thumbnail
+    </Text>
+  </View>
 
-      {/* Image Previews */}
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false} 
-        style={styles.imageScrollView}
-      >
-        {images?.map((imageUri, index) => (
-          <View key={index} style={styles.imagePreview}>
-            <Image source={{ uri: imageUri }} style={styles.previewImage} />
-            <TouchableOpacity
-              style={styles.removeImageButton}
-              onPress={() => handleRemoveImage(index)}
-            >
-              <Text style={styles.removeImageText}>×</Text>
-            </TouchableOpacity>
+  {/* Thumbnail Disclaimer */}
+
+
+  {/* Image Previews */}
+  <ScrollView 
+    horizontal 
+    showsHorizontalScrollIndicator={false} 
+    style={styles.imageScrollView}
+  >
+    {images?.map((imageUri, index) => (
+      <View key={index} style={styles.imagePreview}>
+        <Image source={{ uri: imageUri }} style={styles.previewImage} />
+        {index === 0 && (
+          <View style={styles.thumbnailBadge}>
+            <Text style={styles.thumbnailBadgeText}>Main</Text>
           </View>
-        ))}
-      </ScrollView>
+        )}
+        <TouchableOpacity
+          style={styles.removeImageButton}
+          onPress={() => handleRemoveImage(index)}
+        >
+          <Text style={styles.removeImageText}>×</Text>
+        </TouchableOpacity>
+      </View>
+    ))}
+  </ScrollView>
 
-      {/* Action Buttons */}
-      {canAddMore && (
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity 
-            style={styles.actionButton} 
-            onPress={handleTakePhoto}
-          >
-            <Ionicons name="camera" size={20} color="#7A5AF8" />
-            <Text style={styles.buttonText}>Take Photo</Text>
-          </TouchableOpacity>
+  {/* Action Buttons */}
+  {canAddMore && (
+    <View style={styles.buttonContainer}>
+      <TouchableOpacity 
+        style={styles.actionButton} 
+        onPress={handleTakePhoto}
+      >
+        <Ionicons name="camera" size={20} color="#7A5AF8" />
+        <Text style={styles.buttonText}>Take Photo</Text>
+      </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.actionButton} 
-            onPress={handleChooseFromGallery}
-          >
-            <Ionicons name="images" size={20} color="#7A5AF8" />
-            <Text style={styles.buttonText}>Choose from Gallery</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {!canAddMore && (
-        <Text style={styles.limitText}>
-          Maximum {maxImages} images reached
-        </Text>
-      )}
+      <TouchableOpacity 
+        style={styles.actionButton} 
+        onPress={handleChooseFromGallery}
+      >
+        <Ionicons name="images" size={20} color="#7A5AF8" />
+        <Text style={styles.buttonText}>Choose from Gallery</Text>
+      </TouchableOpacity>
     </View>
+  )}
+
+  {!canAddMore && (
+    <Text style={styles.limitText}>
+      Maximum {maxImages} images reached
+    </Text>
+  )}
+</View>
   );
 };
 
 const styles = StyleSheet.create({
+container: {
+  marginBottom: 20,
+
+},
+label: {
+  fontSize: 16,
+  fontWeight: '600',
+  color: '#1a1a1a',
+  marginBottom: 8,
+},
+required: {
+  color: '#FF4D4F',
+},
+inputContainer2: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  borderWidth: 1.5,
+  borderColor: '#E0E0E0',
+  borderRadius: 12,
+ 
+  paddingHorizontal: 14,
+  paddingVertical: 4,
+},
+inputContainerError: {
+  borderColor: '#FF4D4F',
+},
+prefixText: {
+  fontSize: 16,
+  fontWeight: '500',
+  // color: '#7A5AF8',
+  marginRight: 5,
+  marginLeft: 1,
+},
+input: {
+  flex: 1,
+  paddingVertical: 12,
+  fontSize: 16,
+  color: '#1a1a1a',
+},
+counterText: {
+  fontSize: 12,
+  color: '#999',
+  fontWeight: '500',
+  marginLeft: 8,
+},
+counterComplete: {
+  color: '#52C41A',
+  fontWeight: '600',
+},
+errorText: {
+  fontSize: 13,
+  color: '#FF4D4F',
+  marginTop: 6,
+},
+successText: {
+  fontSize: 13,
+  color: '#52C41A',
+  marginTop: 6,
+},
   inputContainer: {
     marginBottom: 24,
   },
@@ -471,6 +599,36 @@ const styles = StyleSheet.create({
     color: '#333333',
     backgroundColor: '#FFFFFF',
   },
+  disclaimerContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  // backgroundColor: '#F3F0FF',
+  // paddingVertical: 10,
+  // paddingHorizontal: 12,
+  borderRadius: 8,
+  marginBottom: 12,
+  gap: 8,
+},
+disclaimerText: {
+  flex: 1,
+  fontSize: 13,
+  color: '#7A5AF8',
+  lineHeight: 18,
+},
+thumbnailBadge: {
+  position: 'absolute',
+  top: 8,
+  left: 8,
+  backgroundColor: '#7A5AF8',
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 4,
+},
+thumbnailBadgeText: {
+  color: '#FFFFFF',
+  fontSize: 11,
+  fontWeight: '600',
+},
   multilineInput: {
     height: 100,
     textAlignVertical: 'top',
@@ -668,7 +826,7 @@ flexWrap: 'wrap',
   imageSubtext: {
     fontSize: 14,
     color: '#666666',
-    marginBottom: 12,
+    marginBottom: 6,
   },
   imageScrollView: {
     flexDirection: 'row',

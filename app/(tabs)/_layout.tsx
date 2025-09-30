@@ -1,9 +1,4 @@
-// import React, { useRef } from 'react';
-// import { View, Text, Dimensions, StatusBar, Pressable } from 'react-native';
-// import { router, Tabs } from 'expo-router';
-// import { FontAwesome6, Ionicons, MaterialCommunityIcons, MaterialIcons, Octicons, SimpleLineIcons } from '@expo/vector-icons';
-// import { useSafeAreaInsets } from 'react-native-safe-area-context';
-// import Animated, { useSharedValue, withSpring, useAnimatedStyle } from 'react-native-reanimated';
+
 import React, { useRef } from 'react';
 import { View, Text, Pressable, Dimensions } from 'react-native';
 
@@ -13,6 +8,7 @@ import { FontAwesome6, SimpleLineIcons, Ionicons, MaterialCommunityIcons } from 
 import { router } from 'expo-router';
 import { Animated } from 'react-native';
 import { preventDoubleTap } from '../../services/debounfunc';
+import { StatusBar } from 'expo-status-bar';
 const { width } = Dimensions.get('window');
 
 export default function TabLayout() {
@@ -42,6 +38,7 @@ const handlePressOut = () => {
 
   return (
     <>
+    
       <Tabs
         screenOptions={{
           headerShown: false,

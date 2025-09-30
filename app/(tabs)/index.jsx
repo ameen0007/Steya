@@ -1,112 +1,138 @@
-// Example usage in HomeScreen.js
-import React, { useState, useEffect } from 'react';
-import { FlatList, View } from 'react-native';
-import { LocationHeader } from '../../componets/locationfilter'; // Filter at the top
-import SharedCard from '../../componets/sharecard'; // Cards for Shared Room
-import PGCard from '../../componets/pgcard'; // Cards for PG/Hostel
-import FlatCard from '../../componets/flatcard'; // Cards for Flats/Home
-import SafeWrapper from '../../services/Safewrapper';
-import { dummyListings } from '../../services/dummyListings'; 
-import { StatusBar } from 'expo-status-bar';
+import React, { useState, useEffect } from "react";
+import { FlatList, View } from "react-native";
+import { LocationHeader } from "../../componets/locationfilter";
+import SharedCard from "../../componets/sharecard";
+import PGCard from "../../componets/pgcard";
+import FlatCard from "../../componets/flatcard";
+import { SkeletonList } from "../../componets/loading"; // Import skeleton
+import SafeWrapper from "../../services/Safewrapper";
+import axios from "axios";
+import { useSelector } from "react-redux";
 
 const filterMap = {
-  "All": "all",
+  All: "all",
   "Shared Rooms": "shared",
   "PG/Hostels": "pg_hostel",
-  "Rental Property": "flat_home"
+  "Rental Property": "flat_home",
 };
 
 const HomeScreen = () => {
-  const [activeFilter, setActiveFilter] = useState('All'); // Default is 'All'
-  const [filterParams, setFilterParams] = useState({});
+  const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+  const locationData = useSelector((state) => state.location.locationData);
+  const [activeFilter, setActiveFilter] = useState("All");
+  const [rooms, setRooms] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(true);
 
-  const filteredListings = dummyListings.filter((listing) => {
-    // First filter by category
-    const selectedCategory = filterMap[activeFilter];
-    const categoryMatch = selectedCategory === "all" ? true : listing.category === selectedCategory;
-    
-    if (!categoryMatch) return false;
-    
-    // Then apply additional filters if any
-    if (Object.keys(filterParams).length === 0) return true;
-    
-    // Additional filtering logic based on the filter parameters
-    // This is where you would implement your custom filtering logic
-    // based on the selections made in the FilterModal
-    
-    // Example filtering (you'll need to adapt this to your data structure):
-    let matchesFilters = true;
-    
-    Object.entries(filterParams).forEach(([key, filter]) => {
-      if (!filter.selected) return; // Skip filters that aren't selected
-      
-      // Handle different filter types
-      if (filter.options) {
-        // For multi-select options
-        const selectedOptions = filter.options
-          .filter(opt => opt.selected)
-          .map(opt => opt.label);
-        
-        if (selectedOptions.length > 0) {
-          // Check if listing has any of the selected options
-          // This is an example - adapt to your data structure
-          if (listing[key] && !selectedOptions.includes(listing[key])) {
-            matchesFilters = false;
-          }
-        }
-      } else if (filter.currentMin !== undefined && filter.currentMax !== undefined) {
-        // For range filters
-        const value = listing[key];
-        if (value !== undefined && (value < filter.currentMin || value > filter.currentMax)) {
-          matchesFilters = false;
-        }
-      } else if (filter.value !== undefined) {
-        // For toggle filters
-        if (listing[key] !== filter.value) {
-          matchesFilters = false;
-        }
+  const limit = 15;
+  const userLat = locationData?.lat;
+  const userLng = locationData?.lng;
+
+  const radiusBuckets = [
+    { min: 0, max: 5000 },
+    { min: 5000, max: 10000 },
+    { min: 10000, max: 15000 },
+    { min: 15000, max: 25000 },
+    { min: 25000, max: 40000 }
+  ];
+
+  const [currentBucket, setCurrentBucket] = useState(0);
+
+  const fetchRooms = async (reset = false) => {
+    if (loading || !userLat || !userLng) return;
+    setLoading(true);
+
+    try {
+      let bucketIndex = currentBucket;
+      if (reset) {
+        setRooms([]);
+        setInitialLoading(true);
+        bucketIndex = 0;
+        setCurrentBucket(0);
+        setHasMore(true);
       }
-    });
-    
-    return matchesFilters;
-  });
 
-  // Function to receive filter params from LocationHeader
-  const handleFilterUpdate = (filters) => {
-    setFilterParams(filters);
+      const categoryParam = filterMap[activeFilter] === "all" ? undefined : filterMap[activeFilter];
+      const bucket = radiusBuckets[bucketIndex];
+
+      const res = await axios.get(`${apiUrl}/api/getrooms`, {
+        params: {
+          category: categoryParam,
+          lat: userLat,
+          lng: userLng,
+          limit,
+          min: bucket.min,
+          max: bucket.max,
+        },
+      });
+
+      if (res.data.success) {
+        const newRooms = res.data.rooms;
+
+        setRooms(prev => {
+          const combined = reset ? newRooms : [...prev, ...newRooms];
+          const unique = combined.filter((v, i, a) => a.findIndex(t => t._id === v._id) === i);
+
+          if (newRooms.length === 0 && bucketIndex < radiusBuckets.length - 1) {
+            setCurrentBucket(bucketIndex + 1);
+          }
+
+          setHasMore(newRooms.length === limit);
+          return unique;
+        });
+      }
+    } catch (err) {
+      console.error("Fetch error:", err);
+    } finally {
+      setLoading(false);
+      setInitialLoading(false);
+    }
   };
 
-  // Properly defined renderItem function
+  useEffect(() => {
+    fetchRooms(true);
+  }, [activeFilter, userLat, userLng]);
+
   const renderItem = ({ item }) => {
-    if (item.category === 'shared') {
-      return <SharedCard data={item} activeFilter={activeFilter} />;
-    } else if (item.category === 'pg_hostel') {
-      return <PGCard data={item} activeFilter={activeFilter} />;
-    } else if (item.category === 'flat_home') {
-      return <FlatCard data={item} activeFilter={activeFilter} />;
-    }
-    return null; // If category doesn't match
+    if (item.category === "shared") return <SharedCard data={item} activeFilter={activeFilter} />;
+    if (item.category === "pg_hostel") return <PGCard data={item} activeFilter={activeFilter} />;
+    if (item.category === "flat_home") return <FlatCard data={item} activeFilter={activeFilter} />;
+    return null;
+  };
+
+  const handleEndReached = () => {
+    if (!loading && hasMore) fetchRooms();
+  };
+
+  // Get skeleton type based on active filter
+  const getSkeletonType = () => {
+    const category = filterMap[activeFilter];
+    if (category === "all") return "shared"; // default for all
+    return category;
   };
 
   return (
-    <>
-      <StatusBar style="dark" translucent  />
-      <SafeWrapper>
-        <View style={{ flex: 1 }}>
-          <LocationHeader 
-            setActiveFilter={setActiveFilter} 
-            activeFilter={activeFilter}
-            onFilterUpdate={handleFilterUpdate} 
-          />
+    <SafeWrapper>
+      <View style={{ flex: 1 }}>
+        <LocationHeader setActiveFilter={setActiveFilter} activeFilter={activeFilter} />
+        
+        {initialLoading ? (
+          <SkeletonList type={getSkeletonType()} count={5} />
+        ) : (
           <FlatList
-            data={filteredListings}
+            data={rooms}
             renderItem={renderItem}
             keyExtractor={(item) => item._id}
             contentContainerStyle={{ padding: 5 }}
+            onEndReached={handleEndReached}
+            onEndReachedThreshold={0.5}
+            refreshing={loading && !initialLoading}
+            onRefresh={() => fetchRooms(true)}
           />
-        </View>
-      </SafeWrapper>
-    </>
+        )}
+      </View>
+    </SafeWrapper>
   );
 };
 

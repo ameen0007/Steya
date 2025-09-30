@@ -32,7 +32,7 @@ const [activeCategory, setActiveCategory] = useState("shared");
 
   const getFilterIcon = (filterName) => {
     switch(filterName) {
-      case 'Shared Rooms': return 'slideshare';
+      case 'Shared Rooms': return 'people';
       case 'PG/Hostels': return 'business-sharp';
       case 'Rental Property': return 'home-city'; 
     }
@@ -99,10 +99,10 @@ const handleApplyFilters = (filters) => {
         <TouchableOpacity style={styles.leftContainer} onPress={handleLocationPress}>
           <View style={styles.topRow}>
             <FontAwesome5 name="location-arrow" size={18} color="#7A5AF8" />
-            <Text style={styles.locatingText}>Locating...</Text>
+            <Text style={styles.locatingText}>Nearby rooms in...</Text>
           </View>
           <Text style={styles.addressText} numberOfLines={1}>
-            {locationData}...
+            {locationData.name}...
           </Text>
         </TouchableOpacity>
 
@@ -146,7 +146,7 @@ const handleApplyFilters = (filters) => {
               <View style={styles.filterContent}>
               {iconName && (
   filter === 'Shared Rooms' ? (
-    <Entypo 
+    <Ionicons 
       name={iconName} 
       size={16} 
       color={activeFilter === filter ? '#fff' : '#7A5AF8'} 
@@ -156,14 +156,14 @@ const handleApplyFilters = (filters) => {
     <MaterialCommunityIcons 
       name={iconName}
       size={16}
-      color={activeFilter === filter ? '#fff' : '#7A5AF8'}
+      color={activeFilter === filter ? '#fff' : '#6ED5D0'}
       style={styles.filterIcon}
     />
   ) : (
     <Ionicons 
       name={iconName} 
       size={16} 
-      color={activeFilter === filter ? '#fff' : '#7A5AF8'} 
+      color={activeFilter === filter ? '#fff' : '#FF6B6B'} 
       style={styles.filterIcon}
     />
   )
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins',
   },
   addressText: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#757575',
     fontFamily: 'Poppinssm',
     letterSpacing: 0.4,

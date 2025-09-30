@@ -20,15 +20,21 @@ import { preventDoubleTap } from '../services/debounfunc';
 
 
   import { useDispatch, useSelector } from 'react-redux';
+import { setLocationData } from './Redux/LocationSlice';
 
 export default function Login() {
+
+ const apiUrl = process.env.EXPO_PUBLIC_API_URL
+
+ const dispatch = useDispatch();
+
 const [isReady, setIsReady] = useState(false);
 GoogleSignin.configure({
   webClientId: "593177901144-ttbib4ng7ff5trbq1csuhhec9m8ddmi5.apps.googleusercontent.com",
   offlineAccess: true,
 });
 
-const dispatch = useDispatch();
+
   const router = useRouter();
        const locationData = useSelector((state) => state.location.locationData);
 
@@ -46,19 +52,6 @@ const dispatch = useDispatch();
     }
   }, [from]);
 
-
-
-//   useEffect(() => {
-//     const signOut = async () => {
-//   try {
-//     await GoogleSignin.signOut();
-   
-//   } catch (error) {
-//     console.error(error);
-//   }
-// };
-// signOut()
-//   }, [])
 
 const handleGuestLogin = async () => {
   try {
@@ -107,58 +100,98 @@ useFocusEffect(
 const handleGoogleLogin = async () => {
   preventDoubleTap(async () => {
     try {
+      console.log("🔄 Starting Google login...");
+
+      // Check Play Services
       await GoogleSignin.hasPlayServices();
+      console.log("✅ Google Play Services available");
+
+      // Try sign-in
       const userInfo = await GoogleSignin.signIn();
+      console.log("📥 Google userInfo response:", JSON.stringify(userInfo, null, 2));
 
       if (isSuccessResponse(userInfo)) {
+        console.log("✅ Google sign-in success, proceeding...");
 
-        const isFirstLaunch = await AsyncStorage.getItem('isFirstLaunch');
+        const isFirstLaunch = await AsyncStorage.getItem("isFirstLaunch");
+        console.log("📌 isFirstLaunch:", isFirstLaunch);
 
-        // Remove guest flag if exists
-        const userType = await AsyncStorage.getItem('userType');
-        if (userType === 'GuestUser') {
-          await AsyncStorage.removeItem('userType');
+        const userType = await AsyncStorage.getItem("userType");
+        console.log("📌 userType before login:", userType);
+
+        if (userType === "GuestUser") {
+          console.log("🗑 Removing GuestUser flag...");
+          await AsyncStorage.removeItem("userType");
         }
 
-        // Set isFirstLaunch only if not already
         if (!isFirstLaunch) {
-          await AsyncStorage.setItem('isFirstLaunch', 'true');
+          console.log("🆕 Setting isFirstLaunch...");
+          await AsyncStorage.setItem("isFirstLaunch", "true");
         }
 
-        // Save user data in Redux
-        dispatch(setUserData(userInfo));
-        console.log("--------in Google login");
+        // Token
+        const idToken = userInfo.data?.idToken;
+        if (!idToken) {
+          console.log("❌ No idToken found in userInfo");
+          return;
+        }
+        console.log("🔑 idToken received");
 
-        // Navigate based on location
+        // API call
+        console.log("🌐 Sending token to backend:", `${apiUrl}/api/auth/google-login`);
+        const res = await axios.post(`${apiUrl}/api/auth/google-login`, { idToken });
+
+        console.log("📥 Backend response:", JSON.stringify(res.data, null, 2));
+
+        // Location
+        if (res.data.user?.location) {
+          console.log("📍 Setting location from backend:", res.data.user.location);
+          dispatch(setLocationData(res.data.user.location));
+        } else {
+          console.log("⚠️ No location data in backend response");
+        }
+
+        // Save auth
+        await AsyncStorage.setItem("authToken", res.data.accessToken);
+        console.log("💾 Auth token saved");
+     
+        
+        await AsyncStorage.setItem("userId", res.data.user._id);
+        dispatch(setUserData(res.data.user));
+        console.log("👤 User data saved in Redux");
+
+        // Navigation
         if (locationData) {
+          console.log("➡️ Navigating to tabs");
           router.replace("(tabs)");
         } else {
-          console.log("======================in Google location");
+          console.log("➡️ Navigating to location screen");
           router.replace("/locationScreen");
         }
-
       } else {
-        console.log('Google sign-in cancelled');
+        console.log("⚠️ Google sign-in cancelled");
       }
-
     } catch (error) {
+      console.log("❌ Error during Google sign-in:", error);
+
       if (isErrorWithCode(error)) {
         switch (error.code) {
           case statusCodes.IN_PROGRESS:
-            console.log('Google sign-in in progress');
+            console.log("⚠️ Google sign-in already in progress");
             break;
           case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
-            console.log('Google Play Services not available or outdated');
+            console.log("❌ Google Play Services not available or outdated");
             break;
           default:
-            console.log('Some other Google sign-in error:', error);
+            console.log("❌ Google sign-in error with code:", error.code, error.message);
         }
       } else {
-        console.log('Non-Google sign-in error:', error);
+        console.log("❌ Non-Google sign-in error:", error);
       }
     }
   });
 };
+
 
 
   return (
@@ -235,8 +268,8 @@ const handleGoogleLogin = async () => {
       onPress={handleGoogleLogin}
     >
       <Image
-        source={{ uri: 'https://cdn-icons-png.flaticon.com/512/2991/2991148.png' }}
-        style={styles.googleIcon}
+        source={require('../assets/images/googleLogo.png')}
+        style={styles.googleIcon1}
       />
       <Text style={styles.googleButtonText}>Login with google</Text>
     </TouchableOpacity>
@@ -254,10 +287,10 @@ const handleGoogleLogin = async () => {
   }
     >
       <Image
-     source={{ uri: 'https://cdn-icons-png.flaticon.com/128/14591/14591158.png' }}
+     source={require('../assets/images/guestlogo.png')}
         style={styles.googleIcon}
       />
-      <Text style={styles.googleButtonText}> Continue as guest </Text>
+      <Text style={styles.googleButtonText}>Continue as Guest</Text>
     </TouchableOpacity>
     </View>
 
@@ -396,7 +429,7 @@ orText: {
   googleButton: {
     flexDirection: 'row',
     backgroundColor: 'white',
-    paddingVertical: 11,
+    paddingVertical: 9,
     paddingHorizontal: 50,
     borderRadius: 30,
     alignItems: 'center',
@@ -409,9 +442,14 @@ orText: {
     // top:50,
 
   },
+  googleIcon1: {
+    width: 30,
+    height: 30,
+    marginRight: 12,
+  },
   googleIcon: {
-    width: 24,
-    height: 24,
+    width: 27,
+    height: 27,
     marginRight: 12,
   },
   googleButtonText: {

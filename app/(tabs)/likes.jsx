@@ -8,11 +8,12 @@ import {
   TouchableOpacity,
   Dimensions,
   Alert,
-  StatusBar,
+
  
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 const { width, height } = Dimensions.get('window');
 
 export default function MyAds() {
@@ -192,34 +193,41 @@ export default function MyAds() {
     });
   };
 
-  const StickyHeader = () => (
-    <View style={styles.stickyHeaderContainer}>
-      <LinearGradient
-        colors={['#7A5AF8', '#9B7DF7', '#B998F5']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.stickyHeader}
-      >
-        <View style={styles.headerContent}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.stickyHeaderTitle}>My Ads</Text>
-            <View style={styles.listingBadge}>
-              <Ionicons name="checkmark-circle" size={14} color="#4CAF50" />
-              <Text style={styles.listingCount}>{ads.length} Active Listings</Text>
+const StickyHeader = () => {
+  return (
+    ads.length === 3 && (
+      <View style={styles.stickyHeaderContainer}>
+        <LinearGradient
+          colors={['#7A5AF8', '#9B7DF7', '#B998F5']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.stickyHeader}
+        >
+          <View style={styles.headerContent}>
+            <View style={styles.headerLeft}>
+              <Text style={styles.stickyHeaderTitle}>My Ads</Text>
+              <View style={styles.listingBadge}>
+                <Ionicons name="checkmark-circle" size={14} color="#4CAF50" />
+                <Text style={styles.listingCount}>
+                  {ads.length} Active Listings
+                </Text>
+              </View>
             </View>
+            <TouchableOpacity style={styles.headerButton}>
+              <Ionicons name="add-circle" size={24} color="white" />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.headerButton}>
-            <Ionicons name="add-circle" size={24} color="white" />
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
-    </View>
+        </LinearGradient>
+      </View>
+    )
   );
+};
 
-  if (ads.length === 0) {
+
+  if (ads.length <0 ) {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#7A5AF8" />
+     <StatusBar style="dark" />
         <StickyHeader />
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIconContainer}>
@@ -250,7 +258,7 @@ export default function MyAds() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#7A5AF8" />
+     <StatusBar style="dark" />
       <StickyHeader />
       
       <ScrollView 

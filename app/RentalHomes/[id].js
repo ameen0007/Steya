@@ -8,9 +8,13 @@ import { dummyListings } from '../../services/dummyListings';
 const { width } = Dimensions.get('window');
 import TopFadeGradient from '../../componets/topgradient';
 import  StaticMap  from '../../componets/map'; 
+import SkeletonLoader from '../../componets/individualloader';
+import axios from 'axios';
+
 const FlatHomeDetailsPage = () => {
       const { id } = useLocalSearchParams();
-      const item = dummyListings.find((item) => item._id === id);
+const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+
   const router = useRouter();
   const modalFlatListRef = useRef(null);
   const [currentImage, setCurrentImage] = useState(0);
@@ -18,7 +22,36 @@ const FlatHomeDetailsPage = () => {
   const [isFavorite, setIsFavorite] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [initialImageIndex, setInitialImageIndex] = useState(0);
-  
+    const [item, setItem] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+
+    useEffect(() => {
+    const fetchRoomData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await axios.get(`${apiUrl}/api/singleroom/${id}`);
+        // console.log("🔍 Fetched room data:", response.data?.room);
+        setItem(response.data?.room);
+        console.log("✅ Room data fetched:", response.data?.room);
+      } catch (err) {
+        console.error("❌ Error fetching room data:", err);
+        setError(err.message || 'Failed to load room details');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchRoomData();
+    }
+  }, [id]);
+
+
+
+
   const handleBackPress = () => {
     router.back(); // Go back to the previous screen
   };
@@ -91,61 +124,71 @@ const FlatHomeDetailsPage = () => {
   };
 
   return (
+   <>
+   {loading || !item ? (
+    <SkeletonLoader />
+  ) : (
     <SafeWrapper>
       <ScrollView>
         {/* Image Carousel */}
-        <FlatList
-          data={item.images}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={(imageUrl, index) => index.toString()}
-          onMomentumScrollEnd={(e) => {
-            const index = Math.floor(e.nativeEvent.contentOffset.x / width);
-            setCurrentImage(index);
-          }}
-          renderItem={({ item: imageUrl, index }) => (
-            <View style={{ width, justifyContent: 'center', alignItems: 'center' }}>
-              <TouchableOpacity activeOpacity={0.8} onPress={() => openImageModal(index)}>
-                <TopFadeGradient/>
-                <Image source={{ uri: imageUrl }} style={{ width, height: 250 }} resizeMode="cover" />
-                <View style={{
-                  position: 'absolute',
-                  bottom: 10,
-                  right: 10,
-                  backgroundColor: '#0009',
-                  paddingHorizontal: 10,
-                  paddingVertical: 5,
-                  borderRadius: 12
-                }}>
-                  <Text style={{ color: 'white', fontSize: 12 }}>
-                    {index === currentImage ? currentImage + 1 : index + 1}/{item.images.length}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            </View>
-          )}
+    <FlatList
+  data={item?.images} // safe access
+  horizontal
+  pagingEnabled
+  showsHorizontalScrollIndicator={false}
+  keyExtractor={(image) => image._id} // use _id from backend
+  onMomentumScrollEnd={(e) => {
+    const index = Math.floor(e.nativeEvent.contentOffset.x / width);
+    setCurrentImage(index);
+  }}
+  renderItem={({ item: image, index }) => (
+    <View style={{ width, justifyContent: 'center', alignItems: 'center' }}>
+      <TouchableOpacity activeOpacity={0.8} onPress={() => openImageModal(index)}>
+        <TopFadeGradient />
+        <Image 
+          source={{ uri: image.originalUrl }} // use originalUrl
+          style={{ width, height: 250 }} 
+          resizeMode="cover" 
         />
+        <View style={{
+          position: 'absolute',
+          bottom: 10,
+          right: 10,
+          backgroundColor: '#0009',
+          paddingHorizontal: 10,
+          paddingVertical: 5,
+          borderRadius: 12
+        }}>
+          <Text style={{ color: 'white', fontSize: 12 }}>
+            {index === currentImage ? currentImage + 1 : index + 1}/{item?.images?.length || item?.images?.length} 
+            {/* or use item.images.length from parent if needed */}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    </View>
+  )}
+/>
+
 
         {/* Flat Info */}
         <View style={styles.container}>
   {/* Title and Price Row */}
   <View style={styles.rowBetween}>
         <View style={styles.priceContainer}>
-          <Text style={styles.priceText}>₹{item.monthlyRent}/month</Text>
+          <Text style={styles.priceText}>₹{item?.monthlyRent}/month</Text>
         </View>
         <View style={styles.locationContainer}>
           <Ionicons name="location-sharp" size={16} color="#7A5AF8" />
-          <Text style={styles.locationText}>{item.location.fullAddress}</Text>
+          <Text style={styles.locationText}>{item?.location?.fullAddress}</Text>
         </View>
       </View>
-  <Text style={styles.title}>{item.title}</Text>
+  <Text style={styles.title}>{item?.title}</Text>
   {/* Location */}
 
 
   {/* Description */}
   <View style={styles.descriptionContainer}>
-    <Text style={styles.descriptionText}>{item.description}</Text>
+    <Text style={styles.descriptionText}>{item?.description}</Text>
   </View>
 
   {/* Property Details Section */}
@@ -160,7 +203,7 @@ const FlatHomeDetailsPage = () => {
         <View style={styles.detailContent}>
           <Text style={styles.detailLabel}>Property Type</Text>
           <Text style={styles.detailValue}>
-            {item.propertyType.charAt(0).toUpperCase() + item.propertyType.slice(1)}
+            {item?.propertyType?.charAt(0).toUpperCase() + item?.propertyType?.slice(1)}
           </Text>
         </View>
       </View>
@@ -171,7 +214,7 @@ const FlatHomeDetailsPage = () => {
         </View>
         <View style={styles.detailContent}>
           <Text style={styles.detailLabel}>Furnishing</Text>
-          <Text style={styles.detailValue}>{formatFurnishedStatus(item.furnishedStatus)}</Text>
+          <Text style={styles.detailValue}>{formatFurnishedStatus(item?.furnishedStatus)}</Text>
         </View>
       </View>
     </View>
@@ -184,7 +227,7 @@ const FlatHomeDetailsPage = () => {
         </View>
         <View style={styles.detailContent}>
           <Text style={styles.detailLabel}>Area</Text>
-          <Text style={styles.detailValue}>{item.squareFeet} sq.ft</Text>
+          <Text style={styles.detailValue}>{item?.squareFeet} sq.ft</Text>
         </View>
       </View>
 
@@ -194,7 +237,7 @@ const FlatHomeDetailsPage = () => {
         </View>
         <View style={styles.detailContent}>
           <Text style={styles.detailLabel}>Floor</Text>
-          <Text style={styles.detailValue}>{item.floorNumber}/{item.totalFloors}</Text>
+          <Text style={styles.detailValue}>{item?.floorNumber}/{item?.totalFloors}</Text>
         </View>
       </View>
     </View>
@@ -207,7 +250,7 @@ const FlatHomeDetailsPage = () => {
         </View>
         <View style={styles.detailContent}>
           <Text style={styles.detailLabel}>Tenant Pref</Text>
-          <Text style={styles.detailValue}>{formatTenantPreference(item.tenantPreference)}</Text>
+          <Text style={styles.detailValue}>{formatTenantPreference(item?.tenantPreference)}</Text>
         </View>
       </View>
 
@@ -217,7 +260,7 @@ const FlatHomeDetailsPage = () => {
         </View>
         <View style={styles.detailContent}>
           <Text style={styles.detailLabel}>Parking</Text>
-          <Text style={styles.detailValue}>{formatParking(item.parking)}</Text>
+          <Text style={styles.detailValue}>{formatParking(item?.parking)}</Text>
         </View>
       </View>
     </View>
@@ -228,15 +271,15 @@ const FlatHomeDetailsPage = () => {
   <View style={[styles.detailsContainer, {flexDirection: 'row', flexWrap: 'wrap'}]}>
     <View style={styles.chip}>
       <MaterialIcons name="king-bed" size={16} color="#7A5AF8" />
-      <Text style={styles.chipText}>{item.bedrooms} Bed</Text>
+      <Text style={styles.chipText}>{item?.bedrooms} Bed</Text>
     </View>
     <View style={styles.chip}>
       <MaterialIcons name="bathtub" size={16} color="#7A5AF8" />
-      <Text style={styles.chipText}>{item.bathrooms} Bath</Text>
+      <Text style={styles.chipText}>{item?.bathrooms} Bath</Text>
     </View>
     <View style={styles.chip}>
       <MaterialIcons name="balcony" size={16} color="#7A5AF8" />
-      <Text style={styles.chipText}>{item.balconies} Balcony</Text>
+      <Text style={styles.chipText}>{item?.balconies} Balcony</Text>
     </View>
   </View>
 
@@ -244,14 +287,17 @@ const FlatHomeDetailsPage = () => {
   <Text style={styles.sectionTitle}>Posted By</Text>
   <View style={styles.postedByContainer}>
     <Image 
-      source={{ uri: item.postedBy.profileImage }} 
+      source={{ uri: item?.createdBy.picture }} 
       style={styles.profileImage} 
     />
     <View style={styles.posterInfo}>
-      <Text style={styles.posterName}>{item.postedBy.name}</Text>
-      <Text style={styles.postedDate}>
-        Posted on {format(new Date(item.createdAt), 'dd MMM yyyy')}
-      </Text>
+      <Text style={styles.posterName}>{item?.createdBy.name}</Text>
+        <Text style={styles.postedDate}>
+  {new Date(item.createdAt).toLocaleDateString('en-US', {
+    month: 'short',
+    day: '2-digit',
+  })}
+</Text>
     </View>
   </View>
 </View>
@@ -287,7 +333,12 @@ const FlatHomeDetailsPage = () => {
             <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={25} color={isFavorite ? '#FF4081' : 'white'}/> 
           </TouchableOpacity>
         </View>
-        <StaticMap latitude={item?.location?.latitude} longitude={item?.location?.longitude} placeName={item.location.fullAddress} />
+            
+       <StaticMap
+  latitude={item?.location?.coordinates[1]}   // latitude
+  longitude={item?.location?.coordinates[0]}  // longitude
+  placeName={item?.location?.fullAddress}
+/>
       </ScrollView>
 
       {/* Bottom Buttons */}
@@ -317,12 +368,12 @@ const FlatHomeDetailsPage = () => {
   </TouchableOpacity>
 
   <TouchableOpacity
-    disabled={!item.showPhonePublic}
-    onPress={() => console.log('Calling:', item.contactPhone)}
+    disabled={!item?.showPhonePublic}
+    onPress={() => console.log('Calling:', item?.contactPhone)}
     style={{
       flex: 1,
       flexDirection: 'row', // horizontal
-      backgroundColor: item.showPhonePublic ? '#7A5AF8' : '#ccc',
+      backgroundColor: item?.showPhonePublic ? '#7A5AF8' : '#ccc',
       padding: 14,
       borderRadius: 10,
       alignItems: 'center',
@@ -357,25 +408,30 @@ const FlatHomeDetailsPage = () => {
           </TouchableOpacity>
 
           {/* Image Modal with FlatList - Fixed with getItemLayout and ref */}
-          <FlatList
-            ref={modalFlatListRef}
-            data={item.images}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            getItemLayout={getItemLayout}
-            initialScrollIndex={modalCurrentImage}
-            onMomentumScrollEnd={(event) => {
-              const newIndex = Math.round(event.nativeEvent.contentOffset.x / width);
-              setModalCurrentImage(newIndex); // Update the modal's current image index
-            }}
-            renderItem={({ item, index }) => (
-              <View style={{ width, justifyContent: 'center', alignItems: 'center' }}>
-                <Image source={{ uri: item }} style={{ width, height: 400 }} resizeMode="contain" />
-              </View>
-            )}
-            keyExtractor={(item, index) => index.toString()}
-          />
+      <FlatList
+  ref={modalFlatListRef}
+  data={item?.images} // safe access
+  horizontal
+  pagingEnabled
+  showsHorizontalScrollIndicator={false}
+  getItemLayout={getItemLayout}
+  initialScrollIndex={modalCurrentImage}
+  onMomentumScrollEnd={(event) => {
+    const newIndex = Math.round(event.nativeEvent.contentOffset.x / width);
+    setModalCurrentImage(newIndex); // Update the modal's current image index
+  }}
+  renderItem={({ item: image, index }) => (
+    <View style={{ width, justifyContent: 'center', alignItems: 'center' }}>
+      <Image 
+        source={{ uri: image.originalUrl }} // use originalUrl
+        style={{ width, height: 400 }} 
+        resizeMode="contain" 
+      />
+    </View>
+  )}
+  keyExtractor={(image) => image._id} // use _id from backend
+/>
+
 
           {/* Image Indicator */}
           <View style={{
@@ -389,12 +445,15 @@ const FlatHomeDetailsPage = () => {
             paddingBottom: '10%'
           }}>
             <Text style={{ color: 'white', fontSize: 12 }}>
-              {modalCurrentImage + 1}/{item.images?.length}
+              {modalCurrentImage + 1}/{item?.images?.length}
             </Text>
           </View> 
         </View>
       </Modal>
     </SafeWrapper>
+
+  )}
+    </>
   );
 };
 const greybg = '#FBFAFF';

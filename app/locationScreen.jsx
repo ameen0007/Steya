@@ -27,13 +27,15 @@ import Animated, {
 } from 'react-native-reanimated';
 import { locationSearch } from '../services/LocationSearch';
 import GoogleStyleLoadingBar from '../componets/Loader';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useLocation } from '../context/LocationContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setLocationData } from './Redux/LocationSlice';
 import { useDispatch, useSelector } from 'react-redux';
 import { preventDoubleTap } from '../services/debounfunc';
+import api from '../services/intercepter';
+import axios from 'axios';
 
 
 // Constants
@@ -69,6 +71,11 @@ const debounce = (func, delay) => {
 
 
 export default function LocationScreen() {
+
+  const { returnTo, fromForm } = useLocalSearchParams();
+
+const user = useSelector((state) => state.user.userData);
+ const apiUrl = process.env.EXPO_PUBLIC_API_URL
   const translateY = useSharedValue(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -142,13 +149,28 @@ const dispatch = useDispatch();
  const handleLocationSelect = (location) => {
   preventDoubleTap(async () => {
     try {
-      console.log(location.formatted, "selected location");
-
-      dispatch(setLocationData(location.formatted));
-
-      await refreshLocation(); // call your top-level refresh function
+      console.log(location, "selected location--------------search select");
+  const locationData = {
+        name: location.formatted,
+        lat: location.lat,
+        lng: location.lon,
+      };
+     dispatch(setLocationData(locationData));
+   if(user){
+ await axios.put(`${apiUrl}/api/auth/update-location`, { location: locationData ,userId: user?._id});
+    }
+      await refreshLocation();
+      if (fromForm) {
+        console.log('====================================');
+        console.log('which is work ?',fromForm);
+        console.log('====================================');
+ router.back();    // back to post-room page, which shows your form component
+}else{
+   console.log('inside else?',fromForm);
+ // call your top-level refresh function
  router.dismissAll(); 
       router.replace("/(tabs)");
+}
     } catch (error) {
       console.error("Error selecting location:", error);
     }
@@ -375,15 +397,35 @@ const debouncedSearch = useMemo(() => debounce(performSearch, 300), []);
       const locationData = {
         name: locationName.trim(),
         lat: location.coords.latitude,
-        lon: location.coords.longitude,
+        lng: location.coords.longitude,
       };
   
-      console.log(locationData, 'locationData-------');
-  // 
-     dispatch(setLocationData(locationData.name));
+    
+     
+     dispatch(setLocationData(locationData));
+     console.log('====================================');
+     console.log(user,"current user");
+     console.log('====================================');
+    if(user){
+ await axios.put(`${apiUrl}/api/auth/update-location`, { location: locationData ,userId: user?._id});
+    }
+     
+
+
       await refreshLocation();
-       router.dismissAll(); 
-      router.replace('/(tabs)');
+     if (fromForm) {
+        console.log('====================================');
+        console.log('which is work ?',fromForm);
+        console.log('====================================');
+        
+   router.back();   
+  
+}else{
+   console.log('inside else?',fromForm);
+ // call your top-level refresh function
+ router.dismissAll(); 
+      router.replace("/(tabs)");
+}
       
     } catch (error) {
       console.log('Error getting location:', error);

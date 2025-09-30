@@ -5,23 +5,13 @@ import { Entypo,MaterialCommunityIcons, FontAwesome, Ionicons } from '@expo/vect
 
 const SharedRoomCard = ({ data, activeFilter }) => {
   // Extract data or provide defaults
-  const images = data.images && data.images.length > 0 
-    ? data.images 
-    : ["https://via.placeholder.com/300x200.png?text=No+Image"];
-  
-  const distance = data.km || '2.5 km';
-  const roommates = data.roommatesWanted || 1;
-  const gender = data.genderPreference || 'male';
-  const habits = data.habitPreferences || [];
-  const price = data.monthlyRent;
-  const createdAt = data.createdAt;
-const postedDate = new Date(createdAt).toLocaleDateString("en-IN", {
-  day: "numeric",
-  month: "short", // You can use "long" for full month name
-});
-// console.log(gender,"gender");
-// useEffect(() => {
-//   router.push('/pg-hostel/4')}, [])
+
+
+    console.log('====================================');
+  console.log(data, activeFilter, "shared data");
+  console.log('====================================');
+
+
   const id = data._id 
   return (
     <TouchableOpacity
@@ -85,12 +75,15 @@ onPress={() => {
       <View style={styles.cardContainer}>
         {/* Top image section */}
         <View style={styles.imageContainer}>
-          <Image source={{ uri: images[0] }} style={styles.image} />
+          <Image source={{ uri:data?.thumbnail?.url  }} style={styles.image} />
           <View style={styles.topOverlay}>
-            <View style={styles.distanceBadge}>
-              <Ionicons name="location-sharp" size={16} color="#7A5AF8" />
-              <Text style={styles.distanceText}>{distance}</Text>
-            </View>
+          <View style={styles.distanceBadge}>
+                {activeFilter === 'All' &&
+ <View style={styles.categoryBadge}>
+ <Ionicons name='people' size={16} color='#7A5AF8' /> 
+</View>
+            }
+            </View> 
             <TouchableOpacity style={styles.favoriteButton}>
               <Ionicons name="heart-outline" size={23} color="#FF4081" />
             </TouchableOpacity>
@@ -100,17 +93,18 @@ onPress={() => {
         {/* Content section */}
         <View style={styles.contentContainer}>
           <View style={styles.headerRow}>
-            <Text numberOfLines={2} style={styles.title}>{data.title}</Text>
-            {activeFilter === 'All' &&
- <View style={styles.categoryBadge}>
- <Entypo name='slideshare' size={16} color='#7A5AF8' />
-</View>
-            }
+            <Text numberOfLines={2} style={styles.title}>{data?.title}</Text>
+              <Text style={styles.postedDate}>
+  {new Date(data?.createdAt).toLocaleDateString("en-US", {
+    month: "short", 
+    day: "2-digit",
+  })}
+</Text>
            
           </View>
 
           <Text style={styles.description} numberOfLines={2}>
-            {data.description}
+            {data?.description}
           </Text>
 
           {/* Preferences row */}
@@ -118,16 +112,16 @@ onPress={() => {
             <View style={styles.roommateInfo}>
               <Text style={styles.needText}>Need</Text>
               <View style={styles.countBadge}>
-                <Text style={styles.countText}>{roommates}</Text>
+                <Text style={styles.countText}>{data?.roommatesWanted}</Text>
               </View>
               <View style={styles.genderBadge}>
-                {gender === 'any' ?
+                {data?.genderPreference === 'any' ?
                 <MaterialCommunityIcons color='#2D9596'  size={16}  name='gender-male-female'/>  :
                
    <Ionicons 
-   name={gender === 'female' ? 'female' : 'male'} 
+   name={data?.genderPreference === 'female' ? 'female' : 'male'} 
    size={16} 
-   color={gender === 'female' ? '#FF4081' : '#2196F3'} 
+   color={data?.genderPreference === 'female' ? '#FF4081' : '#2196F3'} 
  />
                 }
              
@@ -136,29 +130,34 @@ onPress={() => {
                 style={[
                   styles.genderText,
                   { 
-                    color: gender === 'any' 
+                    color: data?.genderPreference === 'any' 
                       ? '#2D9596' 
-                      : gender === 'female' 
+                      : data?.genderPreference === 'female' 
                       ? '#FF4081' 
                       : '#2196F3' 
                   }
                 ]}>
 
-                  {gender.charAt(0).toUpperCase() + gender.slice(1)}
+                  {data?.genderPreference.charAt(0).toUpperCase() + data?.genderPreference.slice(1)}
                 </Text>
               </View>
             </View>
-            <Text style={styles.price}>₹{price}</Text>
+       <Text style={styles.price}>
+  ₹{data?.monthlyRent?.toLocaleString()}
+   </Text>
+
    
           </View>
 
         
         </View>
         <View style={styles.date}>
-  <Text  style={styles.postedDate}>{postedDate}</Text>
+
+
 </View>
       </View>
     </TouchableOpacity>
+
   );
 };
 
@@ -206,21 +205,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
-  distanceBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 24,
-    backgroundColor: greybg,
-    paddingHorizontal: 10,
-    borderRadius: 20,
-  },
-  distanceText: {
-    color: maintext,
-    fontWeight: '600',
-    marginLeft: 4,
-    includeFontPadding: false,
-    textAlignVertical: 'center',
-  },
+ 
+
   date:{
      flex:1,
 justifyContent:'flex-start',
@@ -261,7 +247,7 @@ paddingRight:15
     backgroundColor: greybg,
     padding: 8,
     borderRadius: 20,
-    marginLeft: 8,
+  
   },
   description: {
     fontSize: 13,
