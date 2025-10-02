@@ -12,7 +12,8 @@ import { conversationTree, getNextOptions } from '../../services/chattree';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
-const SOCKET_URL = 'http://192.168.1.2:8080';
+const apiUrl = process.env.EXPO_PUBLIC_API_URL
+
 
 const ChatScreen = () => {
   const { id: roomId } = useLocalSearchParams();
@@ -94,7 +95,7 @@ const ChatScreen = () => {
     isInitializedRef.current = true;
 
     console.log('🔌 Initializing socket connection...');
-    const socket = io(SOCKET_URL, socketConfig);
+    const socket = io(apiUrl, socketConfig);
     socketRef.current = socket;
 
     // Connection successful

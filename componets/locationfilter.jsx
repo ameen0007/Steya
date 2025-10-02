@@ -117,7 +117,7 @@ const handleApplyFilters = (filters) => {
 
     {/* Saved Ads (for now disabled) */}
     <TouchableOpacity style={styles.iconButton}>
-      <Ionicons name="heart-outline" size={24} color="#282C3F" />
+      <Ionicons name="heart-outline" size={24} color="red" />
     </TouchableOpacity>
   </View>
 
