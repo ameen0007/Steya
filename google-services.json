@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "162262901999",
+    "project_id": "steya-f3031",
+    "storage_bucket": "steya-f3031.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:162262901999:android:48fe056283f3be5daee71a",
+        "android_client_info": {
+          "package_name": "com.ameen007.Steya"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDZHYhK8bE4zPg29UZM1SiOGzvU_4cteVc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
