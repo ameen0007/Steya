@@ -14,12 +14,15 @@ import axios from 'axios';
 import SkeletonLoader from '../../componets/individualloader';
 const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 
+import api from '../../services/intercepter';
+import { useSelector } from 'react-redux';
 const DetailsPage = () => {
   console.log("✅ DetailsPage loaded");
 
   const { id } = useLocalSearchParams();
   console.log("📥 Received ID from route:", id);
- 
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
+  
  
   const router = useRouter();
   const modalFlatListRef = useRef(null);
@@ -30,7 +33,8 @@ const DetailsPage = () => {
   const [isFavorite, setIsFavorite] = useState(false); // Manage favorite state
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [initialImageIndex, setInitialImageIndex] = useState(0);
-  
+   const user = useSelector((state) => state.user.userData);
+   
       useEffect(() => {
     const fetchRoomData = async () => {
       try {
@@ -53,7 +57,48 @@ const DetailsPage = () => {
     }
   }, [id]);
 
+  const handleChatPress = async () => {
+  console.log("Starting chat for product:", item._id);
   
+  try {
+    setIsCreatingRoom(true);
+
+    // First, check if room already exists
+    const checkResponse = await api.get(`${apiUrl}/api/chat/check-room`, {
+      params: { productId: item._id }
+    });
+
+    let roomId;
+
+    if (checkResponse.data.exists) {
+      // Use existing room (could be pending or active)
+      roomId = checkResponse.data.roomId;
+      console.log("Using existing room:", roomId, "Status:", checkResponse.data.status);
+    } else {
+      // Create new PENDING room
+      const createResponse = await api.post(`${apiUrl}/api/chat/create-room`, {
+        productId: item._id,
+        productTitle: item.title || 'Product Chat',
+        ownerId: item?.createdBy?._id 
+      });
+      
+      roomId = createResponse.data.roomId;
+      console.log("Created new pending room:", roomId);
+    }
+
+    // Navigate to chat
+    router.push({
+      pathname: '/chat/[id]',
+      params: { id: roomId }
+    });
+
+  } catch (error) {
+    console.error('Error creating chat room:', error);
+    alert('Failed to start chat. Please try again.');
+  } finally {
+    setIsCreatingRoom(false);
+  }
+};
 
   const handleBackPress = () => {
     router.back(); // Go back to the previous screen
@@ -319,7 +364,7 @@ const DetailsPage = () => {
 
       </ScrollView>
 
-    
+    {item.createdBy._id !== user._id ? (
     <View style={{
   flexDirection: 'row',
   justifyContent: 'space-between',
@@ -328,29 +373,31 @@ const DetailsPage = () => {
   borderColor: '#eee',
   backgroundColor: '#fff'
 }}>
-  <TouchableOpacity
-    style={{
-      flex: 1,
-      flexDirection: 'row', // horizontal
-      backgroundColor: '#7A5AF8',
-      padding: 14,
-      borderRadius: 10,
-      alignItems: 'center',
-      justifyContent: 'center', // center both icon and text
-      marginRight: 10
-    }}
 
-   
-onPress={() =>
-  router.push({
-    pathname: '/chat/[id]',
-    params: { id: item._id }, // key must match [id] in filename
-  })
-}
-  >
-    <Feather name="message-circle" size={20} color="white" />
-    <Text style={{ color: 'white', marginLeft: 8 }}>Chat</Text>
-  </TouchableOpacity>
+   <TouchableOpacity
+      style={{
+        flex: 1,
+        flexDirection: 'row',
+        backgroundColor: '#7A5AF8',
+        padding: 14,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+        opacity: isCreatingRoom ? 0.6 : 1
+      }}
+      onPress={handleChatPress}
+      disabled={isCreatingRoom}
+    >
+      {isCreatingRoom ? (
+        <ActivityIndicator size="small" color="white" />
+      ) : (
+        <>
+          <Feather name="message-circle" size={20} color="white" />
+          <Text style={{ color: 'white', marginLeft: 8 }}>Chat</Text>
+        </>
+      )}
+    </TouchableOpacity>
 
   <TouchableOpacity
     disabled={!item?.showPhonePublic}
@@ -370,7 +417,11 @@ onPress={() =>
   </TouchableOpacity>
 </View> 
 
-
+) : (
+  <View style={styles.chatDisabled}>
+    <Text style={styles.chatDisabledText}>This is your product</Text>
+  </View>
+)}
       
       <Modal visible={isModalVisible} transparent={true} animationType="fade" onRequestClose={closeImageModal}>
         <View style={{
@@ -446,6 +497,21 @@ const maintext = '#212121';
 const lighttext = '#757575';
 const mainbg = '#7A5AF8';
 const styles = StyleSheet.create({
+  chatDisabled: {
+  paddingVertical: 10,
+  paddingHorizontal: 16,
+  backgroundColor: '#E5E7EB', // light gray to indicate disabled
+  borderRadius: 8,
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginTop: 8,
+},
+
+chatDisabledText: {
+  color: '#9CA3AF', // gray text
+  fontSize: 14,
+  fontWeight: '500',
+},
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',

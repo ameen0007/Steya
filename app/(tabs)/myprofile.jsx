@@ -20,7 +20,7 @@ import ProtectedRoute from '../protectedroute';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 
-
+import { removePushTokenFromBackend } from '../../services/notificationHandler';
 
 const ProfilePage = () => {
   GoogleSignin.configure({
@@ -94,42 +94,55 @@ const ProfilePage = () => {
  
   
 
+
+
+// logout handler - CORRECTED
+
+
 const handleLogout = async () => {
   try {
-   
-    console.log("🔹 Setting isLoggingOut flag to true");
+    console.log("🔹 Starting logout process...");
+    
+    // Set logout flag
     await AsyncStorage.setItem("isLoggingOut", "true");
-  
-    // Verify it's set
-    const checkFlag = await AsyncStorage.getItem("isLoggingOut");
-    console.log("🔹 isLoggingOut after set:", checkFlag); // should print "true"
 
+    // ✅ REMOVE PUSH TOKEN (Non-blocking, runs in background)
+    const pushToken = await AsyncStorage.getItem('expoPushToken');
+    if (pushToken) {
+      console.log("📱 Removing push token from backend...");
+      // Don't await - let it run in background
+      removePushTokenFromBackend(pushToken, apiUrl)
+        .then(() => console.log("✅ Push token removed"))
+        .catch(err => console.error("⚠️ Failed to remove push token:", err.message));
+    }
 
-
-    console.log("🔹 Navigating to home (/(tabs))");
-    router.replace("(tabs)");
+    // Clear local data immediately
+    console.log("🗑️ Clearing local data...");
+    await AsyncStorage.removeItem("authToken");
+    await AsyncStorage.removeItem("userId");
+    await AsyncStorage.removeItem("expoPushToken");
     
-    
-        await AsyncStorage.removeItem("authToken");
-   
-    console.log("🔹 Clearing Redux user data");
+    // Clear Redux state
     dispatch(clearUserData());
 
-    console.log("🔹 Signing out Google");
+    // Sign out from Google
+    console.log("📤 Signing out from Google...");
     await GoogleSignin.signOut();
 
-    console.log("🔹 Removing isLoggingOut flag");
+    // Navigate to home
+    console.log("➡️ Navigating to home...");
+    router.replace("(tabs)");
+
+    // Cleanup flag
     await AsyncStorage.removeItem("isLoggingOut");
-
-    // Verify it's removed
-    const removedFlag = await AsyncStorage.getItem("isLoggingOut");
-    console.log("🔹 isLoggingOut after remove:", removedFlag); // should print null
-
-    console.log("✅ Logout completed, user at home");
-     
+    
+    console.log("✅ Logout completed successfully");
+    
   } catch (error) {
     console.error("❌ Logout error:", error);
+    // Ensure user is logged out even if there's an error
     await AsyncStorage.removeItem("isLoggingOut");
+    await AsyncStorage.removeItem("authToken");
     router.replace("(tabs)");
   }
 };

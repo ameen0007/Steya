@@ -63,6 +63,15 @@
           "recordAudioAndroid": true
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/applogo.png",
+          "color": "#7A5AF8",
+          "defaultChannel": "chat-messages",
+          "enableBackgroundRemoteNotifications": false
+        }
+      ],
       "expo-font",
       "expo-web-browser",
       [

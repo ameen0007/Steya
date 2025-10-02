@@ -21,7 +21,7 @@ import { preventDoubleTap } from '../services/debounfunc';
 
   import { useDispatch, useSelector } from 'react-redux';
 import { setLocationData } from './Redux/LocationSlice';
-
+import { initializePushNotifications } from '../services/notificationHandler';
 export default function Login() {
 
  const apiUrl = process.env.EXPO_PUBLIC_API_URL
@@ -97,108 +97,86 @@ useFocusEffect(
   }, [isReady])
 );
 
+// login.js - CORRECTED FOR EAS BUILD
+
+
 const handleGoogleLogin = async () => {
   preventDoubleTap(async () => {
     try {
       console.log("🔄 Starting Google login...");
-
-      // Check Play Services
       await GoogleSignin.hasPlayServices();
-      console.log("✅ Google Play Services available");
-
-      // Try sign-in
+      
       const userInfo = await GoogleSignin.signIn();
-      console.log("📥 Google userInfo response:", JSON.stringify(userInfo, null, 2));
-
+      
       if (isSuccessResponse(userInfo)) {
-        console.log("✅ Google sign-in success, proceeding...");
-
-        const isFirstLaunch = await AsyncStorage.getItem("isFirstLaunch");
-        console.log("📌 isFirstLaunch:", isFirstLaunch);
-
-        const userType = await AsyncStorage.getItem("userType");
-        console.log("📌 userType before login:", userType);
-
-        if (userType === "GuestUser") {
-          console.log("🗑 Removing GuestUser flag...");
-          await AsyncStorage.removeItem("userType");
-        }
-
-        if (!isFirstLaunch) {
-          console.log("🆕 Setting isFirstLaunch...");
-          await AsyncStorage.setItem("isFirstLaunch", "true");
-        }
-
-        // Token
         const idToken = userInfo.data?.idToken;
         if (!idToken) {
-          console.log("❌ No idToken found in userInfo");
+          console.log("❌ No idToken found");
           return;
         }
-        console.log("🔑 idToken received");
 
         // API call
-        console.log("🌐 Sending token to backend:", `${apiUrl}/api/auth/google-login`);
+        console.log("🌐 Calling backend for authentication...");
         const res = await axios.post(`${apiUrl}/api/auth/google-login`, { idToken });
 
-        console.log("📥 Backend response:", JSON.stringify(res.data, null, 2));
-
-        // Location
+        // Save location
         if (res.data.user?.location) {
-          console.log("📍 Setting location from backend:", res.data.user.location);
+          console.log("📍 Setting location data");
           dispatch(setLocationData(res.data.user.location));
-        } else {
-          console.log("⚠️ No location data in backend response");
         }
 
-        // Save auth
+        // Save auth token and user data
         await AsyncStorage.setItem("authToken", res.data.accessToken);
-        console.log("💾 Auth token saved");
-     
-        
         await AsyncStorage.setItem("userId", res.data.user._id);
         dispatch(setUserData(res.data.user));
-        console.log("👤 User data saved in Redux");
+        
+        console.log("✅ User authenticated successfully");
 
-        // Navigation
-        if (locationData) {
-          console.log("➡️ Navigating to tabs");
+        // ✅ SETUP PUSH NOTIFICATIONS AFTER LOGIN (Non-blocking)
+        // This will work perfectly after EAS build
+        console.log("📱 Initializing push notifications...");
+        initializePushNotifications(apiUrl)
+          .then(pushToken => {
+            if (pushToken) {
+              console.log("✅ Push notifications ready:", pushToken);
+            } else {
+              console.log("⚠️ Push notifications not available (user may have denied permissions)");
+            }
+          })
+          .catch(pushError => {
+            console.error("⚠️ Push notification setup error:", pushError.message);
+            // Login continues successfully even if push fails
+          });
+
+        // Navigate immediately (don't wait for push notifications)
+        if (res.data.user?.location || locationData) {
+          console.log("➡️ Navigating to home");
           router.replace("(tabs)");
         } else {
-          console.log("➡️ Navigating to location screen");
+          console.log("➡️ Navigating to location setup");
           router.replace("/locationScreen");
         }
       } else {
-        console.log("⚠️ Google sign-in cancelled");
+        console.log("⚠️ Google sign-in cancelled by user");
       }
     } catch (error) {
-      console.log("❌ Error during Google sign-in:", error);
-
-      if (isErrorWithCode(error)) {
-        switch (error.code) {
-          case statusCodes.IN_PROGRESS:
-            console.log("⚠️ Google sign-in already in progress");
-            break;
-          case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
-            console.log("❌ Google Play Services not available or outdated");
-            break;
-          default:
-            console.log("❌ Google sign-in error with code:", error.code, error.message);
-        }
+      console.error("❌ Login error:", error.message);
+      // Show user-friendly error
+      if (error.response?.status === 401) {
+        alert("Authentication failed. Please try again.");
+      } else if (error.message?.includes('network')) {
+        alert("Network error. Please check your connection.");
       } else {
-        console.log("❌ Non-Google sign-in error:", error);
+        alert("Login failed. Please try again.");
       }
     }
   });
 };
 
 
-
   return (
     <>
-      <StatusBar
-      style="dark"
-      />
+      <StatusBar style="dark" />
       <ImageBackground
         source={require('../assets/images/home.png')} // Your background image
         style={styles.backgroundImage} // Full screen styling

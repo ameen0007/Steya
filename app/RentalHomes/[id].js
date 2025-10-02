@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
-import { ScrollView, TouchableOpacity, Text, View, Image, Modal, Dimensions, Platform, FlatList, StyleSheet } from 'react-native';
+import { ScrollView, TouchableOpacity, Text, View, Image, Modal, Dimensions, Platform, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather, FontAwesome5, Ionicons, MaterialCommunityIcons, MaterialIcons, Entypo } from '@expo/vector-icons';
 import { format } from 'date-fns';
@@ -10,11 +10,12 @@ import TopFadeGradient from '../../componets/topgradient';
 import  StaticMap  from '../../componets/map'; 
 import SkeletonLoader from '../../componets/individualloader';
 import axios from 'axios';
-
+import api from '../../services/intercepter';
+import { useSelector } from 'react-redux';
 const FlatHomeDetailsPage = () => {
       const { id } = useLocalSearchParams();
 const apiUrl = process.env.EXPO_PUBLIC_API_URL;
-
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const router = useRouter();
   const modalFlatListRef = useRef(null);
   const [currentImage, setCurrentImage] = useState(0);
@@ -25,7 +26,7 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL;
     const [item, setItem] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
+   const user = useSelector((state) => state.user.userData);
 
     useEffect(() => {
     const fetchRoomData = async () => {
@@ -50,6 +51,48 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL;
   }, [id]);
 
 
+  const handleChatPress = async () => {
+  console.log("Starting chat for product:", item._id);
+  
+  try {
+    setIsCreatingRoom(true);
+
+    // First, check if room already exists
+    const checkResponse = await api.get(`${apiUrl}/api/chat/check-room`, {
+      params: { productId: item._id }
+    });
+
+    let roomId;
+
+    if (checkResponse.data.exists) {
+      // Use existing room (could be pending or active)
+      roomId = checkResponse.data.roomId;
+      console.log("Using existing room:", roomId, "Status:", checkResponse.data.status);
+    } else {
+      // Create new PENDING room
+      const createResponse = await api.post(`${apiUrl}/api/chat/create-room`, {
+        productId: item._id,
+        productTitle: item.title || 'Product Chat',
+        ownerId: item?.createdBy?._id 
+      });
+      
+      roomId = createResponse.data.roomId;
+      console.log("Created new pending room:", roomId);
+    }
+
+    // Navigate to chat
+    router.push({
+      pathname: '/chat/[id]',
+      params: { id: roomId }
+    });
+
+  } catch (error) {
+    console.error('Error creating chat room:', error);
+    alert('Failed to start chat. Please try again.');
+  } finally {
+    setIsCreatingRoom(false);
+  }
+};
 
 
   const handleBackPress = () => {
@@ -342,7 +385,8 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL;
       </ScrollView>
 
       {/* Bottom Buttons */}
-      <View style={{
+    {item.createdBy._id !== user._id ? (
+    <View style={{
   flexDirection: 'row',
   justifyContent: 'space-between',
   padding: 16,
@@ -350,30 +394,39 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL;
   borderColor: '#eee',
   backgroundColor: '#fff'
 }}>
-  <TouchableOpacity
-    style={{
-      flex: 1,
-      flexDirection: 'row', // horizontal
-      backgroundColor: '#7A5AF8',
-      padding: 14,
-      borderRadius: 10,
-      alignItems: 'center',
-      justifyContent: 'center', // center both icon and text
-      marginRight: 10
-    }}
-    onPress={() => console.log('Chat clicked')}
-  >
-    <Feather name="message-circle" size={20} color="white" />
-    <Text style={{ color: 'white', marginLeft: 8 }}>Chat</Text>
-  </TouchableOpacity>
+
+   <TouchableOpacity
+      style={{
+        flex: 1,
+        flexDirection: 'row',
+        backgroundColor: '#7A5AF8',
+        padding: 14,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+        opacity: isCreatingRoom ? 0.6 : 1
+      }}
+      onPress={handleChatPress}
+      disabled={isCreatingRoom}
+    >
+      {isCreatingRoom ? (
+        <ActivityIndicator size="small" color="white" />
+      ) : (
+        <>
+          <Feather name="message-circle" size={20} color="white" />
+          <Text style={{ color: 'white', marginLeft: 8 }}>Chat</Text>
+        </>
+      )}
+    </TouchableOpacity>
 
   <TouchableOpacity
     disabled={!item?.showPhonePublic}
-    onPress={() => console.log('Calling:', item?.contactPhone)}
+    onPress={() => console.log('Calling:', item.contactPhone)}
     style={{
       flex: 1,
       flexDirection: 'row', // horizontal
-      backgroundColor: item?.showPhonePublic ? '#7A5AF8' : '#ccc',
+      backgroundColor: item.showPhonePublic ? '#7A5AF8' : '#ccc',
       padding: 14,
       borderRadius: 10,
       alignItems: 'center',
@@ -383,8 +436,13 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL;
     <Feather name="phone-call" size={20} color="white" />
     <Text style={{ color: 'white', marginLeft: 8 }}>Call</Text>
   </TouchableOpacity>
-</View>
+</View> 
 
+) : (
+  <View style={styles.chatDisabled}>
+    <Text style={styles.chatDisabledText}>This is your product</Text>
+  </View>
+)}
 
       {/* Image Modal */}
       <Modal visible={isModalVisible} transparent={true} animationType="fade" onRequestClose={closeImageModal}>
@@ -462,6 +520,21 @@ const lighttext = '#757575';
 const mainbg = '#7A5AF8';
 
 const styles = StyleSheet.create({
+    chatDisabled: {
+  paddingVertical: 10,
+  paddingHorizontal: 16,
+  backgroundColor: '#E5E7EB', // light gray to indicate disabled
+  borderRadius: 8,
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginTop: 8,
+},
+
+chatDisabledText: {
+  color: '#9CA3AF', // gray text
+  fontSize: 14,
+  fontWeight: '500',
+},
   container: {
    
    flex: 1,
