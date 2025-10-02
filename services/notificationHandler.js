@@ -165,7 +165,7 @@ export async function savePushTokenToBackend(pushToken, ) {
 export async function removePushTokenFromBackend(pushToken) {
   try {
     const authToken = await AsyncStorage.getItem('authToken');
-    const API_URL = apiUrl || process.env.EXPO_PUBLIC_API_URL
+    const API_URL = process.env.EXPO_PUBLIC_API_URL
 
     if (!authToken || !pushToken) {
       console.warn('⚠️ Missing auth token or push token');
