@@ -26,7 +26,8 @@
         "READ_MEDIA_IMAGES",
         "WRITE_EXTERNAL_STORAGE"
       ],
-      "package": "com.ameen007.Steya"
+      "package": "com.ameen007.Steya",
+      "googleServicesFile": "./google-services.json"   
     },
     "androidNavigationBar": {
       "barStyle": "light-content",
