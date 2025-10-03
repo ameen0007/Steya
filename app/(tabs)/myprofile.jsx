@@ -111,7 +111,7 @@ const handleLogout = async () => {
     if (pushToken) {
       console.log("📱 Removing push token from backend...");
       // Don't await - let it run in background
-      removePushTokenFromBackend(pushToken, apiUrl)
+      removePushTokenFromBackend(pushToken)
         .then(() => console.log("✅ Push token removed"))
         .catch(err => console.error("⚠️ Failed to remove push token:", err.message));
     }
@@ -131,7 +131,7 @@ const handleLogout = async () => {
 
     // Navigate to home
     console.log("➡️ Navigating to home...");
-    router.replace("(tabs)");
+    router.replace("/(tabs)");
 
     // Cleanup flag
     await AsyncStorage.removeItem("isLoggingOut");
@@ -143,7 +143,7 @@ const handleLogout = async () => {
     // Ensure user is logged out even if there's an error
     await AsyncStorage.removeItem("isLoggingOut");
     await AsyncStorage.removeItem("authToken");
-    router.replace("(tabs)");
+    router.replace("/(tabs)");
   }
 };
 
