@@ -20,33 +20,38 @@ export default function Add() {
   const apiUrl = process.env.EXPO_PUBLIC_API_URL;
   const user = useSelector((state) => state.user.userData);
 
-const fetchRooms = useCallback(async () => {
-  try {
-    setError(null);
-    const response = await api.get(`${apiUrl}/api/chat/chatrooms`);
-    
-    const roomsData = response.data?.data || response.data;
-    
-    if (Array.isArray(roomsData)) {
-      console.log('Rooms data received:', roomsData.length, 'rooms');
+  // ✅ FIXED: Correct data parsing
+  const fetchRooms = useCallback(async () => {
+    try {
+      setError(null);
+      const response = await api.get(`${apiUrl}/api/chat/chatrooms`);
       
-      // Filter to show only active rooms with messages
-      const activeRooms = roomsData.filter(room => 
-        room.status === 'active' && room.hasMessages
-      );
+      console.log('📦 Full API Response:', response.data);
       
-      console.log('Active rooms with messages:', activeRooms.length);
-      setRooms([...activeRooms]);
-    } else {
+      // ✅ CORRECT: The data is in response.data.chatrooms (with pagination)
+      const roomsData = response.data?.chatrooms || [];
+      
+      if (Array.isArray(roomsData)) {
+        console.log('✅ Rooms data received:', roomsData.length, 'rooms');
+        
+        // Filter to show only active rooms with messages
+        const activeRooms = roomsData.filter(room => 
+          room && room.status === 'active' && room.hasMessages
+        );
+        
+        console.log('✅ Active rooms with messages:', activeRooms.length);
+        setRooms(activeRooms);
+      } else {
+        console.log('❌ Invalid data format:', response.data);
+        setRooms([]);
+        setError('Invalid data format received');
+      }
+    } catch (err) {
+      console.log('❌ Error fetching rooms:', err.response?.data || err.message);
+      setError('Failed to load conversations');
       setRooms([]);
-      setError('Invalid data format received');
     }
-  } catch (err) {
-    console.log('Error fetching rooms:', err);
-    setError('Failed to load conversations');
-    setRooms([]);
-  }
-}, [apiUrl]);
+  }, [apiUrl]);
 
   useEffect(() => {
     const loadInitial = async () => {
@@ -86,6 +91,23 @@ const fetchRooms = useCallback(async () => {
     }
   };
 
+  // Render loading state
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <StatusBar style='dark' />
+        <LinearGradient
+          colors={['#8E6AFB', '#7A5AF8']}
+          style={styles.loadingIconBackground}
+        >
+          <Ionicons name="chatbubble-ellipses" size={32} color="#FFFFFF" />
+        </LinearGradient>
+        <Text style={styles.loadingText}>Loading conversations...</Text>
+      </View>
+    );
+  }
+
+  // Render error state
   if (error && !loading) {
     return (
       <SafeWrapper>
@@ -116,24 +138,11 @@ const fetchRooms = useCallback(async () => {
     );
   }
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <StatusBar style='dark' />
-        <LinearGradient
-          colors={['#8E6AFB', '#7A5AF8']}
-          style={styles.loadingIconBackground}
-        >
-          <Ionicons name="chatbubble-ellipses" size={32} color="#FFFFFF" />
-        </LinearGradient>
-        <Text style={styles.loadingText}>Loading conversations...</Text>
-      </View>
-    );
-  }
-
   const renderItem = ({ item, index }) => {
+    if (!item) return null;
+
     const participants = item.participants || [];
-    const otherUser = participants.find(p => String(p?._id) !== String(user?._id)) 
+    const otherUser = participants.find(p => p && String(p._id) !== String(user?._id)) 
       || participants[0] 
       || { name: 'Unknown User' };
 
@@ -176,7 +185,7 @@ const fetchRooms = useCallback(async () => {
               {otherUser.name || 'Unknown User'}
             </Text>
             <Text style={styles.timeText}>
-              {formatTime(item.lastMessageTime)}
+              {formatTime(item.updatedAt)}
             </Text>
           </View>
 
@@ -232,10 +241,13 @@ const fetchRooms = useCallback(async () => {
         <View style={styles.listContainer}>
           <FlatList
             data={rooms}
-            keyExtractor={(item, index) => item._id ? `room-${item._id}` : `room-${index}`}
+            keyExtractor={(item, index) => item?._id ? `room-${item._id}` : `room-${index}`}
             renderItem={renderItem}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={[
+              styles.listContent,
+              rooms.length === 0 && styles.emptyListContent
+            ]}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <LinearGradient
@@ -267,230 +279,17 @@ const fetchRooms = useCallback(async () => {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#FFFFFF' 
-  },
-  listContainer: {
+  container: {
     flex: 1,
-    width: '100%',
-  },
-  headerGradient: {
-    paddingBottom: 8, // Reduced bottom padding
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 50, // Reduced top padding
-    paddingBottom: 12, // Reduced bottom padding
-  },
-  headerTitle: {
-    fontSize: 28, // Slightly smaller
-    fontWeight: '700',
-    color: '#1A1A2C',
-    marginBottom: 4, // Reduced margin
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#7A5AF8',
-    fontWeight: '600',
-  },
-  listContent: {
-    paddingHorizontal: 12, // Reduced padding
-    paddingTop: 8, // Reduced top padding
-    paddingBottom: 20,
-    flexGrow: 1,
-  },
-  roomItem: {
-    flexDirection: 'row',
-    padding: 12, // Reduced padding
     backgroundColor: '#FFFFFF',
-    borderRadius: 12, // Slightly smaller radius
-    alignItems: 'center',
-    shadowColor: '#7A5AF8',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#F8F7FF',
-    height: 80, // Fixed height - much smaller!
-    marginHorizontal: 4, // Small horizontal margin
   },
-  unreadRoomItem: {
-    backgroundColor: '#F8F7FF',
-    borderLeftWidth: 3, // Thinner border
-    borderLeftColor: '#7A5AF8',
-  },
-  avatarContainer: {
-    position: 'relative',
-    marginRight: 12, // Reduced margin
-  },
-  avatar: {
-    width: 48, // Smaller avatar
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#E5E7EB',
-  },
-  avatarFallback: {
-    width: 48, // Smaller avatar
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#E9E5FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarFallbackText: {
-    fontSize: 18, // Smaller text
-    fontWeight: '600',
-    color: '#7A5AF8',
-  },
-  onlineIndicator: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 12, // Smaller indicator
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  onlineIndicatorActive: {
-    backgroundColor: '#10B981',
-  },
-  onlineIndicatorInactive: {
-    backgroundColor: '#9CA3AF',
-  },
-  roomContent: {
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
-    height: '100%', // Take full height of parent
-  },
-  roomHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 2, // Reduced margin
-  },
-  roomName: { 
-    fontSize: 15, // Smaller font
-    fontWeight: '700', 
-    color: '#1A1A2C',
-    flex: 1,
-  },
-  timeText: {
-    fontSize: 11, // Smaller font
-    color: '#9CA3AF',
-    fontWeight: '500',
-  },
-  productContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 2, // Reduced margin
-  },
-  productIcon: {
-    width: 14, // Smaller icon
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#7A5AF8',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 4, // Reduced margin
-  },
-  productTitle: { 
-    fontSize: 12, // Smaller font
-    color: '#7A5AF8', 
-    fontWeight: '600',
-    flex: 1,
-  },
-  messageContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flex: 1, // Take available space
-  },
-  lastMsg: { 
-    fontSize: 13, // Slightly smaller
-    color: '#6B7280',
-    flex: 1,
-    lineHeight: 16, // Tighter line height
-  },
-  unreadLastMsg: {
-    color: '#1A1A2C',
-    fontWeight: '500',
-  },
-  unreadBadge: {
-    backgroundColor: '#7A5AF8',
-    paddingHorizontal: 6, // Smaller padding
-    paddingVertical: 2, // Smaller padding
-    borderRadius: 8, // Smaller radius
-    marginLeft: 6, // Reduced margin
-  },
-  unreadText: {
-    fontSize: 10, // Smaller font
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-  separator: {
-    height: 6, // Smaller separator
-  },
-  emptyContainer: { 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    paddingVertical: 60, // Reduced padding
-    paddingHorizontal: 40,
-  },
-  emptyIconBackground: {
-    width: 80, // Smaller icon
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16, // Reduced margin
-  },
-  emptyTitle: {
-    fontSize: 18, // Slightly smaller
-    fontWeight: '700',
-    color: '#1A1A2C',
-    marginBottom: 8, // Reduced margin
-  },
-  emptySubtitle: {
-    fontSize: 14, // Slightly smaller
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 20, // Tighter line height
-  },
-  loadingContainer: { 
-    flex: 1, 
-    justifyContent: 'center', 
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
   },
   loadingIconBackground: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 15,
-    color: '#7A5AF8',
-    fontWeight: '600',
-  },
-  chevronContainer: {
-    paddingLeft: 8, // Reduced padding
-    justifyContent: 'center',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 40,
-  },
-  errorIconBackground: {
     width: 80,
     height: 80,
     borderRadius: 40,
@@ -498,35 +297,233 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
+  loadingText: {
+    fontSize: 16,
+    color: '#6B7280',
+    fontFamily: 'Inter-Medium',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#FFFFFF',
+  },
+  errorIconBackground: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   errorTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1A1A2C',
-    marginBottom: 10,
+    fontSize: 20,
+    fontFamily: 'Inter-Bold',
+    color: '#1F2937',
+    marginBottom: 8,
   },
   errorSubtitle: {
-    fontSize: 14,
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
     color: '#6B7280',
     textAlign: 'center',
-    lineHeight: 20,
     marginBottom: 30,
   },
   retryButton: {
-    width: '80%',
     borderRadius: 12,
     overflow: 'hidden',
   },
   retryButtonGradient: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 14,
     paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
   },
   retryButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
     marginLeft: 8,
+  },
+  headerGradient: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingTop: 60,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontFamily: 'Inter-Bold',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#6B7280',
+  },
+  listContainer: {
+    flex: 1,
+  },
+  listContent: {
+    paddingVertical: 8,
+  },
+  emptyListContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  roomItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#FFFFFF',
+  },
+  unreadRoomItem: {
+    backgroundColor: '#F8F7FF',
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 12,
+  },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  avatarFallback: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#7A5AF8',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarFallbackText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+  },
+  onlineIndicator: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  onlineIndicatorInactive: {
+    backgroundColor: '#6B7280',
+  },
+  roomContent: {
+    flex: 1,
+  },
+  roomHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  roomName: {
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    color: '#1F2937',
+    flex: 1,
+    marginRight: 8,
+  },
+  timeText: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#9CA3AF',
+  },
+  productContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  productIcon: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#7A5AF8',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 6,
+  },
+  productTitle: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    color: '#6B7280',
+    flex: 1,
+  },
+  messageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  lastMsg: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#6B7280',
+    flex: 1,
+    marginRight: 8,
+  },
+  unreadLastMsg: {
+    color: '#1F2937',
+    fontFamily: 'Inter-SemiBold',
+  },
+  unreadBadge: {
+    backgroundColor: '#7A5AF8',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  unreadText: {
+    fontSize: 10,
+    fontFamily: 'Inter-Bold',
+    color: '#FFFFFF',
+  },
+  chevronContainer: {
+    marginLeft: 8,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginHorizontal: 20,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyIconBackground: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontFamily: 'Inter-SemiBold',
+    color: '#1F2937',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

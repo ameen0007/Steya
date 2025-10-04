@@ -18,7 +18,7 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
-
+steya-f3031-firebase-adminsdk-fbsvc-231b19ae48.json
 # Metro
 .metro-health-check*
 

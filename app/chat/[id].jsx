@@ -1,8 +1,9 @@
-// ChatScreen.js - UPDATED WITH CAPSULE OPTIONS & NO PROFILE PICS IN MESSAGES
+// ChatScreen.js - UPDATED HYBRID VERSION (Enhanced)
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { 
   View, Text, TouchableOpacity, FlatList, StyleSheet, 
-  ActivityIndicator, Image,  
+  ActivityIndicator, Image, TextInput, KeyboardAvoidingView, Platform,
+  RefreshControl, Alert
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { io } from 'socket.io-client';
@@ -12,8 +13,20 @@ import { conversationTree, getNextOptions } from '../../services/chattree';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
-const apiUrl = process.env.EXPO_PUBLIC_API_URL
 
+const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+
+// Input validation helper
+const validateMessage = (text) => {
+  const trimmed = text.trim();
+  if (!trimmed) return { isValid: false, error: 'Message cannot be empty' };
+  if (trimmed.length > 500) return { isValid: false, error: 'Message too long (max 500 characters)' };
+  if (trimmed.length < 1) return { isValid: false, error: 'Message too short' };
+  
+  // Basic sanitization
+  const sanitized = trimmed.replace(/[<>]/g, '');
+  return { isValid: true, sanitized };
+};
 
 const ChatScreen = () => {
   const { id: roomId } = useLocalSearchParams();
@@ -32,11 +45,18 @@ const ChatScreen = () => {
   const [connectionError, setConnectionError] = useState(null);
   const [otherUser, setOtherUser] = useState(null);
   
+  // Enhanced state management
+  const [isConnected, setIsConnected] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [messageInput, setMessageInput] = useState('');
+  
   const socketRef = useRef(null);
   const flatListRef = useRef(null);
   const isInitializedRef = useRef(false);
+  const inputRef = useRef(null);
+  const scrollTimeoutRef = useRef(null);
 
-  // Memoize socket configuration
   const socketConfig = useMemo(() => ({
     transports: ['websocket', 'polling'],
     reconnection: true,
@@ -45,7 +65,7 @@ const ChatScreen = () => {
     timeout: 10000
   }), []);
 
-  // Extract other user from room info
+  // Enhanced connection monitoring
   useEffect(() => {
     if (roomInfo?.participants && userId) {
       const other = roomInfo.participants.find(p => 
@@ -55,7 +75,6 @@ const ChatScreen = () => {
     }
   }, [roomInfo, userId]);
 
-  // Memoized update options function
   const updateOptionsForState = useCallback((state, role) => {
     if (!role) return;
 
@@ -69,12 +88,6 @@ const ChatScreen = () => {
       setCanReply(userCanReply);
       setCurrentOptions(options || []);
       setWaitingFor(waiting);
-      
-      console.log(`🎯 Options updated for ${role} at state ${state}:`, {
-        canReply: userCanReply,
-        optionsCount: options?.length || 0,
-        waitingFor: waiting
-      });
     } catch (error) {
       console.error('❌ Error updating options:', error);
       setCanReply(false);
@@ -82,7 +95,7 @@ const ChatScreen = () => {
     }
   }, []);
 
-  // Socket initialization and event handling
+  // Enhanced socket connection with better error handling
   useEffect(() => {
     if (!roomId || !userId) {
       setConnectionError('Missing room or user information');
@@ -90,103 +103,79 @@ const ChatScreen = () => {
       return;
     }
 
-    // Prevent duplicate initialization
     if (isInitializedRef.current) return;
     isInitializedRef.current = true;
 
-    console.log('🔌 Initializing socket connection...');
     const socket = io(apiUrl, socketConfig);
     socketRef.current = socket;
 
-    // Connection successful
     socket.on('connect', () => {
-      console.log('✅ Socket connected:', socket.id);
+      console.log('✅ Socket connected');
+      setIsConnected(true);
       setIsConnecting(false);
       setConnectionError(null);
-      
-      // Join room immediately after connection
       socket.emit('joinRoom', { roomId, userId });
-      console.log('📨 Emitted joinRoom:', { roomId, userId });
+      socket.emit('userOnline', { userId });
     });
 
-    // Receive initial room data
     socket.on('initialData', (data) => {
-      console.log('📦 Initial data received:', data);
       const { messages: prevMessages, currentState: state, userRole: role, roomInfo: info } = data;
       
       setMessages(prevMessages || []);
       setCurrentState(state);
       setUserRole(role);
       setRoomInfo(info);
-      
-      // Update options based on received state and role
       updateOptionsForState(state, role);
-      
-      console.log('✅ Room initialized:', {
-        messagesCount: prevMessages?.length || 0,
-        currentState: state,
-        userRole: role,
-        roomName: info?.propertyTitle
-      });
     });
 
-    // Receive new messages
     socket.on('newMessage', ({ message, nextState }) => {
-      console.log('📨 New message received:', message);
-      
       setMessages(prev => {
-        const messageKey = `${message.sender}-${message.createdAt}`;
+        // Enhanced deduplication
+        const messageKey = `${message.sender}-${message.createdAt}-${message.optionId || message.text?.substring(0,20)}`;
         const exists = prev.some(m => 
-          `${m.sender}-${m.createdAt}` === messageKey
+          `${m.sender}-${m.createdAt}-${m.optionId || m.text?.substring(0,20)}` === messageKey
         );
         
-        if (exists) {
-          console.log('⚠️ Duplicate message detected, skipping');
-          return prev;
-        }
+        if (exists) return prev;
         
         const newMsg = {
           ...message,
           fromMe: message.sender?.toString() === userId?.toString()
         };
         
-        console.log('✅ Message added to list:', newMsg.option);
         return [...prev, newMsg];
       });
 
-      setCurrentState(nextState);
-      console.log('🔄 State transitioned to:', nextState);
+      if (nextState) {
+        setCurrentState(nextState);
+      }
     });
 
-    // Update options when state changes
-    socket.on('newMessage', ({ nextState }) => {
-      updateOptionsForState(nextState, userRole);
-    });
-
-    // Connection error
     socket.on('connect_error', (error) => {
-      console.error('❌ Connection error:', error);
+      console.log('❌ Connection error:', error);
+      setIsConnected(false);
       setConnectionError('Connection failed. Retrying...');
       setIsConnecting(false);
     });
 
-    // General error
     socket.on('error', (error) => {
-      console.error('❌ Socket error:', error);
+      console.log('❌ Socket error:', error);
       setConnectionError(error.message || 'An error occurred');
     });
 
-    // Disconnection
     socket.on('disconnect', (reason) => {
       console.log('❌ Socket disconnected:', reason);
+      setIsConnected(false);
       if (reason === 'io server disconnect') {
         socket.connect();
       }
     });
 
-    // Cleanup
+    // Cleanup function
     return () => {
-      console.log('🧹 Cleaning up socket connection');
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
       if (socketRef.current) {
         socketRef.current.emit('leaveRoom', { roomId, userId });
         socketRef.current.disconnect();
@@ -195,29 +184,45 @@ const ChatScreen = () => {
     };
   }, [roomId, userId, socketConfig, updateOptionsForState]);
 
-  // Auto-scroll when new messages arrive
+  // Enhanced scroll with cleanup
   useEffect(() => {
     if (messages.length > 0) {
-      setTimeout(() => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+      scrollTimeoutRef.current = setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     }
+
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
   }, [messages.length]);
 
-  // Update options when userRole or currentState changes
   useEffect(() => {
     if (userRole && currentState) {
       updateOptionsForState(currentState, userRole);
     }
   }, [userRole, currentState, updateOptionsForState]);
 
-  // Memoized send option handler
+  // Enhanced refresh function
+  const refreshChat = useCallback(() => {
+    if (!socketRef.current) return;
+    
+    setIsRefreshing(true);
+    socketRef.current.emit('joinRoom', { roomId, userId });
+    
+    // Auto-stop refreshing after 3 seconds
+    setTimeout(() => setIsRefreshing(false), 3000);
+  }, [roomId, userId]);
+
+  // Enhanced send option with connection check
   const sendOption = useCallback((option) => {
-    if (!socketRef.current || !canReply) {
-      console.log('⚠️ Cannot send message:', { 
-        hasSocket: !!socketRef.current, 
-        canReply 
-      });
+    if (!socketRef.current || !canReply || !isConnected) {
+      setConnectionError('No connection. Please check your internet.');
       return;
     }
 
@@ -227,18 +232,50 @@ const ChatScreen = () => {
       optionId: option.id,
       optionText: option.text,
       nextState: option.next,
-      senderRole: userRole
+      senderRole: userRole,
+      messageType: 'option'
     };
 
-    console.log('📤 Sending message:', messageData);
     socketRef.current.emit('sendMessage', messageData);
-
-    // Optimistic UI update
     setCanReply(false);
     setCurrentOptions([]);
-  }, [canReply, roomId, userId, userRole]);
+  }, [canReply, roomId, userId, userRole, isConnected]);
 
-  // Memoized time formatter
+  // Enhanced send free-text with validation
+  const sendFreeText = useCallback(() => {
+    // Connection check
+    if (!socketRef.current || !isConnected) {
+      setConnectionError('No connection. Please check your internet.');
+      return;
+    }
+
+    // Validation
+    const validation = validateMessage(messageInput);
+    if (!validation.isValid) {
+      Alert.alert('Invalid Message', validation.error);
+      return;
+    }
+
+    if (isSending) return;
+
+    setIsSending(true);
+
+    const messageData = {
+      roomId,
+      sender: userId,
+      text: validation.sanitized,
+      senderRole: userRole,
+      messageType: 'freetext',
+      nextState: currentState
+    };
+
+    socketRef.current.emit('sendMessage', messageData);
+    
+    setMessageInput('');
+    setIsSending(false);
+    inputRef.current?.blur();
+  }, [messageInput, roomId, userId, userRole, currentState, isSending, isConnected]);
+
   const formatTime = useCallback((timestamp) => {
     const date = timestamp ? new Date(timestamp) : new Date();
     return date.toLocaleTimeString('en-US', { 
@@ -247,38 +284,54 @@ const ChatScreen = () => {
     });
   }, []);
 
-  // Memoized render item for FlatList - REMOVED PROFILE PICTURES
-  const renderMessage = useCallback(({ item }) => (
-    <View style={[
-      styles.messageContainer, 
-      item.fromMe ? styles.myMessage : styles.theirMessage
-    ]}>
-      <View style={[
-        styles.messageBubble, 
-        item.fromMe ? styles.myBubble : styles.theirBubble
-      ]}>
-        <Text style={[
-          styles.messageText, 
-          item.fromMe ? styles.myText : styles.theirText
+  // Enhanced message render with error boundary
+  const renderMessage = useCallback(({ item }) => {
+    try {
+      const displayText = item.messageType === 'freetext' ? item.text : item.option;
+      
+      return (
+        <View style={[
+          styles.messageContainer, 
+          item.fromMe ? styles.myMessage : styles.theirMessage
         ]}>
-          {item.option}
-        </Text>
-        <Text style={[
-          styles.timeText, 
-          item.fromMe ? styles.myTimeText : styles.theirTimeText
-        ]}>
-          {formatTime(item.createdAt)}
-        </Text>
-      </View>
-    </View>
-  ), [formatTime]);
+          <View style={[
+            styles.messageBubble, 
+            item.fromMe ? styles.myBubble : styles.theirBubble
+          ]}>
+            {item.messageType === 'option' && (
+              <View style={styles.optionIndicator}>
+                <Ionicons name="options-outline" size={12} color={item.fromMe ? "#FFFFFF" : "#7A5AF8"} />
+              </View>
+            )}
+            <Text style={[
+              styles.messageText, 
+              item.fromMe ? styles.myText : styles.theirText
+            ]}>
+              {displayText}
+            </Text>
+            <Text style={[
+              styles.timeText, 
+              item.fromMe ? styles.myTimeText : styles.theirTimeText
+            ]}>
+              {formatTime(item.createdAt)}
+            </Text>
+          </View>
+        </View>
+      );
+    } catch (error) {
+      console.error('Error rendering message:', error);
+      return (
+        <View style={styles.errorMessageContainer}>
+          <Text style={styles.errorMessageText}>Error displaying message</Text>
+        </View>
+      );
+    }
+  }, [formatTime]);
 
-  // Memoized key extractor
   const keyExtractor = useCallback((item, index) => 
-    `${item.sender}-${item.createdAt}-${index}`, []
+    `${item.sender}-${item.createdAt}-${item.optionId || 'text'}-${index}`, []
   );
 
-  // Memoized empty component
   const EmptyComponent = useMemo(() => (
     <View style={styles.emptyState}>
       <LinearGradient
@@ -289,25 +342,11 @@ const ChatScreen = () => {
       </LinearGradient>
       <Text style={styles.emptyText}>Start the conversation</Text>
       <Text style={styles.emptySubtext}>
-        {userRole === 'inquirer' 
-          ? 'Choose a question to ask the owner'
-          : 'Wait for the inquirer to send a message'}
+        Choose a quick reply or type your message
       </Text>
     </View>
-  ), [userRole]);
+  ), []);
 
-  // Memoized waiting message
-  const waitingMessage = useMemo(() => {
-    if (waitingFor) {
-      return ` Waiting for ${waitingFor === 'owner' ? 'owner' : 'inquirer'}...`;
-    }
-    if (currentState === 'END_CONVERSATION') {
-      return '✅ Conversation complete';
-    }
-    return ' Waiting...';
-  }, [waitingFor, currentState]);
-
-  // Show loading state
   if (isConnecting) {
     return (
       <SafeWrapper style={styles.container}>
@@ -325,7 +364,6 @@ const ChatScreen = () => {
     );
   }
 
-  // Show error state
   if (connectionError && !roomInfo) {
     return (
       <SafeWrapper style={styles.container}>
@@ -363,116 +401,171 @@ const ChatScreen = () => {
   return (
     <SafeWrapper style={styles.container}>
       <StatusBar style="dark"/>
-
-      {/* HEADER */}
-      <LinearGradient
-        colors={['#FFFFFF', '#F8F7FF']}
-        style={styles.headerGradient}
+      <KeyboardAvoidingView 
+        style={styles.container} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        <View style={styles.header}>
-          {/* Back Button */}
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Ionicons name="chevron-back" size={28} color="#7A5AF8" />
-          </TouchableOpacity>
+        {/* HEADER */}
+        <LinearGradient
+          colors={['#FFFFFF', '#F8F7FF']}
+          style={styles.headerGradient}
+        >
+          <View style={styles.header}>
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => router.back()}
+              accessibilityLabel="Go back"
+              accessibilityRole="button"
+            >
+              <Ionicons name="chevron-back" size={28} color="#7A5AF8" />
+            </TouchableOpacity>
 
-          {/* User Info */}
-          <View style={styles.userInfo}>
-            <View style={styles.avatarContainer}>
-              {otherUser?.picture ? (
-                <Image
-                  source={{ uri: otherUser.picture }}
-                  style={styles.headerAvatar}
-                />
-              ) : (
-                <View style={styles.headerAvatarFallback}>
-                  <Text style={styles.headerAvatarText}>
-                    {(otherUser?.name?.charAt(0) || 'U').toUpperCase()}
-                  </Text>
-                </View>
-              )}
-              <View style={[
-                styles.onlineIndicator,
-                canReply ? styles.onlineActive : styles.onlineInactive
-              ]} />
+            <View style={styles.userInfo}>
+              <View style={styles.avatarContainer}>
+                {otherUser?.picture ? (
+                  <Image
+                    source={{ uri: otherUser.picture }}
+                    style={styles.headerAvatar}
+                  />
+                ) : (
+                  <View style={styles.headerAvatarFallback}>
+                    <Text style={styles.headerAvatarText}>
+                      {(otherUser?.name?.charAt(0) || 'U').toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+                <View style={[
+                  styles.onlineIndicator,
+                  isConnected ? styles.onlineActive : styles.onlineInactive
+                ]} />
+              </View>
+              
+              <View style={styles.userTextContainer}>
+                <Text style={styles.userName} numberOfLines={1}>
+                  {otherUser?.name || 'User'}
+                </Text>
+                <Text style={styles.productTitle} numberOfLines={1}>
+                  {roomInfo?.propertyTitle || 'Property Chat'}
+                </Text>
+              </View>
             </View>
-            
-            <View style={styles.userTextContainer}>
-              <Text style={styles.userName} numberOfLines={1}>
-                {otherUser?.name || 'User'}
-              </Text>
-              <Text style={styles.productTitle} numberOfLines={1}>
-                {roomInfo?.propertyTitle || 'Property Chat'}
+
+            <View style={[
+              styles.statusBadge,
+              isConnected ? styles.statusActive : styles.statusWaiting
+            ]}>
+              <Text style={[
+                styles.statusText,
+                isConnected ? styles.statusActiveText : styles.statusWaitingText
+              ]}>
+                {isConnected ? 'Online' : 'Offline'}
               </Text>
             </View>
           </View>
+        </LinearGradient>
 
-          {/* Status Badge */}
-          <View style={[
-            styles.statusBadge,
-            canReply ? styles.statusActive : styles.statusWaiting
-          ]}>
-            <Text style={[
-              styles.statusText,
-              canReply ? styles.statusActiveText : styles.statusWaitingText
-            ]}>
-              {canReply ? 'Active' : 'Waiting'}
+        {/* Messages List */}
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={keyExtractor}
+          contentContainerStyle={styles.messageList}
+          renderItem={renderMessage}
+          ListEmptyComponent={EmptyComponent}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={20}
+          windowSize={10}
+          initialNumToRender={15}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={refreshChat}
+              colors={['#7A5AF8']}
+              tintColor={'#7A5AF8'}
+            />
+          }
+        />
+
+        {/* Connection Status Banner */}
+        {!isConnected && (
+          <View style={styles.connectionBanner}>
+            <Ionicons name="cloud-offline" size={16} color="#FFFFFF" />
+            <Text style={styles.connectionBannerText}>
+              No connection. Attempting to reconnect...
+            </Text>
+          </View>
+        )}
+
+        {/* Input Area - HYBRID: Options + Text Input */}
+        <View style={styles.inputWrapper}>
+          {/* Quick Reply Options */}
+          {canReply && currentOptions.length > 0 && (
+            <View style={styles.quickRepliesContainer}>
+              <Text style={styles.quickRepliesLabel}>Quick replies:</Text>
+              <View style={styles.optionsRow}>
+                {currentOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option.id}
+                    style={styles.capsuleOption}
+                    onPress={() => sendOption(option)}
+                    activeOpacity={0.7}
+                    accessibilityLabel={`Quick reply: ${option.text}`}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.capsuleOptionText} numberOfLines={2}>
+                      {option.text}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Text Input Area - Always visible */}
+          <View style={styles.inputContainer}>
+            <View style={styles.inputRow}>
+              <TextInput
+                ref={inputRef}
+                style={styles.textInput}
+                placeholder="Type your message..."
+                placeholderTextColor="#9CA3AF"
+                value={messageInput}
+                onChangeText={setMessageInput}
+                multiline
+                maxLength={500}
+                editable={!isSending && isConnected}
+                accessibilityLabel="Message input"
+                accessibilityHint="Type your message here. Press send button when done."
+              />
+              <TouchableOpacity
+                style={[
+                  styles.sendButton,
+                  (!messageInput.trim() || isSending || !isConnected) && styles.sendButtonDisabled
+                ]}
+                onPress={sendFreeText}
+                disabled={!messageInput.trim() || isSending || !isConnected}
+                accessibilityLabel={`Send message: ${messageInput}`}
+                accessibilityRole="button"
+              >
+                {isSending ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Ionicons 
+                    name="send" 
+                    size={20} 
+                    color={messageInput.trim() && isConnected ? "#FFFFFF" : "#9CA3AF"} 
+                  />
+                )}
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.charCount}>
+              {messageInput.length}/500
             </Text>
           </View>
         </View>
-      </LinearGradient>
-
-      {/* Messages List */}
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        keyExtractor={keyExtractor}
-        contentContainerStyle={styles.messageList}
-        renderItem={renderMessage}
-        ListEmptyComponent={EmptyComponent}
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={20}
-        windowSize={10}
-        initialNumToRender={15}
-        showsVerticalScrollIndicator={false}
-      />
-
-      {/* Options Panel - CAPSULE STYLE */}
-      <View style={styles.optionsContainer}>
-        {canReply && currentOptions.length > 0 ? (
-          <>
-            <Text style={styles.optionsTitle}>
-              💬 Choose your reply
-            </Text>
-            <View style={styles.optionsRow}>
-              {currentOptions.map((option) => (
-                <TouchableOpacity
-                  key={option.id}
-                  style={styles.capsuleOption}
-                  onPress={() => sendOption(option)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.capsuleOptionText} numberOfLines={2}>
-                    {option.text}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </>
-        ) : (
-          <View style={styles.waitingContainer}>
-            <Ionicons 
-              name="time-outline" 
-              size={24} 
-              color="#9CA3AF" 
-              style={styles.waitingIcon}
-            />
-            <Text style={styles.waitingText}>{waitingMessage}</Text>
-          </View>
-        )}
-      </View>
+      </KeyboardAvoidingView>
     </SafeWrapper>
   );
 };
@@ -489,26 +582,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   loadingIconBackground: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#7A5AF8',
-    fontWeight: '600',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 40,
-  },
-  errorIconBackground: {
     width: 80,
     height: 80,
     borderRadius: 40,
@@ -516,57 +589,70 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
+  loadingText: {
+    fontSize: 16,
+    color: '#6B7280',
+    fontFamily: 'Inter-Medium',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#FFFFFF',
+  },
+  errorIconBackground: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   errorTitle: {
     fontSize: 20,
-    fontWeight: '700',
-    color: '#1A1A2C',
+    fontFamily: 'Inter-Bold',
+    color: '#1F2937',
     marginBottom: 8,
   },
   errorSubtitle: {
-    fontSize: 15,
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
     color: '#6B7280',
     textAlign: 'center',
     marginBottom: 30,
-    lineHeight: 20,
   },
   retryButton: {
-    width: '80%',
-    borderRadius: 14,
+    borderRadius: 12,
     overflow: 'hidden',
   },
   retryButtonGradient: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 16,
     paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
   },
   retryButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
     marginLeft: 8,
   },
-
-  // HEADER STYLES
   headerGradient: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 3,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 16,
-    backgroundColor: 'transparent',
+    paddingVertical: 12,
+    paddingTop: Platform.OS === 'ios' ? 50 : 12,
   },
   backButton: {
-    marginRight: 12,
     padding: 4,
+    marginRight: 8,
   },
   userInfo: {
     flex: 1,
@@ -578,23 +664,22 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   headerAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#E5E7EB',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
   },
   headerAvatarFallback: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#E9E5FF',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#7A5AF8',
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerAvatarText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#7A5AF8',
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
   },
   onlineIndicator: {
     position: 'absolute',
@@ -610,21 +695,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#10B981',
   },
   onlineInactive: {
-    backgroundColor: '#9CA3AF',
+    backgroundColor: '#6B7280',
   },
   userTextContainer: {
     flex: 1,
   },
   userName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1A1A2C',
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    color: '#1F2937',
     marginBottom: 2,
   },
   productTitle: {
     fontSize: 14,
-    color: '#7A5AF8',
-    fontWeight: '600',
+    fontFamily: 'Inter-Regular',
+    color: '#6B7280',
   },
   statusBadge: {
     paddingHorizontal: 12,
@@ -632,159 +717,213 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   statusActive: {
-    backgroundColor: '#10B98120',
+    backgroundColor: '#D1FAE5',
   },
   statusWaiting: {
-    backgroundColor: '#F59E0B20',
+    backgroundColor: '#F3F4F6',
   },
   statusText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'Inter-Medium',
   },
   statusActiveText: {
-    color: '#10B981',
+    color: '#065F46',
   },
   statusWaitingText: {
-    color: '#F59E0B',
+    color: '#6B7280',
   },
-
-  // MESSAGE STYLES - NO PROFILE PICTURES
   messageList: {
-    padding: 16,
     flexGrow: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyIconBackground: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontFamily: 'Inter-SemiBold',
+    color: '#1F2937',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtext: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
   },
   messageContainer: {
-    marginBottom: 16,
+    marginVertical: 4,
   },
   myMessage: {
-    alignSelf: 'flex-end',
+    alignItems: 'flex-end',
   },
   theirMessage: {
-    alignSelf: 'flex-start',
+    alignItems: 'flex-start',
   },
   messageBubble: {
-    borderRadius: 18,
-    padding: 12,
     maxWidth: '80%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
   },
   myBubble: {
     backgroundColor: '#7A5AF8',
     borderBottomRightRadius: 4,
   },
   theirBubble: {
-    backgroundColor: '#F8F7FF',
+    backgroundColor: '#F3F4F6',
     borderBottomLeftRadius: 4,
   },
+  optionIndicator: {
+    marginRight: 6,
+    marginBottom: 2,
+  },
   messageText: {
-    fontSize: 15,
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    flex: 1,
     lineHeight: 20,
   },
   myText: {
     color: '#FFFFFF',
   },
   theirText: {
-    color: '#1A1A2C',
+    color: '#1F2937',
   },
   timeText: {
     fontSize: 11,
+    fontFamily: 'Inter-Regular',
+    marginLeft: 8,
     marginTop: 4,
   },
   myTimeText: {
-    color: '#E0E0E0',
-    textAlign: 'right',
+    color: '#E5E7EB',
   },
   theirTimeText: {
-    color: '#6B7280',
+    color: '#9CA3AF',
   },
-
-  // EMPTY STATE
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
+  errorMessageContainer: {
+    padding: 16,
+    margin: 8,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FECACA',
   },
-  emptyIconBackground: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1A1A2C',
-    marginBottom: 8,
-  },
-  emptySubtext: {
+  errorMessageText: {
+    color: '#DC2626',
     fontSize: 14,
-    color: '#6B7280',
+    fontFamily: 'Inter-Regular',
     textAlign: 'center',
-    paddingHorizontal: 32,
-    lineHeight: 20,
   },
-
-  // OPTIONS STYLES - CAPSULE DESIGN
-  optionsContainer: {
+  connectionBanner: {
+    backgroundColor: '#EF4444',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  connectionBannerText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    marginLeft: 8,
+  },
+  inputWrapper: {
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
-    padding: 16,
-    paddingBottom: 24,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 8,
   },
-  optionsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1A1A2C',
-    marginBottom: 12,
-    textAlign: 'center',
+  quickRepliesContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  quickRepliesLabel: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    color: '#6B7280',
+    marginBottom: 8,
   },
   optionsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 10,
   },
   capsuleOption: {
-    backgroundColor: '#7A5AF8',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 25, // Capsule shape
+    backgroundColor: '#F8F7FF',
+    borderWidth: 1,
+    borderColor: '#7A5AF8',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginRight: 8,
     marginBottom: 8,
-    shadowColor: '#7A5AF8',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
   },
   capsuleOptionText: {
-    color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'Inter-Medium',
+    color: '#7A5AF8',
     textAlign: 'center',
   },
-  waitingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-    backgroundColor: '#F8F7FF',
-    borderRadius: 12,
+  inputContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
   },
-  waitingIcon: {
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  textInput: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingTop: 12,
+    maxHeight: 100,
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#1F2937',
     marginRight: 8,
   },
-  waitingText: {
-    fontSize: 15,
-    color: '#6B7280',
-    fontStyle: 'italic',
+  sendButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#7A5AF8',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sendButtonDisabled: {
+    backgroundColor: '#E5E7EB',
+  },
+  charCount: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#9CA3AF',
+    textAlign: 'right',
+    marginTop: 4,
+    marginRight: 8,
   },
 });
 
