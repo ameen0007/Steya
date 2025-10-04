@@ -1,13 +1,12 @@
-
 import { useRef, useState, useEffect } from 'react';
-import { ScrollView, TouchableOpacity, Text, View, Image, Modal, Dimensions, Platform, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import { ScrollView, TouchableOpacity, Text, View, Image, Modal, Dimensions, Platform, FlatList, StyleSheet, ActivityIndicator, Share, TextInput, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather, FontAwesome5, Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 
-
-import SafeWrapper from '../../services/Safewrapper'; // Adjust this path if neededimport { WebView } from 'react-native-webview';
+import SafeWrapper from '../../services/Safewrapper';
+import { WebView } from 'react-native-webview';
 const { width } = Dimensions.get('window');
-import  StaticMap  from '../../componets/map'; 
+import StaticMap from '../../componets/map';
 import TopFadeGradient from '../../componets/topgradient';
 import { StatusBar } from 'expo-status-bar';
 import axios from 'axios';
@@ -16,32 +15,36 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 
 import api from '../../services/intercepter';
 import { useSelector } from 'react-redux';
+
 const DetailsPage = () => {
   console.log("✅ DetailsPage loaded");
 
   const { id } = useLocalSearchParams();
   console.log("📥 Received ID from route:", id);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
-  
- 
+
   const router = useRouter();
   const modalFlatListRef = useRef(null);
   const [item, setItem] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [currentImage, setCurrentImage] = useState(0);
-  const [isFavorite, setIsFavorite] = useState(false); // Manage favorite state
+  const [isFavorite, setIsFavorite] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [initialImageIndex, setInitialImageIndex] = useState(0);
-   const user = useSelector((state) => state.user.userData);
-   
-      useEffect(() => {
+  const [isReportModalVisible, setIsReportModalVisible] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDescription, setReportDescription] = useState('');
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [isFavoriteLoading, setIsFavoriteLoading] = useState(false);
+  const user = useSelector((state) => state.user.userData);
+
+  useEffect(() => {
     const fetchRoomData = async () => {
       try {
         setLoading(true);
         setError(null);
         const response = await axios.get(`${apiUrl}/api/singleroom/${id}`);
-        // console.log("🔍 Fetched room data:", response.data?.room);
         setItem(response.data?.room);
         console.log("✅ Room data fetched:", response.data?.room);
       } catch (err) {
@@ -57,67 +60,145 @@ const DetailsPage = () => {
     }
   }, [id]);
 
+  // Check if room is favorited
+  useEffect(() => {
+    const checkFavorite = async () => {
+      if (!id) return;
+      try {
+        const response = await api.get(`${apiUrl}/api/favorites/check/${id}`);
+        console.log('Favorite check response:', response.data);
+        
+        // ✅ FIXED: Handle both possible property names
+        const favoriteStatus = response.data.isFavorited ?? response.data.isFavorite ?? false;
+        setIsFavorite(favoriteStatus);
+      } catch (error) {
+        console.error('Error checking favorite status:', error);
+      }
+    };
+
+    checkFavorite();
+  }, [id]);
+
   const handleChatPress = async () => {
-  console.log("Starting chat for product:", item._id);
-  
-  try {
-    setIsCreatingRoom(true);
+    console.log("Starting chat for product:", item._id);
 
-    // First, check if room already exists
-    const checkResponse = await api.get(`${apiUrl}/api/chat/check-room`, {
-      params: { productId: item._id }
-    });
+    try {
+      setIsCreatingRoom(true);
 
-    let roomId;
-
-    if (checkResponse.data.exists) {
-      // Use existing room (could be pending or active)
-      roomId = checkResponse.data.roomId;
-      console.log("Using existing room:", roomId, "Status:", checkResponse.data.status);
-    } else {
-      // Create new PENDING room
-      const createResponse = await api.post(`${apiUrl}/api/chat/create-room`, {
-        productId: item._id,
-        productTitle: item.title || 'Product Chat',
-        ownerId: item?.createdBy?._id 
+      const checkResponse = await api.get(`${apiUrl}/api/chat/check-room`, {
+        params: { productId: item._id }
       });
-      
-      roomId = createResponse.data.roomId;
-      console.log("Created new pending room:", roomId);
+
+      let roomId;
+
+      if (checkResponse.data.exists) {
+        roomId = checkResponse.data.roomId;
+        console.log("Using existing room:", roomId, "Status:", checkResponse.data.status);
+      } else {
+        const createResponse = await api.post(`${apiUrl}/api/chat/create-room`, {
+          productId: item._id,
+          productTitle: item.title || 'Product Chat',
+          ownerId: item?.createdBy?._id
+        });
+
+        roomId = createResponse.data.roomId;
+        console.log("Created new pending room:", roomId);
+      }
+
+      router.push({
+        pathname: '/chat/[id]',
+        params: { id: roomId }
+      });
+
+    } catch (error) {
+      console.error('Error creating chat room:', error);
+      Alert.alert('Error', 'Failed to start chat. Please try again.');
+    } finally {
+      setIsCreatingRoom(false);
     }
-
-    // Navigate to chat
-    router.push({
-      pathname: '/chat/[id]',
-      params: { id: roomId }
-    });
-
-  } catch (error) {
-    console.error('Error creating chat room:', error);
-    alert('Failed to start chat. Please try again.');
-  } finally {
-    setIsCreatingRoom(false);
-  }
-};
+  };
 
   const handleBackPress = () => {
-    router.back(); // Go back to the previous screen
+    router.back();
   };
 
-  const toggleFavorite = () => {
-    setIsFavorite((prev) => !prev);
+  const toggleFavorite = async () => {
+    if (isFavoriteLoading) return;
+
+    try {
+      setIsFavoriteLoading(true);
+      console.log('🔄 Toggling favorite for room:', id);
+      
+      const response = await api.post(`${apiUrl}/api/favorites/toggle`, {
+        roomId: id
+      });
+
+      console.log('✅ Favorite toggle response:', response.data);
+      
+      // ✅ FIXED: Handle both possible property names
+      const newFavoriteStatus = response.data.isFavorited ?? response.data.isFavorite ?? false;
+      setIsFavorite(newFavoriteStatus);
+      
+    } catch (error) {
+      console.error('❌ Error toggling favorite:', error);
+      console.error('❌ Error response:', error.response?.data);
+      Alert.alert('Error', 'Failed to update favorite status');
+    } finally {
+      setIsFavoriteLoading(false);
+    }
   };
 
-  // Keep track of the current image in modal separately
+  const handleShare = async () => {
+    try {
+      const result = await Share.share({
+        message: `Check out this room: ${item?.title}\n₹${item?.monthlyRent}/month\n\nView details: ${apiUrl}/room/${id}`,
+        title: item?.title || 'Room Listing',
+      });
+
+      if (result.action === Share.sharedAction) {
+        console.log('Shared successfully');
+      }
+    } catch (error) {
+      console.error('Error sharing:', error);
+      Alert.alert('Error', 'Failed to share');
+    }
+  };
+
+  const handleReportSubmit = async () => {
+    if (!reportReason) {
+      Alert.alert('Error', 'Please select a reason for reporting');
+      return;
+    }
+
+    try {
+      setIsSubmittingReport(true);
+      const response = await api.post(`${apiUrl}/api/reports/report-room`, {
+        roomId: id,
+        reason: reportReason,
+        description: reportDescription
+      });
+
+      Alert.alert('Success', 'Room reported successfully. Our team will review it shortly.');
+      setIsReportModalVisible(false);
+      setReportReason('');
+      setReportDescription('');
+    } catch (error) {
+      console.error('Error reporting room:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to report room';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  };
+
   const [modalCurrentImage, setModalCurrentImage] = useState(0);
 
   const openImageModal = (index) => {
     setInitialImageIndex(index);
-    setModalCurrentImage(index); // Set modal's current image
+    setModalCurrentImage(index);
     setIsModalVisible(true);
   };
 
-  // Use this effect to scroll to the proper image when modal opens
   useEffect(() => {
     if (isModalVisible && modalFlatListRef.current) {
       setTimeout(() => {
@@ -131,12 +212,10 @@ const DetailsPage = () => {
 
   const closeImageModal = () => {
     console.log('Modal closed');
-    // Update the main carousel image to match what was last viewed in modal
     setCurrentImage(modalCurrentImage);
     setIsModalVisible(false);
   };
 
-  // This is required for initialScrollIndex to work properly
   const getItemLayout = (data, index) => ({
     length: width,
     offset: width * index,
@@ -144,374 +223,497 @@ const DetailsPage = () => {
   });
 
   const transformedItem = {
-  ...item,
-  images: item?.images ? item.images.map(img => img.originalUrl) : [],
-};
+    ...item,
+    images: item?.images ? item.images.map(img => img.originalUrl) : [],
+  };
 
-// okay, now show me that com
+  const reportReasons = [
+    { value: 'spam', label: 'Spam or Scam' },
+    { value: 'inappropriate', label: 'Inappropriate Content' },
+    { value: 'misinformation', label: 'Misinformation' },
+    { value: 'fake_listing', label: 'Fake Listing' },
+    { value: 'already_rented', label: 'Already Rented' },
+    { value: 'wrong_info', label: 'Wrong Information' },
+    { value: 'other', label: 'Other' }
+  ];
+
   return (
     <>
-     <StatusBar style="dark" />
-   {loading || !item ? (
-    <SkeletonLoader />
-  ) : (
-    <SafeWrapper>
-
-      <ScrollView>
-   
-<FlatList
-  data={item?.images}
-  horizontal
-  pagingEnabled
-  showsHorizontalScrollIndicator={false}
-  keyExtractor={(img, index) => img._id || index.toString()}
-  onMomentumScrollEnd={(e) => {
-    const index = Math.floor(e.nativeEvent.contentOffset.x / width);
-    setCurrentImage(index); // Update current image index
-  }}
-  renderItem={({ item: img, index }) => (
-    <View
-      style={{
-        width,
-        justifyContent: "center",
-        alignItems: "center"
-      }}
-    >
-      <TouchableOpacity
-        activeOpacity={0.8}
-        onPress={() => openImageModal(index)}
-      >
-        <Image
-          source={{ uri: img.originalUrl }}
-          style={{ width, height: 250 }}
-          resizeMode="cover"
-        />
-        <TopFadeGradient />
-
-        {/* counter bottom right */}
-        <View
-          style={{
-            position: "absolute",
-            bottom: 10,
-            right: 10,
-            backgroundColor: "#0009",
-            paddingHorizontal: 10,
-            paddingVertical: 5,
-            borderRadius: 12
-          }}
-        >
-          <Text style={{ color: "white", fontSize: 12 }}>
-            {index + 1}/{item.images.length}
-          </Text>
-        </View>
-      </TouchableOpacity>
-    </View>
-  )}
-/>
-
-
-
- 
-
-
-<View style={styles.container}>
-<View style={styles.rowBetween}>
-        <View style={styles.priceContainer}>
-          <Text style={styles.priceText}>₹{item?.monthlyRent}/month</Text>
-        </View>
-        <View style={styles.locationContainer}>
-          <Ionicons name="location-sharp" size={16} color="#7A5AF8" />
-          <Text style={styles.locationText}>{item?.location?.fullAddress}</Text>
-        </View>
-      </View>
-
-      <Text style={styles.title}>{item?.title}</Text>
-      
-     
-      <View style={styles.descriptionContainer}>
-        <Text style={styles.descriptionText}>{item?.description}</Text>
-      </View>
-      
-    
-      <Text style={styles.sectionTitle}>Room Details</Text>
-      <View style={styles.detailsContainer}>
-      
-        <View style={styles.detailsRow}>
-          <View style={styles.detailBox}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="home-outline" size={16} color="#ffffff" />
-            </View>
-            <View style={styles.detailContent}>
-              <Text style={styles.detailLabel}>Room Type</Text>
-              <Text style={styles.detailValue}>{item?.category?.charAt(0).toUpperCase() + item?.category?.slice(1)}</Text>
-            </View>
-          </View>
-          
-          <View style={styles.detailBox}>
-            <View style={styles.iconCircle}>
-              <MaterialCommunityIcons name="account-multiple-outline" size={16} color="#ffffff" />
-            </View>
-            <View style={styles.detailContent}>
-              <Text style={styles.detailLabel}>Vacancy</Text>
-              <Text style={styles.detailValue}>{item?.roommatesWanted} Available</Text>
-            </View>
-          </View>
-        </View>
-        
-      
-        <View style={styles.detailsRow}>
-          <View style={styles.detailBox}>
-            <View style={styles.iconCircle}>
-              <MaterialIcons name="person" size={16} color="#ffffff" />
-            </View>
-            <View style={styles.detailContent}>
-              <Text style={styles.detailLabel}>Gender Pref</Text>
-              <Text style={styles.detailValue}>{item?.genderPreference?.charAt(0).toUpperCase() + item?.genderPreference?.slice(1)}</Text>
-            </View>
-          </View>
-          
-          <View style={styles.detailBox}>
-            <View style={styles.iconCircle}>
-              <FontAwesome5 name="user-graduate" size={14} color="#ffffff" />
-            </View>
-            <View style={styles.detailContent}>
-              <Text style={styles.detailLabel}>For</Text>
-              <Text style={styles.detailValue}>
-                {item?.purpose?.map(p => p.charAt(0).toUpperCase() + p?.slice(1)).join(', ')}
-              </Text>
-            </View>
-          </View>
-        </View>
-        
-     
-        <View style={styles.detailsRow}>
-          <View style={[styles.detailBox, { flex: 1 }]}>
-            <View style={styles.iconCircle}>
-              <MaterialCommunityIcons name="dumbbell" size={16} color="#ffffff" />
-            </View>
-            <View style={styles.detailContent}>
-              <Text style={styles.detailLabel}>Habit Preferences</Text>
-              <Text style={styles.detailValue}>
-                {item?.habitPreferences?.map(h => h?.charAt(0).toUpperCase() + h?.slice(1)).join(', ')}
-              </Text>
-            </View>
-          </View>
-        </View>
-      </View>
-
-      <Text style={styles.sectionTitle}>Posted By</Text>
-     
-      <View style={styles.postedByContainer}>
-        <Image 
-          source={{ uri: item?.createdBy?.picture }} 
-          style={styles.profileImage} 
-        />
-        <View style={styles.posterInfo}>
-          <Text style={styles.posterName}>{item?.createdBy?.name}</Text>
-    <Text style={styles.postedDate}>
-  {new Date(item.createdAt).toLocaleDateString('en-US', {
-    month: 'short',
-    day: '2-digit',
-  })}
-</Text>
-
-        </View>
-      </View>
-    </View>
-
-
-        
-       
-        <View style={{
-          position: 'absolute', 
-          top: 10, 
-          left: 10, 
-          zIndex: 10,
-          paddingHorizontal: 15,
-          backgroundColor: 'rgba(0, 0, 0, 0.2)',
-          padding: 10,
-          borderRadius: 50,
-        }}>
-          <TouchableOpacity onPress={handleBackPress} accessible={true} accessibilityLabel="Back Button">
-            <FontAwesome5 name="chevron-left" size={20} color="white" />
-          </TouchableOpacity>
-        </View>
-
-       
-        <View style={{
-          position: 'absolute', 
-          top: 10, 
-          right: 10, 
-          zIndex: 10,
-          paddingHorizontal: 10,
-          backgroundColor: 'rgba(0, 0, 0, 0.2)',
-
-          padding: 8,
-          borderRadius: 50,
-        }}>
-          <TouchableOpacity onPress={toggleFavorite}>
-            <Ionicons name={isFavorite ? 'heart' : 'heart-outline' } size={25} color={isFavorite ? '#FF4081' : 'white'}/> 
-          </TouchableOpacity>
-        </View>
-       
-       
-       <StaticMap
-  latitude={item?.location?.coordinates[1]}   // latitude
-  longitude={item?.location?.coordinates[0]}  // longitude
-  placeName={item?.location?.fullAddress}
-/>
-
-
-      </ScrollView>
-
-    {item.createdBy._id !== user._id ? (
-    <View style={{
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  padding: 16,
-  borderTopWidth: 1,
-  borderColor: '#eee',
-  backgroundColor: '#fff'
-}}>
-
-   <TouchableOpacity
-      style={{
-        flex: 1,
-        flexDirection: 'row',
-        backgroundColor: '#7A5AF8',
-        padding: 14,
-        borderRadius: 10,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 10,
-        opacity: isCreatingRoom ? 0.6 : 1
-      }}
-      onPress={handleChatPress}
-      disabled={isCreatingRoom}
-    >
-      {isCreatingRoom ? (
-        <ActivityIndicator size="small" color="white" />
+      <StatusBar style="dark" />
+      {loading || !item ? (
+        <SkeletonLoader />
       ) : (
-        <>
-          <Feather name="message-circle" size={20} color="white" />
-          <Text style={{ color: 'white', marginLeft: 8 }}>Chat</Text>
-        </>
+        <SafeWrapper>
+          <ScrollView>
+            <FlatList
+              data={item?.images}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(img, index) => img._id || index.toString()}
+              onMomentumScrollEnd={(e) => {
+                const index = Math.floor(e.nativeEvent.contentOffset.x / width);
+                setCurrentImage(index);
+              }}
+              renderItem={({ item: img, index }) => (
+                <View
+                  style={{
+                    width,
+                    justifyContent: "center",
+                    alignItems: "center"
+                  }}
+                >
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => openImageModal(index)}
+                  >
+                    <Image
+                      source={{ uri: img.originalUrl }}
+                      style={{ width, height: 250 }}
+                      resizeMode="cover"
+                    />
+                    <TopFadeGradient />
+
+                    <View
+                      style={{
+                        position: "absolute",
+                        bottom: 10,
+                        right: 10,
+                        backgroundColor: "#0009",
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 12
+                      }}
+                    >
+                      <Text style={{ color: "white", fontSize: 12 }}>
+                        {index + 1}/{item.images.length}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              )}
+            />
+
+            <View style={styles.container}>
+              <View style={styles.rowBetween}>
+                <View style={styles.priceContainer}>
+                  <Text style={styles.priceText}>₹{item?.monthlyRent}/month</Text>
+                </View>
+                <View style={styles.locationContainer}>
+                  <Ionicons name="location-sharp" size={16} color="#7A5AF8" />
+                  <Text style={styles.locationText}>{item?.location?.fullAddress}</Text>
+                </View>
+              </View>
+
+              <Text style={styles.title}>{item?.title}</Text>
+
+              <View style={styles.descriptionContainer}>
+                <Text style={styles.descriptionText}>{item?.description}</Text>
+              </View>
+
+              <Text style={styles.sectionTitle}>Room Details</Text>
+              <View style={styles.detailsContainer}>
+                <View style={styles.detailsRow}>
+                  <View style={styles.detailBox}>
+                    <View style={styles.iconCircle}>
+                      <Ionicons name="home-outline" size={16} color="#ffffff" />
+                    </View>
+                    <View style={styles.detailContent}>
+                      <Text style={styles.detailLabel}>Room Type</Text>
+                      <Text style={styles.detailValue}>{item?.category?.charAt(0).toUpperCase() + item?.category?.slice(1)}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.detailBox}>
+                    <View style={styles.iconCircle}>
+                      <MaterialCommunityIcons name="account-multiple-outline" size={16} color="#ffffff" />
+                    </View>
+                    <View style={styles.detailContent}>
+                      <Text style={styles.detailLabel}>Vacancy</Text>
+                      <Text style={styles.detailValue}>{item?.roommatesWanted} Available</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.detailsRow}>
+                  <View style={styles.detailBox}>
+                    <View style={styles.iconCircle}>
+                      <MaterialIcons name="person" size={16} color="#ffffff" />
+                    </View>
+                    <View style={styles.detailContent}>
+                      <Text style={styles.detailLabel}>Gender Pref</Text>
+                      <Text style={styles.detailValue}>{item?.genderPreference?.charAt(0).toUpperCase() + item?.genderPreference?.slice(1)}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.detailBox}>
+                    <View style={styles.iconCircle}>
+                      <FontAwesome5 name="user-graduate" size={14} color="#ffffff" />
+                    </View>
+                    <View style={styles.detailContent}>
+                      <Text style={styles.detailLabel}>For</Text>
+                      <Text style={styles.detailValue}>
+                        {item?.purpose?.map(p => p.charAt(0).toUpperCase() + p?.slice(1)).join(', ')}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.detailsRow}>
+                  <View style={[styles.detailBox, { flex: 1 }]}>
+                    <View style={styles.iconCircle}>
+                      <MaterialCommunityIcons name="dumbbell" size={16} color="#ffffff" />
+                    </View>
+                    <View style={styles.detailContent}>
+                      <Text style={styles.detailLabel}>Habit Preferences</Text>
+                      <Text style={styles.detailValue}>
+                        {item?.habitPreferences?.map(h => h?.charAt(0).toUpperCase() + h?.slice(1)).join(', ')}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              <Text style={styles.sectionTitle}>Posted By</Text>
+
+              <View style={styles.postedByContainer}>
+                <Image
+                  source={{ uri: item?.createdBy?.picture }}
+                  style={styles.profileImage}
+                />
+                <View style={styles.posterInfo}>
+                  <Text style={styles.posterName}>{item?.createdBy?.name}</Text>
+                  <Text style={styles.postedDate}>
+                    {new Date(item.createdAt).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: '2-digit',
+                    })}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Action Buttons Row - Share & Report */}
+            <View style={styles.actionButtonsRow}>
+              <TouchableOpacity onPress={handleShare} style={styles.actionButton}>
+                <Feather name="share-2" size={20} color="#7A5AF8" />
+                <Text style={styles.actionButtonText}>Share</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setIsReportModalVisible(true)}
+                style={styles.actionButton}
+              >
+                <Feather name="flag" size={20} color="#FF6B6B" />
+                <Text style={[styles.actionButtonText, { color: '#FF6B6B' }]}>Report</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Top Navigation */}
+            <View style={{
+              position: 'absolute',
+              top: 10,
+              left: 10,
+              zIndex: 10,
+              paddingHorizontal: 15,
+              backgroundColor: 'rgba(0, 0, 0, 0.2)',
+              padding: 10,
+              borderRadius: 50,
+            }}>
+              <TouchableOpacity onPress={handleBackPress} accessible={true} accessibilityLabel="Back Button">
+                <FontAwesome5 name="chevron-left" size={20} color="white" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Top Right Actions - VERTICAL LAYOUT */}
+            <View style={{
+              position: 'absolute',
+              top: 10,
+              right: 10,
+              zIndex: 10,
+              flexDirection: 'column', // Changed to vertical
+              gap: 8,
+            }}>
+              {/* Favorite Button */}
+              <View style={{
+                paddingHorizontal: 10,
+                backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                padding: 8,
+                borderRadius: 50,
+              }}>
+                <TouchableOpacity onPress={toggleFavorite} disabled={isFavoriteLoading}>
+                  {isFavoriteLoading ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Ionicons
+                      name={isFavorite ? 'heart' : 'heart-outline'}
+                      size={25}
+                      color={isFavorite ? '#FF4081' : 'white'}
+                    />
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              {/* Share Button */}
+              <View style={{
+                paddingHorizontal: 10,
+                backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                padding: 8,
+                borderRadius: 50,
+              }}>
+                <TouchableOpacity onPress={handleShare}>
+                  <Feather name="share-2" size={22} color="white" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Report Button */}
+              <View style={{
+                paddingHorizontal: 10,
+                backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                padding: 8,
+                borderRadius: 50,
+              }}>
+                <TouchableOpacity onPress={() => setIsReportModalVisible(true)}>
+                  <Feather name="flag" size={22} color="#FF6B6B" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <StaticMap
+              latitude={item?.location?.coordinates[1]}
+              longitude={item?.location?.coordinates[0]}
+              placeName={item?.location?.fullAddress}
+            />
+          </ScrollView>
+
+          {item.createdBy._id !== user._id ? (
+            <View style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              padding: 16,
+              borderTopWidth: 1,
+              borderColor: '#eee',
+              backgroundColor: '#fff'
+            }}>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  flexDirection: 'row',
+                  backgroundColor: '#7A5AF8',
+                  padding: 14,
+                  borderRadius: 10,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: 10,
+                  opacity: isCreatingRoom ? 0.6 : 1
+                }}
+                onPress={handleChatPress}
+                disabled={isCreatingRoom}
+              >
+                {isCreatingRoom ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <>
+                    <Feather name="message-circle" size={20} color="white" />
+                    <Text style={{ color: 'white', marginLeft: 8 }}>Chat</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                disabled={!item?.showPhonePublic}
+                onPress={() => console.log('Calling:', item.contactPhone)}
+                style={{
+                  flex: 1,
+                  flexDirection: 'row',
+                  backgroundColor: item.showPhonePublic ? '#7A5AF8' : '#ccc',
+                  padding: 14,
+                  borderRadius: 10,
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <Feather name="phone-call" size={20} color="white" />
+                <Text style={{ color: 'white', marginLeft: 8 }}>Call</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.chatDisabled}>
+              <Text style={styles.chatDisabledText}>This is your product</Text>
+            </View>
+          )}
+
+          {/* Image Modal */}
+          <Modal visible={isModalVisible} transparent={true} animationType="fade" onRequestClose={closeImageModal}>
+            <View style={{
+              flex: 1,
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: 'black',
+            }}>
+              <TouchableOpacity onPress={closeImageModal} style={{
+                position: 'absolute',
+                top: 20,
+                right: 15,
+                zIndex: 10,
+                paddingHorizontal: 10,
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                padding: 8,
+                borderRadius: 50,
+              }} accessible={true} accessibilityLabel="Close Image Modal">
+                <Feather name="x" size={20} color="white" />
+              </TouchableOpacity>
+
+              <FlatList
+                ref={modalFlatListRef}
+                data={transformedItem.images}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                getItemLayout={getItemLayout}
+                initialScrollIndex={modalCurrentImage}
+                onMomentumScrollEnd={(event) => {
+                  const newIndex = Math.round(event.nativeEvent.contentOffset.x / width);
+                  setModalCurrentImage(newIndex);
+                }}
+                renderItem={({ item }) => (
+                  <View style={{ width, justifyContent: "center", alignItems: "center" }}>
+                    <Image source={{ uri: item }} style={{ width, height: 400 }} resizeMode="contain" />
+                  </View>
+                )}
+                keyExtractor={(item, index) => index.toString()}
+              />
+
+              <View style={{
+                flexDirection: 'row',
+                justifyContent: 'center',
+                alignItems: 'center',
+                backgroundColor: '#0009',
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: 12,
+                paddingBottom: '10%'
+              }}>
+                <Text style={{ color: 'white', fontSize: 12 }}>
+                  {modalCurrentImage + 1}/{transformedItem?.images?.length}
+                </Text>
+              </View>
+            </View>
+          </Modal>
+
+          {/* Report Modal */}
+          <Modal
+            visible={isReportModalVisible}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={() => setIsReportModalVisible(false)}
+          >
+            <View style={styles.reportModalOverlay}>
+              <View style={styles.reportModalContent}>
+                <View style={styles.reportHeader}>
+                  <Text style={styles.reportTitle}>Report Room</Text>
+                  <TouchableOpacity onPress={() => setIsReportModalVisible(false)}>
+                    <Feather name="x" size={24} color="#333" />
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.reportSubtitle}>Why are you reporting this listing?</Text>
+
+                <ScrollView style={styles.reasonsContainer} showsVerticalScrollIndicator={false}>
+                  {reportReasons.map((reason) => (
+                    <TouchableOpacity
+                      key={reason.value}
+                      style={[
+                        styles.reasonOption,
+                        reportReason === reason.value && styles.reasonOptionSelected
+                      ]}
+                      onPress={() => setReportReason(reason.value)}
+                    >
+                      <View style={[
+                        styles.radioButton,
+                        reportReason === reason.value && styles.radioButtonSelected
+                      ]}>
+                        {reportReason === reason.value && (
+                          <View style={styles.radioButtonInner} />
+                        )}
+                      </View>
+                      <Text style={[
+                        styles.reasonText,
+                        reportReason === reason.value && styles.reasonTextSelected
+                      ]}>
+                        {reason.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                <TextInput
+                  style={styles.descriptionInput}
+                  placeholder="Additional details (optional)"
+                  placeholderTextColor="#999"
+                  multiline
+                  numberOfLines={4}
+                  value={reportDescription}
+                  onChangeText={setReportDescription}
+                  textAlignVertical="top"
+                />
+
+                <View style={styles.reportButtonsRow}>
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={() => {
+                      setIsReportModalVisible(false);
+                      setReportReason('');
+                      setReportDescription('');
+                    }}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.submitButton,
+                      (!reportReason || isSubmittingReport) && styles.submitButtonDisabled
+                    ]}
+                    onPress={handleReportSubmit}
+                    disabled={!reportReason || isSubmittingReport}
+                  >
+                    {isSubmittingReport ? (
+                      <ActivityIndicator size="small" color="white" />
+                    ) : (
+                      <Text style={styles.submitButtonText}>Submit Report</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        </SafeWrapper>
       )}
-    </TouchableOpacity>
-
-  <TouchableOpacity
-    disabled={!item?.showPhonePublic}
-    onPress={() => console.log('Calling:', item.contactPhone)}
-    style={{
-      flex: 1,
-      flexDirection: 'row', // horizontal
-      backgroundColor: item.showPhonePublic ? '#7A5AF8' : '#ccc',
-      padding: 14,
-      borderRadius: 10,
-      alignItems: 'center',
-      justifyContent: 'center'
-    }}
-  >
-    <Feather name="phone-call" size={20} color="white" />
-    <Text style={{ color: 'white', marginLeft: 8 }}>Call</Text>
-  </TouchableOpacity>
-</View> 
-
-) : (
-  <View style={styles.chatDisabled}>
-    <Text style={styles.chatDisabledText}>This is your product</Text>
-  </View>
-)}
-      
-      <Modal visible={isModalVisible} transparent={true} animationType="fade" onRequestClose={closeImageModal}>
-        <View style={{
-          flex: 1,
-          justifyContent: 'center',
-          alignItems: 'center',
-          backgroundColor: 'black',
-        }}>
-          <TouchableOpacity onPress={closeImageModal} style={{
-            position: 'absolute', 
-            top: 20, 
-            right: 15, 
-            zIndex: 10,
-            paddingHorizontal: 10,
-            backgroundColor: 'rgba(255, 255, 255, 0.2)',
-            padding: 8,
-            borderRadius: 50,
-          }} accessible={true} accessibilityLabel="Close Image Modal">
-            <Feather name="x" size={20} color="white" />
-          </TouchableOpacity>
-
-          
-       <FlatList
-  ref={modalFlatListRef}
-  data={transformedItem.images}
-  horizontal
-  pagingEnabled
-  showsHorizontalScrollIndicator={false}
-  getItemLayout={getItemLayout}
-  initialScrollIndex={modalCurrentImage}
-  onMomentumScrollEnd={(event) => {
-    const newIndex = Math.round(event.nativeEvent.contentOffset.x / width);
-    setModalCurrentImage(newIndex);
-  }}
-  renderItem={({ item }) => (
-    <View style={{ width, justifyContent: "center", alignItems: "center" }}>
-      <Image source={{ uri: item }} style={{ width, height: 400 }} resizeMode="contain" />
-    </View>
-  )}
-  keyExtractor={(item, index) => index.toString()}
-/>
-
-
-    
-          <View style={{
-            flexDirection: 'row',
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: '#0009',
-            paddingHorizontal: 10,
-            paddingVertical: 5,
-            borderRadius: 12,
-            paddingBottom: '10%'
-          }}>
-            <Text style={{ color: 'white', fontSize: 12 }}>
-              {modalCurrentImage + 1}/{transformedItem?.images?.length}
-            </Text>
-          </View> 
-        </View>
-      </Modal>
-
-
-    </SafeWrapper>
-  )}
-     
-  
     </>
+  );
+};
 
-  )
-}
 const greybg = '#FBFAFF';
 const maintext = '#212121';
 const lighttext = '#757575';
 const mainbg = '#7A5AF8';
+
 const styles = StyleSheet.create({
   chatDisabled: {
-  paddingVertical: 10,
-  paddingHorizontal: 16,
-  backgroundColor: '#E5E7EB', // light gray to indicate disabled
-  borderRadius: 8,
-  alignItems: 'center',
-  justifyContent: 'center',
-  marginTop: 8,
-},
-
-chatDisabledText: {
-  color: '#9CA3AF', // gray text
-  fontSize: 14,
-  fontWeight: '500',
-},
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  chatDisabledText: {
+    color: '#9CA3AF',
+    fontSize: 14,
+    fontWeight: '500',
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -524,8 +726,6 @@ chatDisabledText: {
     fontSize: 16,
   },
   container: {
-   
- 
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -544,15 +744,10 @@ chatDisabledText: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    // borderBottomWidth: 1,
-    // borderBottomColor: '#EBE7FF',
-
   },
   priceContainer: {
     flex: 1,
     paddingVertical: 4,
-
-    
     borderRadius: 6,
   },
   priceText: {
@@ -564,26 +759,22 @@ chatDisabledText: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-   
   },
   locationText: {
-
     fontSize: 14,
     color: '#555',
     flex: 1,
   },
   descriptionContainer: {
-backgroundColor: '#FBFAFF',
+    backgroundColor: '#FBFAFF',
     borderRadius: 8,
     marginBottom: 16,
     padding: 10,
   },
   descriptionText: {
-
     fontSize: 14,
-    color: '	#4F4F4F',
+    color: '#4F4F4F',
     lineHeight: 20,
-    // fontFamily: 'Poppinsssm',
     fontWeight: '400',
   },
   sectionTitle: {
@@ -594,9 +785,8 @@ backgroundColor: '#FBFAFF',
   },
   detailsContainer: {
     backgroundColor: '#FBFAFF',
-    
     padding: 10,
-  paddingBottom: 0,
+    paddingBottom: 0,
     borderRadius: 10,
     marginBottom: 16,
     borderWidth: 1,
@@ -655,7 +845,6 @@ backgroundColor: '#FBFAFF',
     width: 44,
     height: 44,
     borderRadius: 22,
-  
   },
   posterInfo: {
     marginLeft: 12,
@@ -669,7 +858,150 @@ backgroundColor: '#FBFAFF',
     fontSize: 12,
     color: '#777',
     marginTop: 2,
-  }
+  },
+  actionButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: '#FBFAFF',
+    marginHorizontal: 14,
+    marginBottom: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#EBE7FF',
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+  },
+  actionButtonText: {
+    marginLeft: 8,
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#7A5AF8',
+  },
+  reportModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  reportModalContent: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  reportHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  reportTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333',
+  },
+  reportSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+  },
+  reasonsContainer: {
+    maxHeight: 300,
+    marginBottom: 16,
+  },
+  reasonOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 10,
+    backgroundColor: 'white',
+  },
+  reasonOptionSelected: {
+    borderColor: '#7A5AF8',
+    backgroundColor: '#F5F3FF',
+  },
+  radioButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#D1D5DB',
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioButtonSelected: {
+    borderColor: '#7A5AF8',
+  },
+  radioButtonInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#7A5AF8',
+  },
+  reasonText: {
+    fontSize: 15,
+    color: '#333',
+    flex: 1,
+  },
+  reasonTextSelected: {
+    color: '#7A5AF8',
+    fontWeight: '500',
+  },
+  descriptionInput: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    padding: 12,
+    fontSize: 14,
+    minHeight: 100,
+    marginBottom: 16,
+  },
+  reportButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  submitButton: {
+    flex: 1,
+    backgroundColor: '#FF6B6B',
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#FCA5A5',
+    opacity: 0.6,
+  },
+  submitButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: 'white',
+  },
 });
 
 export default DetailsPage;

@@ -4,10 +4,11 @@ import { LocationHeader } from "../../componets/locationfilter";
 import SharedCard from "../../componets/sharecard";
 import PGCard from "../../componets/pgcard";
 import FlatCard from "../../componets/flatcard";
-import { SkeletonList } from "../../componets/loading"; // Import skeleton
+import { SkeletonList } from "../../componets/loading";
 import SafeWrapper from "../../services/Safewrapper";
 import axios from "axios";
 import { useSelector } from "react-redux";
+import api from "../../services/intercepter";
 
 const filterMap = {
   All: "all",
@@ -19,11 +20,14 @@ const filterMap = {
 const HomeScreen = () => {
   const apiUrl = process.env.EXPO_PUBLIC_API_URL;
   const locationData = useSelector((state) => state.location.locationData);
+  const user = useSelector((state) => state.user.userData);
+  
   const [activeFilter, setActiveFilter] = useState("All");
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
+  const [favorites, setFavorites] = useState({}); // { roomId: boolean }
 
   const limit = 15;
   const userLat = locationData?.lat;
@@ -38,6 +42,59 @@ const HomeScreen = () => {
   ];
 
   const [currentBucket, setCurrentBucket] = useState(0);
+
+  // Check if room is favorited
+  const checkIfFavorited = async (roomId) => {
+    try {
+      if (!user?._id) return false;
+      
+      const response = await api.get(`${apiUrl}/api/favorites/check/${roomId}`);
+      return response.data.isFavorited;
+    } catch (error) {
+      console.error('Error checking favorite status for room', roomId, error);
+      return false;
+    }
+  };
+
+  // Check favorites for all rooms
+  const checkAllFavorites = async (roomList) => {
+    if (!user?._id || !roomList.length) return;
+    
+    try {
+      const favoritesMap = {};
+      const promises = roomList.map(async (room) => {
+        const isFavorited = await checkIfFavorited(room._id);
+        favoritesMap[room._id] = isFavorited;
+      });
+      
+      await Promise.all(promises);
+      setFavorites(prev => ({ ...prev, ...favoritesMap }));
+    } catch (error) {
+      console.error('Error checking all favorites:', error);
+    }
+  };
+
+  // Toggle favorite from HomeScreen
+  const toggleFavorite = async (roomId) => {
+    try {
+      const response = await api.post(`${apiUrl}/api/favorites/toggle`, {
+        roomId: roomId
+      });
+
+      if (response.data.success) {
+        // Update local favorites state
+        setFavorites(prev => ({
+          ...prev,
+          [roomId]: response.data.isFavorited
+        }));
+        
+        return response.data.isFavorited;
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      Alert.alert('Error', error.response?.data?.message || 'Failed to update favorites');
+    }
+  };
 
   const fetchRooms = async (reset = false) => {
     if (loading || !userLat || !userLng) return;
@@ -81,6 +138,11 @@ const HomeScreen = () => {
           setHasMore(newRooms.length === limit);
           return unique;
         });
+
+        // Check favorites for new rooms
+        if (newRooms.length > 0) {
+          checkAllFavorites(newRooms);
+        }
       }
     } catch (err) {
       console.error("Fetch error:", err);
@@ -95,9 +157,35 @@ const HomeScreen = () => {
   }, [activeFilter, userLat, userLng]);
 
   const renderItem = ({ item }) => {
-    if (item.category === "shared") return <SharedCard data={item} activeFilter={activeFilter} />;
-    if (item.category === "pg_hostel") return <PGCard data={item} activeFilter={activeFilter} />;
-    if (item.category === "flat_home") return <FlatCard data={item} activeFilter={activeFilter} />;
+    const isFavorited = favorites[item._id] || false;
+    
+    if (item.category === "shared") 
+      return (
+        <SharedCard 
+          data={item} 
+          activeFilter={activeFilter}
+          isFavorited={isFavorited}
+          onToggleFavorite={toggleFavorite}
+        />
+      );
+    if (item.category === "pg_hostel") 
+      return (
+        <PGCard 
+          data={item} 
+          activeFilter={activeFilter}
+          isFavorited={isFavorited}
+          onToggleFavorite={toggleFavorite}
+        />
+      );
+    if (item.category === "flat_home") 
+      return (
+        <FlatCard 
+          data={item} 
+          activeFilter={activeFilter}
+          isFavorited={isFavorited}
+          onToggleFavorite={toggleFavorite}
+        />
+      );
     return null;
   };
 
@@ -108,7 +196,7 @@ const HomeScreen = () => {
   // Get skeleton type based on active filter
   const getSkeletonType = () => {
     const category = filterMap[activeFilter];
-    if (category === "all") return "shared"; // default for all
+    if (category === "all") return "shared";
     return category;
   };
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,180 +8,132 @@ import {
   TouchableOpacity,
   Dimensions,
   Alert,
-
- 
+  ActivityIndicator,
+  RefreshControl,
+  Switch,
 } from 'react-native';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons, Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
+import api from '../../services/intercepter';
+
 const { width, height } = Dimensions.get('window');
+const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 
 export default function MyAds() {
-  // Sample data for different ad types
-  const [ads, setAds] = useState([
-    {
-      _id: "1",
-      category: "shared",
-      title: "Spacious Shared Room for Bachelors near Infopark, Kochi.",
-      description: "Well-ventilated, fully furnished shared room available for male bachelors near Infopark. Includes high-speed Wi-Fi, washing machine, refrigerator, and 24x7 water supply. Gated building with CCTV security. Just 5 mins walk to bus stop and shops. Peaceful neighborhood, ideal for IT professionals.",
-      images: [
-        "https://images.squarespace-cdn.com/content/v1/56dfd5cc9f7266ed7f04b64d/1585743751085-N2317B7K3I2YBZHPHENO/image-asset.jpeg",
-        "https://images.squarespace-cdn.com/content/v1/56dfd5cc9f7266ed7f04b64d/1585743749675-UQS61BCNTIARPMQNRA4Y/image-asset.jpeg",
-        "https://images.nobroker.in/images/8a9f8503904a58bb01904a66d1f80339/8a9f8503904a58bb01904a66d1f80339_70592_500210_medium.jpg"
-      ],
-      location: {
-        district: "Ernakulam",
-        fullAddress: "Kakkanad, Kochi",
-        state: "Kerala",
-        latitude: 9.9675,
-        longitude: 76.2999
-      },
-      contactPhone: "+91-9999999999",
-      showPhonePublic: true,
-      monthlyRent: 4000,
-      roommatesWanted: 1,
-      genderPreference: "male",
-      habitPreferences: ["Non-Smoker", "Fitness Focused", "Clean & Organized", "Respects Privacy"],
-      purpose: ["Any Purpose"],
-      createdAt: "2025-05-01T08:00:00.000Z",
-      postedBy: {
-        name: "Arjun R",
-        profileImage: "https://randomuser.me/api/portraits/men/32.jpg"
-      }
-    },
-    {
-      _id: "4",
-      category: "pg_hostel",
-      title: "Green Nest Ladies PG – Near Lulu Mall, Edappally",
-      description: "Premium ladies-only PG just 5 minutes from Lulu Mall and Edappally Metro Station. Fully furnished AC/non-AC rooms with attached bathrooms, high-speed Wi-Fi, and 24/7 security. Rent includes 3 vegetarian meals, laundry, and housekeeping. Ideal for female students and working professionals. Rent starts at ₹7,500/month.",
-      images: [
-        "https://content3.jdmagicbox.com/comp/ernakulam/q4/0484px484.x484.210104164018.f1q4/catalogue/flamingos-ladies-hostel-cochin-special-economic-zone-ernakulam-hostels-lg1cd6ac74.jpg",
-        "https://asset-cdn.stanzaliving.com/stanza-living/image/upload/f_auto,q_auto,w_600/e_improve/e_sharpen:10/e_saturation:10/f_auto,q_auto/v1663822622/Website/CMS-Uploads/c6hdh58d28xmmver5f3d.jpg",
-        "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS_kAL3obhSyNxk2i2TBLdak9Z7eadNGl7ev4IOl0-dSXd6eLidTq_BSmJUycAQObq5-w8&usqp=CAU"
-      ],
-      AvailableSpace: "6",
-      location: {
-        fullAddress: "Calicut Beach, Kozhikode",
-        district: "Kozhikode",
-        state: "Kerala",
-        latitude: 11.2588,
-        longitude: 75.7804
-      },
-      priceRange: { min: 6000, max: 8000 },
-      pgGenderCategory: "ladies",
-      roomTypesAvailable: ["single", "double"],
-      mealsProvided: ["breakfast", "dinner"],
-      amenities: ["wifi", "ac", "hot_water"],
-      rules: ["no_pet", "No Alcohol", "No Smoking Inside", "Respect Privacy"],
-      createdAt: "2025-04-29T14:00:00.000Z",
-      contactPhone: "+91 9876543210",
-      showPhonePublic: true,
-      postedBy: {
-        name: "Zainal Nizar",
-        profileImage: "https://randomuser.me/api/portraits/men/61.jpg"
-      }
-    },
-    {
-      _id: "6",
-      category: "flat_home",
-      title: "2BHK Fully Furnished Flat near Kakkanad – Family-Friendly",
-      description: "Spacious and well-lit 2BHK flat available for rent in a peaceful residential area near Kakkanad, Kochi. Ideal for small families or working couples. The apartment is fully furnished with sofa, dining table, double beds, wardrobes, fridge, washing machine, and modular kitchen. Located in a gated society with 24/7 security, lift, power backup, and covered parking.",
-      images: [
-        "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRQ0Jj-ej-IUUuFOUC28LXmhYfXrL3HttWa0g&s",
-        "https://5.imimg.com/data5/SELLER/Default/2024/1/375486950/CM/VQ/OZ/10335204/furnished-rental-house-for-1-month-in-athirampuzha-near-caritas-hospital.jpeg",
-        "https://4.imimg.com/data4/CT/HX/ANDROID-58662519/product-500x500.jpeg"
-      ],
-      location: {
-        fullAddress: "Panampilly Nagar, Kochi",
-        district: "Ernakulam",
-        state: "Kerala",
-        latitude: 9.9561,
-        longitude: 76.2998
-      },
-      propertyType: "flat",
-      furnishedStatus: "furnished",
-      securityDeposit: 15000,
-      squareFeet: 950,
-      bedrooms: 2,
-      bathrooms: 2,
-      balconies: 1,
-      floorNumber: 2,
-      totalFloors: 5,
-      tenantPreference: "family",
-      parking: "four_wheeler",
-      createdAt: "2025-04-28T17:20:00.000Z",
-      contactPhone: "+91 9876543210",
-      showPhonePublic: true,
-      postedBy: {
-        name: "Rishan Jose",
-        profileImage: "https://randomuser.me/api/portraits/men/57.jpg"
-      },
-      monthlyRent: 12000
-    }
-  ]);
+  const [ads, setAds] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('all'); // active, inactive, all
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-  const getCategoryIcon = (category) => {
-    switch (category) {
-      case 'shared':
-        return 'people';
-      case 'pg_hostel':
-        return 'business';
-      case 'flat_home':
-        return 'home';
-      default:
-        return 'location';
+  useEffect(() => {
+    fetchMyAds();
+  }, [statusFilter, categoryFilter, page]);
+
+  const fetchMyAds = async () => {
+    try {
+      setLoading(true);
+      const params = {
+        page,
+        limit: 10,
+        status: statusFilter,
+        category: categoryFilter !== 'all' ? categoryFilter : undefined
+      };
+
+      const response = await api.get(`${apiUrl}/api/posts/my-posts`, { params });
+      
+      if (response.data.success) {
+        setAds(response.data.posts);
+        setTotalPages(response.data.pagination.pages);
+      }
+    } catch (error) {
+      console.error('Error fetching ads:', error);
+      Alert.alert('Error', 'Failed to load your ads');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const getCategoryLabel = (category) => {
-    switch (category) {
-      case 'shared':
-        return 'Shared Room';
-      case 'pg_hostel':
-        return 'PG/Hostel';
-      case 'flat_home':
-        return 'Flat/Home';
-      default:
-        return 'Property';
-    }
+  const onRefresh = () => {
+    setRefreshing(true);
+    setPage(1);
+    fetchMyAds();
   };
 
-  const getCategoryGradient = (category) => {
-    switch (category) {
-      case 'shared':
-        return ['#7A5AF8', '#9B7DF7'];
-      case 'pg_hostel':
-        return ['#FF6B6B', '#FF8E8E'];
-      case 'flat_home':
-        return ['#4ECDC4', '#6ED5D0'];
-      default:
-        return ['#7A5AF8', '#9B7DF7'];
+  const toggleActiveStatus = async (adId, currentStatus) => {
+    try {
+      // Update UI optimistically
+      setAds(ads.map(ad => 
+        ad._id === adId ? { ...ad, isActive: !currentStatus } : ad
+      ));
+
+      const response = await api.patch(`${apiUrl}/api/posts/${adId}/toggle-status`);
+      
+      if (!response.data.success) {
+        // Revert on failure
+        setAds(ads.map(ad => 
+          ad._id === adId ? { ...ad, isActive: currentStatus } : ad
+        ));
+        Alert.alert('Error', 'Failed to update ad status');
+      }
+    } catch (error) {
+      console.error('Error toggling status:', error);
+      // Revert on error
+      setAds(ads.map(ad => 
+        ad._id === adId ? { ...ad, isActive: currentStatus } : ad
+      ));
+      Alert.alert('Error', 'Failed to update ad status');
     }
   };
 
   const handleEdit = (adId) => {
-    Alert.alert('Edit Ad', `Edit functionality for ad ${adId} would be implemented here.`);
+    // Navigate to edit screen
+    Alert.alert('Edit Ad', `Navigate to edit screen for ad ${adId}`);
   };
 
   const handleDelete = (adId) => {
     Alert.alert(
       'Delete Ad',
-      'Are you sure you want to delete this ad?',
+      'Are you sure you want to delete this ad permanently?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            setAds(ads.filter(ad => ad._id !== adId));
+          onPress: async () => {
+            try {
+              await api.delete(`${apiUrl}/api/posts/${adId}`);
+              setAds(ads.filter(ad => ad._id !== adId));
+              Alert.alert('Success', 'Ad deleted successfully');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to delete ad');
+            }
           }
         }
       ]
     );
   };
 
-  const handlePromote = (adId) => {
-    Alert.alert('Promote Ad', `Promote functionality for ad ${adId} would be implemented here.`);
+  const getCategoryIcon = (category) => {
+    switch (category) {
+      case 'shared': return 'people';
+      case 'pg_hostel': return 'business';
+      case 'flat_home': return 'home';
+      default: return 'location';
+    }
+  };
+
+  const getCategoryLabel = (category) => {
+    switch (category) {
+      case 'shared': return 'Shared Room';
+      case 'pg_hostel': return 'PG/Hostel';
+      case 'flat_home': return 'Flat/Home';
+      default: return 'Property';
+    }
   };
 
   const formatDate = (dateString) => {
@@ -193,41 +145,69 @@ export default function MyAds() {
     });
   };
 
-const StickyHeader = () => {
-  return (
-    ads.length === 3 && (
-      <View style={styles.stickyHeaderContainer}>
-        <LinearGradient
-          colors={['#7A5AF8', '#9B7DF7', '#B998F5']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.stickyHeader}
-        >
-          <View style={styles.headerContent}>
-            <View style={styles.headerLeft}>
-              <Text style={styles.stickyHeaderTitle}>My Ads</Text>
-              <View style={styles.listingBadge}>
-                <Ionicons name="checkmark-circle" size={14} color="#4CAF50" />
-                <Text style={styles.listingCount}>
-                  {ads.length} Active Listings
-                </Text>
-              </View>
-            </View>
-            <TouchableOpacity style={styles.headerButton}>
-              <Ionicons name="add-circle" size={24} color="white" />
-            </TouchableOpacity>
-          </View>
-        </LinearGradient>
-      </View>
-    )
+  const calculateDaysLeft = (createdAt) => {
+    const created = new Date(createdAt);
+    const expiry = new Date(created);
+    expiry.setDate(created.getDate() + 30); // Assuming 30 days validity
+    const now = new Date();
+    const daysLeft = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
+    return daysLeft > 0 ? daysLeft : 0;
+  };
+
+  const FilterChip = ({ label, value, active }) => (
+    <TouchableOpacity
+      style={[styles.filterChip, active && styles.filterChipActive]}
+      onPress={() => setStatusFilter(value)}
+    >
+      <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
   );
-};
 
+  const StickyHeader = () => (
+    <View style={styles.stickyHeaderContainer}>
+      <LinearGradient
+        colors={['#7A5AF8', '#9B7DF7', '#B998F5']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.stickyHeader}
+      >
+        <View style={styles.headerContent}>
+          <Text style={styles.stickyHeaderTitle}>My Listings</Text>
+          <View style={styles.listingBadge}>
+            <Text style={styles.listingCount}>{ads.length}</Text>
+            <Text style={styles.listingLabel}>Rooms</Text>
+          </View>
+        </View>
 
-  if (ads.length <0 ) {
+        {/* Filter Chips */}
+        <View style={styles.filterContainer}>
+          <FilterChip label="All" value="all" active={statusFilter === 'all'} />
+          <FilterChip label="Active" value="active" active={statusFilter === 'active'} />
+          <FilterChip label="Inactive" value="inactive" active={statusFilter === 'inactive'} />
+        </View>
+      </LinearGradient>
+    </View>
+  );
+
+  if (loading && !refreshing) {
     return (
       <View style={styles.container}>
-     <StatusBar style="dark" />
+        <StatusBar style="dark" />
+        <StickyHeader />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#7A5AF8" />
+          <Text style={styles.loadingText}>Loading your ads...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (ads.length === 0) {
+    return (
+      <View style={styles.container}>
+        <StatusBar style="dark" />
         <StickyHeader />
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIconContainer}>
@@ -258,138 +238,132 @@ const StickyHeader = () => {
 
   return (
     <View style={styles.container}>
-     <StatusBar style="dark" />
+      <StatusBar style="dark" />
       <StickyHeader />
       
-      <ScrollView 
-        style={styles.scrollContainer} 
+      <ScrollView
+        style={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#7A5AF8']} />
+        }
       >
-        {ads.map((ad, index) => (
-          <View key={ad._id} style={[styles.adCard, { marginTop: index === 0 ? 20 : 16 }]}>
-            <View style={styles.adHeader}>
-              <LinearGradient
-                colors={getCategoryGradient(ad.category)}
-                style={styles.categoryTag}
-              >
-                <Ionicons
-                  name={getCategoryIcon(ad.category)}
-                  size={14}
-                  color="white"
-                />
-                <Text style={styles.categoryText}>
-                  {getCategoryLabel(ad.category)}
-                </Text>
-              </LinearGradient>
-              
-              <View style={styles.adActions}>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => handleEdit(ad._id)}
-                >
-                  <Ionicons name="create-outline" size={18} color="#7A5AF8" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.deleteButton]}
-                  onPress={() => handleDelete(ad._id)}
-                >
-                  <Ionicons name="trash-outline" size={18} color="#FF6B6B" />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.imageContainer}>
-              <Image source={{ uri: ad.images[0] }} style={styles.adImage} />
-              <View style={styles.imageOverlay}>
-                <View style={styles.statusBadge}>
-                  <View style={styles.activeDot} />
-                  <Text style={styles.statusText}>Active</Text>
-                </View>
-              </View>
-            </View>
-            
-            <View style={styles.adContent}>
-              <Text style={styles.adTitle} numberOfLines={2}>
-                {ad.title}
-              </Text>
-              
-              <View style={styles.locationRow}>
-                <View style={styles.locationIcon}>
-                  <Ionicons name="location-outline" size={16} color="#7A5AF8" />
-                </View>
-                <Text style={styles.locationText} numberOfLines={1}>
-                  {ad.location.fullAddress}
-                </Text>
-              </View>
-
-              <View style={styles.priceRow}>
-                <View style={styles.priceContainer}>
-                  <Text style={styles.priceText}>
-                    ₹{ad.monthlyRent || ad.priceRange?.min || 'Contact'}
-                  </Text>
-                  <Text style={styles.priceLabel}>/month</Text>
-                </View>
-                {ad.roommatesWanted && (
-                  <View style={styles.roommatesTag}>
-                    <Text style={styles.roommatesText}>
-                      {ad.roommatesWanted} needed
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              <View style={styles.metaRow}>
-                <View style={styles.dateContainer}>
-                  <Ionicons name="calendar-outline" size={14} color="#999" />
-                  <Text style={styles.dateText}>
-                    {formatDate(ad.createdAt)}
+        {ads.map((ad, index) => {
+          const daysLeft = calculateDaysLeft(ad.createdAt);
+          const isExpiringSoon = daysLeft <= 7;
+          
+          return (
+            <View key={ad._id} style={[styles.adCard, { marginTop: index === 0 ? 20 : 16 }]}>
+              {/* Card Header with Status Toggle */}
+              <View style={styles.adHeader}>
+                <View style={styles.categoryTag}>
+                  <Ionicons
+                    name={getCategoryIcon(ad.category)}
+                    size={14}
+                    color="#7A5AF8"
+                  />
+                  <Text style={styles.categoryText}>
+                    {getCategoryLabel(ad.category)}
                   </Text>
                 </View>
                 
-                <View style={styles.viewsContainer}>
-                  <Ionicons name="eye-outline" size={14} color="#999" />
-                  <Text style={styles.viewsText}>124 views</Text>
+                <View style={styles.statusToggleContainer}>
+                  <Text style={[styles.statusLabel, !ad.isActive && styles.statusLabelInactive]}>
+                    {ad.isActive ? 'Active' : 'Inactive'}
+                  </Text>
+                  <Switch
+                    value={ad.isActive}
+                    onValueChange={() => toggleActiveStatus(ad._id, ad.isActive)}
+                    trackColor={{ false: '#E0E0E0', true: '#B998F5' }}
+                    thumbColor={ad.isActive ? '#7A5AF8' : '#f4f3f4'}
+                    ios_backgroundColor="#E0E0E0"
+                  />
                 </View>
               </View>
-            </View>
 
-            <View style={styles.adFooter}>
-              <TouchableOpacity
-                style={styles.promoteButton}
-                onPress={() => handlePromote(ad._id)}
-              >
-                <LinearGradient
-                  colors={['#FFE082', '#FFB74D']}
-                  style={styles.promoteButtonGradient}
+              {/* Image with Overlay Stats */}
+              <View style={styles.imageContainer}>
+                <Image source={{ uri: ad.images?.[0]?.thumbnailUrl || ad.images?.[0]?.originalUrl }} style={styles.adImage} />
+                
+                {/* Expiry Badge */}
+                <View style={[styles.expiryBadge, isExpiringSoon && styles.expiryBadgeWarning]}>
+                  <Ionicons 
+                    name={isExpiringSoon ? "warning" : "time-outline"} 
+                    size={12} 
+                    color={isExpiringSoon ? "#FF6B6B" : "white"} 
+                  />
+                  <Text style={[styles.expiryText, isExpiringSoon && styles.expiryTextWarning]}>
+                    {daysLeft} days left
+                  </Text>
+                </View>
+
+                {/* Views & Favorites Overlay */}
+                <View style={styles.statsOverlay}>
+                  <View style={styles.statItem}>
+                    <Ionicons name="eye-outline" size={14} color="white" />
+                    <Text style={styles.statText}>{ad.views || 0}</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Ionicons name="heart-outline" size={14} color="white" />
+                    <Text style={styles.statText}>{ad.favoriteCount || 0}</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Ad Content */}
+              <View style={styles.adContent}>
+                <Text style={styles.adTitle} numberOfLines={2}>
+                  {ad.title}
+                </Text>
+                
+                <View style={styles.locationRow}>
+                  <Ionicons name="location" size={16} color="#7A5AF8" />
+                  <Text style={styles.locationText} numberOfLines={1}>
+                    {ad.location?.fullAddress}
+                  </Text>
+                </View>
+
+                <View style={styles.priceRow}>
+                  <View style={styles.priceContainer}>
+                    <Text style={styles.priceText}>
+                      ₹{ad.monthlyRent || ad.priceRange?.min || 'Contact'}
+                    </Text>
+                    <Text style={styles.priceLabel}>/month</Text>
+                  </View>
+                  <View style={styles.dateContainer}>
+                    <Ionicons name="calendar-outline" size={12} color="#999" />
+                    <Text style={styles.dateText}>{formatDate(ad.createdAt)}</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Action Buttons */}
+              <View style={styles.adFooter}>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={() => handleEdit(ad._id)}
                 >
-                  <Ionicons name="trending-up" size={16} color="#F57C00" />
-                  <Text style={styles.promoteButtonText}>Boost Ad</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.shareButton}>
-                <Ionicons name="share-outline" size={16} color="#7A5AF8" />
-                <Text style={styles.shareButtonText}>Share</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.statsButton}>
-                <Ionicons name="analytics-outline" size={16} color="#666" />
-                <Text style={styles.statsButtonText}>Stats</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ))}
+                  <Feather name="edit-2" size={16} color="#7A5AF8" />
+                  <Text style={styles.actionBtnText}>Edit</Text>
+                </TouchableOpacity>
 
-        <TouchableOpacity style={styles.addNewButton}>
-          <LinearGradient
-            colors={['#7A5AF8', '#9B7DF7']}
-            style={styles.addNewButtonGradient}
-          >
-            <Ionicons name="add" size={24} color="white" />
-            <Text style={styles.addNewButtonText}>Post New Ad</Text>
-          </LinearGradient>
-        </TouchableOpacity>
+                <TouchableOpacity style={styles.actionBtn}>
+                  <Feather name="share-2" size={16} color="#2196F3" />
+                  <Text style={[styles.actionBtnText, { color: '#2196F3' }]}>Share</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={() => handleDelete(ad._id)}
+                >
+                  <Feather name="trash-2" size={16} color="#FF6B6B" />
+                  <Text style={[styles.actionBtnText, { color: '#FF6B6B' }]}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        })}
         
         <View style={styles.bottomSpacing} />
       </ScrollView>
@@ -402,6 +376,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFF',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 100,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#7A5AF8',
+    fontWeight: '500',
+  },
   stickyHeaderContainer: {
     position: 'absolute',
     top: 0,
@@ -410,8 +396,8 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   stickyHeader: {
-    paddingTop: StatusBar.currentHeight || 44,
-    paddingBottom: 20,
+    paddingTop: 44,
+    paddingBottom: 16,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 25,
     borderBottomRightRadius: 25,
@@ -425,60 +411,77 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  headerLeft: {
-    flex: 1,
+    marginBottom: 12,
   },
   stickyHeaderTitle: {
     fontSize: 28,
     fontWeight: 'bold',
     color: 'white',
-    marginBottom: 6,
   },
   listingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 20,
-    alignSelf: 'flex-start',
+    gap: 4,
   },
   listingCount: {
     fontSize: 14,
-    color: 'white',
-    marginLeft: 6,
-    fontWeight: '600',
+    color: '#006442',
+    fontWeight: '400',
   },
-  headerButton: {
+  listingLabel: {
+    fontSize: 14,
+    color: 'white',
+    fontWeight: '500',
+  },
+  filterContainer: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    padding: 8,
-    borderRadius: 12,
+  },
+  filterChipActive: {
+    backgroundColor: 'white',
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'white',
+  },
+  filterChipTextActive: {
+    color: '#7A5AF8',
   },
   scrollContainer: {
     flex: 1,
-    marginTop: 120,
+    marginTop: 160,
   },
   scrollContent: {
     paddingHorizontal: 16,
   },
   adCard: {
     backgroundColor: 'white',
-    borderRadius: 20,
+    borderRadius: 16,
     marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
     overflow: 'hidden',
   },
   adHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    paddingBottom: 0,
+    padding: 16,
+    paddingBottom: 12,
   },
   categoryTag: {
     flexDirection: 'row',
@@ -486,92 +489,102 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
+    backgroundColor: '#F0F0FF',
     gap: 6,
   },
   categoryText: {
-    fontSize: 12,
-    color: 'white',
+    fontSize: 11,
+    color: '#7A5AF8',
     fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
-  adActions: {
+  statusToggleContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
   },
-  actionButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F0F0FF',
-    justifyContent: 'center',
-    alignItems: 'center',
+  statusLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4CAF50',
   },
-  deleteButton: {
-    backgroundColor: '#FFE5E5',
+  statusLabelInactive: {
+    color: '#999',
   },
   imageContainer: {
     position: 'relative',
-    margin: 20,
-    marginBottom: 0,
-    borderRadius: 16,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 12,
     overflow: 'hidden',
   },
   adImage: {
     width: '100%',
-    height: 220,
+    height: 200,
   },
-  imageOverlay: {
+  expiryBadge: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 4,
+  },
+  expiryBadgeWarning: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+  },
+  expiryText: {
+    fontSize: 11,
+    color: 'white',
+    fontWeight: '600',
+  },
+  expiryTextWarning: {
+    color: '#FF6B6B',
+  },
+  statsOverlay: {
     position: 'absolute',
     top: 12,
     right: 12,
+    flexDirection: 'row',
+    gap: 8,
   },
-  statusBadge: {
+  statItem: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingVertical: 5,
+    borderRadius: 16,
+    gap: 4,
   },
-  activeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#4CAF50',
-    marginRight: 4,
-  },
-  statusText: {
-    fontSize: 10,
+  statText: {
+    fontSize: 11,
     color: 'white',
     fontWeight: '600',
   },
   adContent: {
-    padding: 20,
+    paddingHorizontal: 16,
+     fontSize: 11,
   },
   adTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#1A1A1A',
-    marginBottom: 12,
-    lineHeight: 24,
+    marginBottom: 8,
+    lineHeight: 22,
   },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
-  },
-  locationIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F0F0FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
+    marginBottom: 10,
+    gap: 6,
   },
   locationText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#666',
     flex: 1,
     fontWeight: '500',
@@ -580,129 +593,53 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
   },
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
   },
   priceText: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#7A5AF8',
   },
   priceLabel: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
     marginLeft: 4,
-    fontWeight: '500',
-  },
-  roommatesTag: {
-    backgroundColor: '#E3F2FD',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  roommatesText: {
-    fontSize: 12,
-    color: '#1976D2',
-    fontWeight: '600',
-  },
-  metaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
   dateContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
   },
   dateText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#999',
-    marginLeft: 4,
-    fontWeight: '500',
-  },
-  viewsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  viewsText: {
-    fontSize: 12,
-    color: '#999',
-    marginLeft: 4,
     fontWeight: '500',
   },
   adFooter: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: '#F5F5F5',
     gap: 8,
   },
-  promoteButton: {
-    flex: 1,
-  },
-  promoteButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 12,
-    gap: 6,
-  },
-  promoteButtonText: {
-    color: '#F57C00',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  shareButton: {
+  actionBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    backgroundColor: '#F0F0FF',
-    borderRadius: 12,
-    gap: 6,
-  },
-  shareButtonText: {
-    color: '#7A5AF8',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  statsButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: 10,
     backgroundColor: '#F8F8F8',
-    borderRadius: 12,
+    borderRadius: 10,
     gap: 6,
   },
-  statsButtonText: {
-    color: '#666',
+  actionBtnText: {
+    fontSize: 12,
     fontWeight: '600',
-    fontSize: 14,
-  },
-  addNewButton: {
-    marginTop: 20,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  addNewButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 18,
-    gap: 8,
-  },
-  addNewButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
+    color: '#7A5AF8',
   },
   bottomSpacing: {
     height: 20,

@@ -31,6 +31,7 @@ export default function RootLayout() {
             <Stack.Screen name="pghostelform" />
             <Stack.Screen name="sharedroomform" />
             <Stack.Screen name="locationScreen"/>
+              <Stack.Screen name="favoritePage"/>
           </Stack>
         </LocationProvider>
       </PersistGate>

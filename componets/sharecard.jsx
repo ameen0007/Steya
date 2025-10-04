@@ -1,91 +1,82 @@
 import { router } from 'expo-router';
-import React, { use, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView } from 'react-native';
-import { Entypo,MaterialCommunityIcons, FontAwesome, Ionicons } from '@expo/vector-icons';
+import React, { useState } from 'react';
+import { 
+  View, Text, StyleSheet, Image, TouchableOpacity, 
+  Alert, ActivityIndicator 
+} from 'react-native';
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 
-const SharedRoomCard = ({ data, activeFilter }) => {
-  // Extract data or provide defaults
+const SharedRoomCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) => {
+  const [loading, setLoading] = useState(false);
 
+    console.log(data,'data in sharecard');
+    
 
-    console.log('====================================');
-  console.log(data, activeFilter, "shared data");
-  console.log('====================================');
+  const id = data._id;
 
+  // Toggle favorite - now calls parent function
+  const toggleFavorite = async () => {
+    try {
+      setLoading(true);
+      await onToggleFavorite(id);
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const id = data._id 
   return (
     <TouchableOpacity
       style={styles.cardWrapper}
-      activeOpacity={0.8} 
-onPress={() => {
-  try {
-    if (!id) {
-      console.warn("ID is missing");
-      Alert.alert("Missing ID", "No ID was found for this item.");
-      return;
-    }
-    
-    console.log(`Attempting to navigate to /shared/${id}`);
-    
-    // Log the pathname and params for debugging
-    const navigationParams = {
-      pathname: "/shared/[id]",
-      params: { id }
-    };
-    console.log("Navigation params:", JSON.stringify(navigationParams));
-
-    // Debug the router.push attempt
-    console.log("Calling router.push()...");
-    router.push(navigationParams);
-    console.log("router.push() called successfully");
-
-  } catch (error) {
-    // Detailed error logging
-    console.error("Navigation error:", error);
-    console.error("Error stack:", error?.stack);
-
-    // Show detailed alert
-    Alert.alert(
-      "Navigation Failed",
-      `Unable to open the detail page.\n\nPath: /shared/${id}\nError: ${error?.message || String(error)}`,
-      [
-        {
-          text: "OK",
-          style: "cancel"
-        },
-        {
-          text: "Try Alternate Route",
-          onPress: () => {
-            // Fallback navigation attempt with direct string path
-            try {
-              console.log("Attempting fallback navigation...");
-              router.push(`/shared/${id}`);
-            } catch (fallbackError) {
-              console.error("Fallback navigation failed:", fallbackError);
-              Alert.alert("Fallback Failed", String(fallbackError));
-            }
+      activeOpacity={0.8}
+      onPress={() => {
+        try {
+          if (!id) {
+            Alert.alert("Missing ID", "No ID was found for this item.");
+            return;
           }
+          router.push({
+            pathname: "/shared/[id]",
+            params: { id }
+          });
+        } catch (error) {
+          console.error("Navigation error:", error);
+          Alert.alert("Navigation Failed", "Unable to open the detail page.");
         }
-      ]
-    );
-  }
-}}
-
+      }}
     >
       <View style={styles.cardContainer}>
         {/* Top image section */}
         <View style={styles.imageContainer}>
-          <Image source={{ uri:data?.thumbnail?.url  }} style={styles.image} />
+          <Image source={{ uri: data?.thumbnail?.url }} style={styles.image} />
           <View style={styles.topOverlay}>
-          <View style={styles.distanceBadge}>
-                {activeFilter === 'All' &&
- <View style={styles.categoryBadge}>
- <Ionicons name='people' size={16} color='#7A5AF8' /> 
-</View>
-            }
-            </View> 
-            <TouchableOpacity style={styles.favoriteButton}>
-              <Ionicons name="heart-outline" size={23} color="#FF4081" />
+            <View style={styles.distanceBadge}>
+              {activeFilter === 'All' && (
+                <View style={styles.categoryBadge}>
+                  <Ionicons name='people' size={16} color='#7A5AF8' />
+                </View>
+              )}
+            </View>
+
+            {/* Favorite Button */}
+            <TouchableOpacity 
+              style={styles.favoriteButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                toggleFavorite();
+              }}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color="#FF4081" />
+              ) : (
+                <Ionicons 
+                  name={isFavorited ? "heart" : "heart-outline"} 
+                  size={23} 
+                  color={isFavorited ? "#FF4081" : "#FF4081"} 
+                />
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -94,13 +85,12 @@ onPress={() => {
         <View style={styles.contentContainer}>
           <View style={styles.headerRow}>
             <Text numberOfLines={2} style={styles.title}>{data?.title}</Text>
-              <Text style={styles.postedDate}>
-  {new Date(data?.createdAt).toLocaleDateString("en-US", {
-    month: "short", 
-    day: "2-digit",
-  })}
-</Text>
-           
+            <Text style={styles.postedDate}>
+              {new Date(data?.createdAt).toLocaleDateString("en-US", {
+                month: "short", 
+                day: "2-digit",
+              })}
+            </Text>
           </View>
 
           <Text style={styles.description} numberOfLines={2}>
@@ -116,18 +106,14 @@ onPress={() => {
               </View>
               <View style={styles.genderBadge}>
                 {data?.genderPreference === 'any' ?
-                <MaterialCommunityIcons color='#2D9596'  size={16}  name='gender-male-female'/>  :
-               
-   <Ionicons 
-   name={data?.genderPreference === 'female' ? 'female' : 'male'} 
-   size={16} 
-   color={data?.genderPreference === 'female' ? '#FF4081' : '#2196F3'} 
- />
+                  <MaterialCommunityIcons color='#2D9596' size={16} name='gender-male-female'/> :
+                  <Ionicons 
+                    name={data?.genderPreference === 'female' ? 'female' : 'male'} 
+                    size={16} 
+                    color={data?.genderPreference === 'female' ? '#FF4081' : '#2196F3'} 
+                  />
                 }
-             
-                <Text
-                
-                style={[
+                <Text style={[
                   styles.genderText,
                   { 
                     color: data?.genderPreference === 'any' 
@@ -137,48 +123,30 @@ onPress={() => {
                       : '#2196F3' 
                   }
                 ]}>
-
                   {data?.genderPreference.charAt(0).toUpperCase() + data?.genderPreference.slice(1)}
                 </Text>
               </View>
             </View>
-       <Text style={styles.price}>
-  ₹{data?.monthlyRent?.toLocaleString()}
-   </Text>
-
-   
+            <Text style={styles.price}>
+              ₹{data?.monthlyRent?.toLocaleString()}
+            </Text>
           </View>
-
-        
         </View>
-        <View style={styles.date}>
-
-
-</View>
       </View>
     </TouchableOpacity>
-
   );
 };
 
-// Color constants
-const greybg = '#F4F4F4';
-const maintext = '#212121';
-const lighttext = '#757575';
-const mainbg = '#7A5AF8';
-const borderc ='#EBE7FF'
-
+// Your existing styles remain the same...
 const styles = StyleSheet.create({
   cardWrapper: {
     marginHorizontal: 12,
     marginVertical: 8,
-  
   },
   cardContainer: {
-    backgroundColor:  '#FBFAFF',
+    backgroundColor: '#FBFAFF',
     borderWidth: 1,
-    borderColor: borderc,
-
+    borderColor: '#EBE7FF',
     borderRadius: 12,
     shadowColor: '#000',
     shadowOpacity: 0.1,
@@ -205,29 +173,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
- 
-
-  date:{
-     flex:1,
-justifyContent:'flex-start',
-alignItems:'flex-end',
-paddingTop:5,
-paddingRight:15
-    },
-    postedDate:{
-    fontFamily:'Poppinssm',
-    fontSize:10,
-    color: lighttext
-    },
   favoriteButton: {
-    backgroundColor: greybg,
-    padding: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    padding: 8,
     borderRadius: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   contentContainer: {
     padding: 12,
     flex: 1,
-    paddingBottom:0
+    paddingBottom: 0
   },
   headerRow: {
     flexDirection: 'row',
@@ -238,49 +201,38 @@ paddingRight:15
   title: {
     fontSize: 17,
     fontWeight: 'bold',
-    color: maintext,
+    color: '#212121',
     flex: 1,
     lineHeight: 22,
-    includeFontPadding: false,
   },
   categoryBadge: {
-    backgroundColor: greybg,
+    backgroundColor: '#F4F4F4',
     padding: 8,
     borderRadius: 20,
-  
   },
   description: {
     fontSize: 13,
     color: '#666',
     marginBottom: 12,
-    fontFamily:'Poppinsssm'
-    // fontSize: 12,
-    // color: lighttext,
-    // marginBottom: 10,
-    // lineHeight: 16,
   },
   preferencesContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
- 
-
   },
   roommateInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  
-    justifyContent:'center'
+    justifyContent: 'center'
   },
   needText: {
     fontSize: 13,
-    color: lighttext,
-    fontFamily:'Poppins',
-    paddingTop:3
+    color: '#757575',
+    paddingTop: 3
   },
   countBadge: {
-    backgroundColor: greybg,
+    backgroundColor: '#F4F4F4',
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -292,7 +244,7 @@ paddingRight:15
   genderBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: greybg,
+    backgroundColor: '#F4F4F4',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 10,
@@ -305,22 +257,11 @@ paddingRight:15
   price: {
     fontSize: 17,
     fontWeight: 'bold',
-    color: maintext,
-
+    color: '#212121',
   },
-  habitsScrollView: {
-    marginTop: 8,
-    maxHeight: 32,
-  },
-  habitsContentContainer: {
-    gap: 8,
-    paddingRight: 16,
-  },
-
-  habitText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '500',
+  postedDate: {
+    fontSize: 10,
+    color: '#757575'
   },
 });
 
