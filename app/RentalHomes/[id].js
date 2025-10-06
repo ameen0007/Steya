@@ -28,15 +28,49 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL;
   const [error, setError] = useState(null);
    const user = useSelector((state) => state.user.userData);
 
-    useEffect(() => {
+
+
+
+  const incrementViewCount = async () => {
+    try {
+      if (!id) return;
+      
+      console.log("🔄 Incrementing view count for room:", id);
+    
+      
+      const response = await axios.post(`${apiUrl}/api/${id}/view`, {
+        userId: user?._id // Send userId if user is logged in
+      });
+
+      if (response.data.success) {
+        console.log("✅ View count updated:", response.data.views);
+        
+        // Update the local item state with new view count
+        if (item) {
+          setItem(prevItem => ({
+            ...prevItem,
+            views: response.data.views
+          }));
+        }
+      }
+    } catch (error) {
+      console.error("❌ Error incrementing view count:", error);
+      // Don't show error to user as this is a background operation
+    }
+  };
+
+  useEffect(() => {
     const fetchRoomData = async () => {
       try {
         setLoading(true);
         setError(null);
         const response = await axios.get(`${apiUrl}/api/singleroom/${id}`);
-        // console.log("🔍 Fetched room data:", response.data?.room);
         setItem(response.data?.room);
         console.log("✅ Room data fetched:", response.data?.room);
+        
+        // ✅ CALL VIEW COUNT API AFTER SUCCESSFUL DATA FETCH
+        await incrementViewCount();
+        
       } catch (err) {
         console.error("❌ Error fetching room data:", err);
         setError(err.message || 'Failed to load room details');
@@ -50,10 +84,39 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL;
     }
   }, [id]);
 
+  // Check if room is favorited
+useEffect(() => {
+  const checkFavorite = async () => {
+    if (!id) return;
+
+    if (!user?._id) {
+      console.log("⚠️ User not logged in, skipping favorite check");
+      return; // <-- must be inside braces
+    }
+
+    try {
+      const response = await api.get(`${apiUrl}/api/check/${id}`);
+      console.log('Favorite check response:', response.data);
+
+      // ✅ Handle both possible property names
+      const favoriteStatus = response.data.isFavorited ?? response.data.isFavorite ?? false;
+      setIsFavorite(favoriteStatus);
+    } catch (error) {
+      console.error('Error checking favorite status:', error);
+    }
+  };
+
+  checkFavorite();
+}, [id, user?._id]); 
+
 
   const handleChatPress = async () => {
   console.log("Starting chat for product:", item._id);
-  
+       if (!user?._id) {
+      // console.log("⚠️ User not logged in, skipping favorite check");
+      router.push('/login');
+      return; // <-- must be inside braces
+    }
   try {
     setIsCreatingRoom(true);
 

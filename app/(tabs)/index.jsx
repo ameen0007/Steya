@@ -48,7 +48,7 @@ const HomeScreen = () => {
     try {
       if (!user?._id) return false;
       
-      const response = await api.get(`${apiUrl}/api/favorites/check/${roomId}`);
+      const response = await api.get(`${apiUrl}/api/check/${roomId}`);
       return response.data.isFavorited;
     } catch (error) {
       console.error('Error checking favorite status for room', roomId, error);
@@ -77,7 +77,7 @@ const HomeScreen = () => {
   // Toggle favorite from HomeScreen
   const toggleFavorite = async (roomId) => {
     try {
-      const response = await api.post(`${apiUrl}/api/favorites/toggle`, {
+      const response = await api.post(`${apiUrl}/api/toggle`, {
         roomId: roomId
       });
 

@@ -33,12 +33,24 @@ import api from '../services/intercepter';
 import { useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 
- const apiUrl = process.env.EXPO_PUBLIC_API_URL
+const apiUrl = process.env.EXPO_PUBLIC_API_URL
+
+
+
+import { router, useLocalSearchParams } from 'expo-router';
 
 const SharedRoomForm = () => {
- const locationData = useSelector((state) => state.location.locationData);
+  // ✅ Get route parameters
+  const params = useLocalSearchParams();
+  const roomId = params.roomId;
+  const isEdit = params.isEdit === "true";
+
+
+
+  const locationData = useSelector((state) => state.location.locationData);
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 4;
+  const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -55,6 +67,48 @@ const SharedRoomForm = () => {
     category: 'shared',
   });
 
+  // ✅ Fetch room data for editing
+  useEffect(() => {
+    if (isEdit && roomId) {
+      fetchRoomData();
+    }
+  }, [isEdit, roomId]);
+
+  const fetchRoomData = async () => {
+    try {
+      setLoading(true);
+      console.log(`🔄 Fetching room data for: ${roomId}`);
+
+      const response = await api.get(`/api/singleroom/${roomId}`);
+      const room = response.data.room;
+
+      // Transform API data to form data
+      setFormData({
+        title: room.title || '',
+        description: room.description || '',
+        location: room.location || null,
+        images: room.images?.map(img => img.originalUrl) || [],
+        monthlyRent: room.monthlyRent?.toString() || '',
+        roommatesWanted: room.roommatesWanted || 1,
+        genderPreference: room.genderPreference || '',
+        habitPreferences: room.habitPreferences || [],
+        purpose: room.purpose || [],
+        contactPhone: room.contactPhone || '',
+        showPhonePublic: room.showPhonePublic ?? true,
+        category: room.category || 'shared',
+      });
+
+      console.log('✅ Room data loaded successfully');
+
+    } catch (error) {
+      console.error('Error fetching room data:', error);
+      Alert.alert('Error', 'Failed to load room data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Rest of your existing state and options remain the same...
   const genderOptions = [
     { label: 'Male Only', value: 'male' },
     { label: 'Female Only', value: 'female' },
@@ -79,11 +133,6 @@ const SharedRoomForm = () => {
     { label: 'Freelancer', value: 'Freelancer' },
   ];
 
-  const phoneVisibilityOptions = [
-    { label: 'Show', value: false },
-    { label: 'Hide', value: true },
-  ];
-
   const updateFormData = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -100,8 +149,7 @@ const SharedRoomForm = () => {
     }
   };
 
-
-
+  // ✅ SIMPLIFIED SUBMIT FUNCTION - Handles both create and update
 const handleSubmit = async () => {
   try {
     console.log(locationData, "location--------");
@@ -123,41 +171,55 @@ const handleSubmit = async () => {
       return;
     }
 
-    // 2️⃣ Compress images & create thumbnail
+    // 2️⃣ Separate existing and new images
+    const existingImages = formData.images.filter(img => img.startsWith('http'));
+    const newImageUris = formData.images.filter(img => !img.startsWith('http'));
+    
+    console.log(`📸 Images - Existing: ${existingImages.length}, New: ${newImageUris.length}, Total: ${formData.images.length}`);
+
+    // 3️⃣ Compress ONLY NEW images
     const timestamp = Date.now();
-    const compressedImages = await Promise.all(
-      formData.images.map(async (img, i) => {
-        let context = ImageManipulator.manipulate(img);
-        context.resize({ width: 1280 });
-        let result = await context.renderAsync();
-        let manip = await result.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
+    const compressedImages = [];
 
-        const info = await FileSystem.getInfoAsync(manip.uri);
-        if (info.size > 1000000) {
-          const context2 = ImageManipulator.manipulate(manip.uri);
-          const result2 = await context2.renderAsync();
-          manip = await result2.saveAsync({ compress: 0.5, format: SaveFormat.JPEG });
-        }
+    for (let i = 0; i < newImageUris.length; i++) {
+      const img = newImageUris[i];
+      
+      let context = ImageManipulator.manipulate(img);
+      context.resize({ width: 1280 });
+      let result = await context.renderAsync();
+      let manip = await result.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
 
-        // First image thumbnail
-        if (i === 0) {
-          const thumbContext = ImageManipulator.manipulate(manip.uri);
-          thumbContext.resize({ width: 300 });
-          const thumbResult = await thumbContext.renderAsync();
-          const thumb = await thumbResult.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
-          manip.thumbnail = thumb.uri;
-        }
+      const info = await FileSystem.getInfoAsync(manip.uri);
+      if (info.size > 1000000) {
+        const context2 = ImageManipulator.manipulate(manip.uri);
+        const result2 = await context2.renderAsync();
+        manip = await result2.saveAsync({ compress: 0.5, format: SaveFormat.JPEG });
+      }
 
-        return manip;
-      })
-    );
+      // ✅ FIRST IMAGE THUMBNAIL - Only create thumbnail for first new image
+      if (i === 0 && existingImages.length === 0) {
+        const thumbContext = ImageManipulator.manipulate(manip.uri);
+        thumbContext.resize({ width: 300 });
+        const thumbResult = await thumbContext.renderAsync();
+        const thumb = await thumbResult.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
+        manip.thumbnail = thumb.uri;
+      }
 
-    // 3️⃣ Prepare FormData
+      compressedImages.push(manip);
+    }
+
+    // 4️⃣ Prepare FormData
     const uploadData = new FormData();
 
-    // Append normal fields (EXCLUDING images and location)
+    // ✅ CRITICAL: Send existing images that should be kept (only for edit mode)
+    if (isEdit && existingImages.length > 0) {
+      uploadData.append("existingImages", JSON.stringify(existingImages));
+      console.log('📤 Sending existing images to keep:', existingImages.length);
+    }
+
+    // Append normal fields
     Object.entries(formData).forEach(([key, value]) => {
-      if (key === "images" || key === "location") return; // skip images and location
+      if (key === "images" || key === "location") return;
       if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
         uploadData.append(key, JSON.stringify(value));
       } else {
@@ -165,7 +227,7 @@ const handleSubmit = async () => {
       }
     });
 
-    // Append location ONLY if we have valid locationData
+    // Append location
     if (locationData?.lat && locationData?.lng && locationData?.name) {
       const geoLocation = {
         type: "Point",
@@ -175,7 +237,7 @@ const handleSubmit = async () => {
       uploadData.append("location", JSON.stringify(geoLocation));
     }
 
-    // Append images
+    // Append NEW images
     compressedImages.forEach((img, i) => {
       uploadData.append("images", {
         uri: img.uri,
@@ -184,8 +246,8 @@ const handleSubmit = async () => {
       });
     });
 
-    // Append first image thumbnail
-    if (compressedImages[0]?.thumbnail) {
+    // ✅ Append thumbnail if it's the first image and we have new images
+    if (compressedImages[0]?.thumbnail && existingImages.length === 0) {
       uploadData.append("thumbnail", {
         uri: compressedImages[0].thumbnail,
         name: `thumbnail_${timestamp}.jpg`,
@@ -193,56 +255,57 @@ const handleSubmit = async () => {
       });
     }
 
-    // 4️⃣ Upload to API - React Native specific approach
-    console.log("API calling started...", uploadData);
-    console.log("API URL:", `${apiUrl}/api/rooms`);
-    console.log("Upload data size:", uploadData._parts?.length || 'unknown');
-    
-    const res = await api.post(`${apiUrl}/api/rooms`, uploadData, {
-      timeout: 60000, // Longer timeout for file uploads
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-      transformRequest: (data, headers) => {
-        // React Native handles FormData differently, so we return it as-is
-        return data;
-      },
-      onUploadProgress: (progressEvent) => {
-        console.log("Upload progress:", Math.round((progressEvent.loaded / progressEvent.total) * 100) + "%");
-      },
-    });
+    // 5️⃣ Make API call
+    let res;
+    if (isEdit && roomId) {
+      console.log("🔄 Updating room...", roomId);
+      console.log("📤 Uploading:", {
+        existingImages: existingImages.length,
+        newImages: compressedImages.length,
+        totalImages: formData.images.length
+      });
+      
+      res = await api.put(`${apiUrl}/api/update/${roomId}`, uploadData, {
+        timeout: 60000,
+        headers: { 'Content-Type': 'multipart/form-data' },
+        transformRequest: (data) => data,
+      });
+    } else {
+      console.log("🆕 Creating new room...");
+      res = await api.post(`${apiUrl}/api/rooms`, uploadData, {
+        timeout: 60000,
+        headers: { 'Content-Type': 'multipart/form-data' },
+        transformRequest: (data) => data,
+      });
+    }
 
-    console.log("✅ Uploaded successfully:", res.data);
-    Alert.alert("Success", "Your room listing has been submitted!");
-  } catch (err) {
-    console.error("❌ Upload failed:", err);
-    console.error("Error details:", err.response?.data || err.message);
-    console.error("Error status:", err.response?.status);
-    console.error("Error config:", err.config?.url);
-    console.error("Full error:", JSON.stringify(err, null, 2));
+    console.log("✅ Success:", res.data);
+    Alert.alert(
+      "Success", 
+      isEdit ? "Your room listing has been updated!" : "Your room listing has been submitted!"
+    );
     
-    let errorMessage = "Something went wrong while submitting your listing.";
+    router.back();
+
+  } catch (err) {
+    console.error("❌ Operation failed:", err);
+    let errorMessage = `Something went wrong while ${isEdit ? 'updating' : 'submitting'} your listing.`;
     if (err.code === 'NETWORK_ERROR') {
       errorMessage = "Network connection failed. Please check your internet connection.";
     } else if (err.response?.status) {
       errorMessage = `Server error (${err.response.status}): ${err.response.data?.message || 'Unknown error'}`;
     }
-    
     Alert.alert("Error", errorMessage);
   }
 };
 
+  // ✅ SIMPLE IMAGE REMOVAL - Just remove from local state
+  const handleRemoveImage = (index) => {
+    const newImages = formData.images.filter((_, i) => i !== index);
+    updateFormData('images', newImages);
+  };
 
-
-
-
-
-
-
-
-
-
-
+  // Your existing renderStepContent function stays the same
   const renderStepContent = () => {
     switch (currentStep) {
       case 1:
@@ -255,6 +318,7 @@ const handleSubmit = async () => {
               placeholder="e.g., Shared Room near Infopark "
               required
               maxLength={100}
+               multiline 
             />
 
             <InputField
@@ -280,9 +344,10 @@ const handleSubmit = async () => {
           <View style={styles.stepContainer}>
             <ImageUploadSection
               images={formData.images}
-              onImagesChange={(value) => updateFormData('images', value)}
+              onImagesChange={(value) => updateFormData('images', value)} // Simple update
               maxImages={5}
               required
+              isEdit={isEdit}
             />
 
             <InputField
@@ -305,6 +370,7 @@ const handleSubmit = async () => {
           </View>
         );
 
+      // ... rest of your steps remain the same
       case 3:
         return (
           <View style={styles.stepContainer}>
@@ -347,9 +413,7 @@ const handleSubmit = async () => {
               required
             />
 
-
-   
-           <SelectionButton
+            <SelectionButton
               label="Phone Number Visibility"
               options={[
                 { label: 'Show ', value: true },
@@ -359,25 +423,24 @@ const handleSubmit = async () => {
               onSelect={(value) => updateFormData('showPhonePublic', value)}
               required
             />
-                            {formData.showPhonePublic === true && formData.contactPhone.length === 10 && (
-  <View style={styles.visibilityDisclaimer}>
-    <Ionicons name="information-circle" size={16} color="#7A5AF8" />
-    <Text style={styles.disclaimerTextShow}>
-      This number will be public
-    </Text>
-  </View>
-)}
 
-{formData.showPhonePublic === false && formData.contactPhone.length === 10 && (
-  <View style={styles.visibilityDisclaimerHide}>
-    <Ionicons name="information-circle" size={16} color="#7A5AF8" /> 
-    <Text style={styles.disclaimerTextHide}>
-      Users must message to see it
-    </Text>
-  </View>
-)}
- 
+            {formData.showPhonePublic === true && formData.contactPhone.length === 10 && (
+              <View style={styles.visibilityDisclaimer}>
+                <Ionicons name="information-circle" size={16} color="#7A5AF8" />
+                <Text style={styles.disclaimerTextShow}>
+                  This number will be public
+                </Text>
+              </View>
+            )}
 
+            {formData.showPhonePublic === false && formData.contactPhone.length === 10 && (
+              <View style={styles.visibilityDisclaimerHide}>
+                <Ionicons name="information-circle" size={16} color="#7A5AF8" />
+                <Text style={styles.disclaimerTextHide}>
+                  Users must message to see it
+                </Text>
+              </View>
+            )}
 
             <View style={styles.summaryContainer}>
               <Text style={styles.summaryTitle}>📋 Listing Summary</Text>
@@ -393,6 +456,12 @@ const handleSubmit = async () => {
                 <Text style={styles.summaryLabel}>Roommates Wanted:</Text>
                 <Text style={styles.summaryValue}>{formData.roommatesWanted}</Text>
               </View>
+              {isEdit && (
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Mode:</Text>
+                  <Text style={styles.summaryValue}>Editing Existing Listing</Text>
+                </View>
+              )}
             </View>
           </View>
         );
@@ -400,6 +469,11 @@ const handleSubmit = async () => {
       default:
         return null;
     }
+  };
+
+  // Update the header title based on mode
+  const getHeaderTitle = () => {
+    return isEdit ? "Edit Shared Room" : "Shared Room Listing";
   };
 
   const getStepTitle = () => {
@@ -412,54 +486,68 @@ const handleSubmit = async () => {
     }
   };
 
+  if (loading) {
+    return (
+      <SafeWrapper>
+        <View style={styles.loadingContainer}>
+          <Text>Loading room data...</Text>
+        </View>
+      </SafeWrapper>
+    );
+  }
+
   return (
     <SafeWrapper>
-    <View style={styles.container}>
-      <FormHeader title="Shared Room Listing" />
-      <ProgressBar 
-        currentStep={currentStep} 
-        totalSteps={totalSteps} 
-        stepTitle={getStepTitle()} 
-      />
-     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 30} // Adjust based on header height
-    >
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {renderStepContent()}
-      </ScrollView>
-</KeyboardAvoidingView>
-      <View style={styles.buttonContainer}>
-        {currentStep > 1 && (
-          <TouchableOpacity style={styles.secondaryButton} onPress={handlePrevious}>
-            <Text style={styles.secondaryButtonText}>Previous</Text>
-          </TouchableOpacity>
-        )}
-        
-        <TouchableOpacity 
-          style={[styles.primaryButton, currentStep === 1 && styles.fullWidthButton]} 
-          onPress={currentStep === totalSteps ? handleSubmit : handleNext}
+      <View style={styles.container}>
+        <FormHeader title={getHeaderTitle()} />
+        <ProgressBar
+          currentStep={currentStep}
+          totalSteps={totalSteps}
+          stepTitle={getStepTitle()}
+        />
+
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.container}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 30}
         >
-          <Text style={styles.primaryButtonText}>
-            {currentStep === totalSteps ? 'Submit Listing' : 'Next'}
-          </Text>
-        </TouchableOpacity>
+          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            {renderStepContent()}
+          </ScrollView>
+        </KeyboardAvoidingView>
+
+        <View style={styles.buttonContainer}>
+          {currentStep > 1 && (
+            <TouchableOpacity style={styles.secondaryButton} onPress={handlePrevious}>
+              <Text style={styles.secondaryButtonText}>Previous</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={[styles.primaryButton, currentStep === 1 && styles.fullWidthButton]}
+            onPress={currentStep === totalSteps ? handleSubmit : handleNext}
+          >
+            <Text style={styles.primaryButtonText}>
+              {currentStep === totalSteps ? (isEdit ? 'Update Listing' : 'Submit Listing') : 'Next'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
-
     </SafeWrapper>
-
-
   );
 };
 
-// File: PGHostelForm.js
 
 const PGHostelForm = () => {
-   const locationData = useSelector((state) => state.location.locationData);
+  // ✅ Get route parameters
+  const params = useLocalSearchParams();
+  const roomId = params.roomId;
+  const isEdit = params.isEdit === "true";
+
+  const locationData = useSelector((state) => state.location.locationData);
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 4;
+  const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -475,9 +563,53 @@ const PGHostelForm = () => {
     rules: [],
     contactPhone: '',
     showPhonePublic: true,
-      category: 'pg_hostel',
+    category: 'pg_hostel',
   });
 
+  // ✅ Fetch room data for editing
+  useEffect(() => {
+    if (isEdit && roomId) {
+      fetchRoomData();
+    }
+  }, [isEdit, roomId]);
+
+  const fetchRoomData = async () => {
+    try {
+      setLoading(true);
+      console.log(`🔄 Fetching PG/Hostel data for: ${roomId}`);
+
+      const response = await api.get(`/api/singleroom/${roomId}`);
+      const room = response.data.room;
+
+      // Transform API data to form data
+      setFormData({
+        title: room.title || '',
+        description: room.description || '',
+        location: room.location || null,
+        images: room.images?.map(img => img.originalUrl) || [],
+        availableSpace: room.availableSpace?.toString() || '',
+        priceRange: room.priceRange || { min: 0, max: 0 },
+        pgGenderCategory: room.pgGenderCategory || '',
+        roomTypesAvailable: room.roomTypesAvailable || [],
+        mealsProvided: room.mealsProvided || [],
+        amenities: room.amenities || [],
+        rules: room.rules || [],
+        contactPhone: room.contactPhone || '',
+        showPhonePublic: room.showPhonePublic ?? true,
+        category: room.category || 'pg_hostel',
+      });
+
+      console.log('✅ PG/Hostel data loaded successfully');
+
+    } catch (error) {
+      console.error('Error fetching PG/Hostel data:', error);
+      Alert.alert('Error', 'Failed to load PG/Hostel data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Your existing options remain the same...
   const genderCategoryOptions = [
     { label: 'Gents Only', value: 'gents' },
     { label: 'Ladies Only', value: 'ladies' },
@@ -495,7 +627,6 @@ const PGHostelForm = () => {
     { label: 'Breakfast', value: 'breakfast' },
     { label: 'Lunch', value: 'lunch' },
     { label: 'Dinner', value: 'dinner' },
-    { label: 'All Meals', value: 'all_meals' },
   ];
 
   const amenityOptions = [
@@ -534,6 +665,7 @@ const PGHostelForm = () => {
     }
   };
 
+  // ✅ UPDATED SUBMIT FUNCTION - Handles both create and update
 const handleSubmit = async () => {
   try {
     console.log(locationData, "location--------");
@@ -541,36 +673,36 @@ const handleSubmit = async () => {
     // 1️⃣ Validate required fields
     const errors = [];
 
-    if (!formData.images || formData.images.length === 0) 
+    if (!formData.images || formData.images.length === 0)
       errors.push("Please select at least one image.");
 
-    if (!formData.title?.trim()) 
+    if (!formData.title?.trim())
       errors.push("Title is required.");
 
-    if (!formData.description?.trim()) 
+    if (!formData.description?.trim())
       errors.push("Description is required.");
 
-    if (!formData.availableSpace || isNaN(formData.availableSpace)) 
+    if (!formData.availableSpace || isNaN(formData.availableSpace))
       errors.push("Available space is required and must be a number.");
 
-    if (!formData.contactPhone?.trim()) 
+    if (!formData.contactPhone?.trim())
       errors.push("Contact phone is required.");
 
-    if (!formData.pgGenderCategory?.trim()) 
+    if (!formData.pgGenderCategory?.trim())
       errors.push("Gender category is required.");
 
-    if (formData.roomTypesAvailable && !Array.isArray(formData.roomTypesAvailable)) 
+    if (formData.roomTypesAvailable && !Array.isArray(formData.roomTypesAvailable))
       errors.push("Please select at least one room type.");
 
     // ✅ Price range validation
     const minPrice = parseFloat(formData.priceRange?.min);
     const maxPrice = parseFloat(formData.priceRange?.max);
 
-    if (isNaN(minPrice) || isNaN(maxPrice)) 
+    if (isNaN(minPrice) || isNaN(maxPrice))
       errors.push("Price range min and max must be numbers.");
-    else if (minPrice < 0 || maxPrice < 0) 
+    else if (minPrice < 0 || maxPrice < 0)
       errors.push("Price range values cannot be negative.");
-    else if (minPrice > maxPrice) 
+    else if (minPrice > maxPrice)
       errors.push("Price range min cannot be greater than max.");
 
     if (errors.length > 0) {
@@ -578,42 +710,60 @@ const handleSubmit = async () => {
       return;
     }
 
-    // 2️⃣ Compress images & create thumbnail
+    // 2️⃣ Separate existing and new images
+    const existingImages = formData.images.filter(img => img.startsWith('http'));
+    const newImageUris = formData.images.filter(img => !img.startsWith('http'));
+    
+    console.log(`📸 Images - Existing: ${existingImages.length}, New: ${newImageUris.length}, Total: ${formData.images.length}`);
+
+    // 3️⃣ Compress ONLY NEW images
     const timestamp = Date.now();
-    const compressedImages = await Promise.all(
-      formData.images.map(async (img, i) => {
-        let context = ImageManipulator.manipulate(img);
-        context.resize({ width: 1280 });
-        let result = await context.renderAsync();
-        let manip = await result.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
+    const compressedImages = [];
 
-        const info = await FileSystem.getInfoAsync(manip.uri);
-        if (info.size > 1000000) {
-          const context2 = ImageManipulator.manipulate(manip.uri);
-          const result2 = await context2.renderAsync();
-          manip = await result2.saveAsync({ compress: 0.5, format: SaveFormat.JPEG });
-        }
+    for (let i = 0; i < newImageUris.length; i++) {
+      const img = newImageUris[i];
 
-        // First image thumbnail
-        if (i === 0) {
-          const thumbContext = ImageManipulator.manipulate(manip.uri);
-          thumbContext.resize({ width: 300 });
-          const thumbResult = await thumbContext.renderAsync();
-          const thumb = await thumbResult.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
-          manip.thumbnail = thumb.uri;
-        }
+      let context = ImageManipulator.manipulate(img);
+      context.resize({ width: 1280 });
+      let result = await context.renderAsync();
+      let manip = await result.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
 
-        return manip;
-      })
-    );
+      const info = await FileSystem.getInfoAsync(manip.uri);
+      if (info.size > 1000000) {
+        const context2 = ImageManipulator.manipulate(manip.uri);
+        const result2 = await context2.renderAsync();
+        manip = await result2.saveAsync({ compress: 0.5, format: SaveFormat.JPEG });
+      }
 
-    // 3️⃣ Prepare FormData
+      // ✅ FIRST IMAGE THUMBNAIL - Only create thumbnail for first new image
+      if (i === 0 && existingImages.length === 0) {
+        const thumbContext = ImageManipulator.manipulate(manip.uri);
+        thumbContext.resize({ width: 300 });
+        const thumbResult = await thumbContext.renderAsync();
+        const thumb = await thumbResult.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
+        manip.thumbnail = thumb.uri;
+      }
+
+      compressedImages.push(manip);
+    }
+
+    // 4️⃣ Prepare FormData
     const uploadData = new FormData();
+
+    // ✅ Send existing images that should be kept (only for edit mode)
+    if (isEdit && existingImages.length > 0) {
+      uploadData.append("existingImages", JSON.stringify(existingImages));
+      console.log('📤 Sending existing images to keep:', existingImages.length);
+    }
 
     // Append normal fields (EXCLUDING images and location)
     Object.entries(formData).forEach(([key, value]) => {
-      if (key === "images" || key === "location") return; // skip images and location
-      if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
+      if (key === "images" || key === "location") return;
+
+      // ✅ FIX: Handle mealsProvided separately to prevent nested string arrays
+      if (key === "mealsProvided") {
+        uploadData.append(key, JSON.stringify(value || []));
+      } else if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
         uploadData.append(key, JSON.stringify(value));
       } else {
         uploadData.append(key, String(value));
@@ -630,7 +780,7 @@ const handleSubmit = async () => {
       uploadData.append("location", JSON.stringify(geoLocation));
     }
 
-    // Append images
+    // Append NEW images
     compressedImages.forEach((img, i) => {
       uploadData.append("images", {
         uri: img.uri,
@@ -639,8 +789,8 @@ const handleSubmit = async () => {
       });
     });
 
-    // Append first image thumbnail
-    if (compressedImages[0]?.thumbnail) {
+    // ✅ Append thumbnail if it's the first image and we have new images
+    if (compressedImages[0]?.thumbnail && existingImages.length === 0) {
       uploadData.append("thumbnail", {
         uri: compressedImages[0].thumbnail,
         name: `thumbnail_${timestamp}.jpg`,
@@ -648,24 +798,36 @@ const handleSubmit = async () => {
       });
     }
 
-    // 4️⃣ Upload to API
-    console.log("API calling started...", uploadData);
+    // 5️⃣ Make API call - CREATE or UPDATE
+    let res;
+    if (isEdit && roomId) {
+      console.log("🔄 Updating PG/Hostel...", roomId);
+      res = await api.put(`${apiUrl}/api/update/${roomId}`, uploadData, {
+        timeout: 60000,
+        headers: { 'Content-Type': 'multipart/form-data' },
+        transformRequest: (data) => data,
+      });
+    } else {
+      console.log("🆕 Creating new PG/Hostel...", uploadData);
+      res = await api.post(`${apiUrl}/api/rooms`, uploadData, {
+        timeout: 60000,
+        headers: { 'Content-Type': 'multipart/form-data' },
+        transformRequest: (data) => data,
+      });
+    }
 
-    const res = await api.post(`${apiUrl}/api/rooms`, uploadData, {
-      timeout: 60000,
-      headers: { 'Content-Type': 'multipart/form-data' },
-      transformRequest: (data) => data,
-      onUploadProgress: (progressEvent) => {
-        console.log("Upload progress:", Math.round((progressEvent.loaded / progressEvent.total) * 100) + "%");
-      },
-    });
+    console.log("✅ Success:", res.data);
+    Alert.alert(
+      "Success",
+      isEdit ? "Your PG/Hostel listing has been updated!" : "Your PG/Hostel listing has been submitted!"
+    );
 
-    console.log("✅ Uploaded successfully:", res.data);
-    Alert.alert("Success", "Your PG/Hostel listing has been submitted!");
+    // Navigate back
+    router.back();
 
   } catch (err) {
-    console.error("❌ Upload failed:", err);
-    let errorMessage = "Something went wrong while submitting your listing.";
+    console.error("❌ Operation failed:", err);
+    let errorMessage = `Something went wrong while ${isEdit ? 'updating' : 'submitting'} your listing.`;
     if (err.code === 'NETWORK_ERROR') {
       errorMessage = "Network connection failed. Please check your internet connection.";
     } else if (err.response?.status) {
@@ -673,8 +835,16 @@ const handleSubmit = async () => {
     }
     Alert.alert("Error", errorMessage);
   }
+};
+
+
+  // ✅ SIMPLE IMAGE REMOVAL - Just remove from local state
+  const handleRemoveImage = (index) => {
+    const newImages = formData.images.filter((_, i) => i !== index);
+    updateFormData('images', newImages);
   };
 
+  // Your existing renderStepContent function with minor updates
   const renderStepContent = () => {
     switch (currentStep) {
       case 1:
@@ -686,6 +856,7 @@ const handleSubmit = async () => {
               onChangeText={(value) => updateFormData('title', value)}
               placeholder="e.g., Tech Stay Gents Hostel - Opposite Infopark"
               required
+                multiline
               maxLength={100}
             />
 
@@ -709,13 +880,13 @@ const handleSubmit = async () => {
 
       case 2:
         return (
-          
           <View style={styles.stepContainer}>
             <ImageUploadSection
               images={formData.images}
               onImagesChange={(value) => updateFormData('images', value)}
               maxImages={8}
               required
+              isEdit={isEdit}
             />
 
             <InputField
@@ -746,9 +917,9 @@ const handleSubmit = async () => {
                     placeholderTextColor="#999999"
                   />
                 </View>
-                
+
                 <Text style={styles.priceSeparator}>to</Text>
-                
+
                 <View style={styles.priceInputContainer}>
                   <Text style={styles.priceLabel}>Max</Text>
                   <TextInput
@@ -825,8 +996,6 @@ const handleSubmit = async () => {
               required
             />
 
- 
-
             <SelectionButton
               label="Phone Number Visibility"
               options={[
@@ -838,23 +1007,23 @@ const handleSubmit = async () => {
               required
             />
 
-                                                   {formData.showPhonePublic === true && formData.contactPhone.length === 10 &&  (
-  <View style={styles.visibilityDisclaimer}>
-    <Ionicons name="information-circle" size={16} color="#7A5AF8" />
-    <Text style={styles.disclaimerTextShow}>
-      This number will be public
-    </Text>
-  </View>
-)}
+            {formData.showPhonePublic === true && formData.contactPhone.length === 10 && (
+              <View style={styles.visibilityDisclaimer}>
+                <Ionicons name="information-circle" size={16} color="#7A5AF8" />
+                <Text style={styles.disclaimerTextShow}>
+                  This number will be public
+                </Text>
+              </View>
+            )}
 
-{formData.showPhonePublic === false && formData.contactPhone.length === 10 && (
-  <View style={styles.visibilityDisclaimerHide}>
-    <Ionicons name="information-circle" size={16} color="#7A5AF8" /> 
-    <Text style={styles.disclaimerTextHide}>
-      Users must message to see it
-    </Text>
-  </View>
-)}
+            {formData.showPhonePublic === false && formData.contactPhone.length === 10 && (
+              <View style={styles.visibilityDisclaimerHide}>
+                <Ionicons name="information-circle" size={16} color="#7A5AF8" />
+                <Text style={styles.disclaimerTextHide}>
+                  Users must message to see it
+                </Text>
+              </View>
+            )}
 
             <View style={styles.summaryContainer}>
               <Text style={styles.summaryTitle}>📋 Listing Summary</Text>
@@ -872,6 +1041,12 @@ const handleSubmit = async () => {
                 <Text style={styles.summaryLabel}>Available Space:</Text>
                 <Text style={styles.summaryValue}>{formData.availableSpace || 0}</Text>
               </View>
+              {isEdit && (
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Mode:</Text>
+                  <Text style={styles.summaryValue}>Editing Existing Listing</Text>
+                </View>
+              )}
             </View>
           </View>
         );
@@ -879,6 +1054,11 @@ const handleSubmit = async () => {
       default:
         return null;
     }
+  };
+
+  // Update the header title based on mode
+  const getHeaderTitle = () => {
+    return isEdit ? "Edit PG/Hostel" : "PG/Hostel Listing";
   };
 
   const getStepTitle = () => {
@@ -891,42 +1071,53 @@ const handleSubmit = async () => {
     }
   };
 
-  return (
-       <SafeWrapper>
-    <View style={styles.container}>
-      <FormHeader title="PG/Hostel Listing" />
-      <ProgressBar 
-        currentStep={currentStep} 
-        totalSteps={totalSteps} 
-        stepTitle={getStepTitle()} 
-      />
- <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 30} // Adjust based on header height
-    >
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {renderStepContent()}
-      </ScrollView>
-     </KeyboardAvoidingView>
+  if (loading) {
+    return (
+      <SafeWrapper>
+        <View style={styles.loadingContainer}>
+          <Text>Loading PG/Hostel data...</Text>
+        </View>
+      </SafeWrapper>
+    );
+  }
 
-      <View style={styles.buttonContainer}>
-        {currentStep > 1 && (
-          <TouchableOpacity style={styles.secondaryButton} onPress={handlePrevious}>
-            <Text style={styles.secondaryButtonText}>Previous</Text>
-          </TouchableOpacity>
-        )}
-        
-        <TouchableOpacity 
-          style={[styles.primaryButton, currentStep === 1 && styles.fullWidthButton]} 
-          onPress={currentStep === totalSteps ? handleSubmit : handleNext}
+  return (
+    <SafeWrapper>
+      <View style={styles.container}>
+        <FormHeader title={getHeaderTitle()} />
+        <ProgressBar
+          currentStep={currentStep}
+          totalSteps={totalSteps}
+          stepTitle={getStepTitle()}
+        />
+
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.container}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 30}
         >
-          <Text style={styles.primaryButtonText}>
-            {currentStep === totalSteps ? 'Submit Listing' : 'Next'}
-          </Text>
-        </TouchableOpacity>
+          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            {renderStepContent()}
+          </ScrollView>
+        </KeyboardAvoidingView>
+
+        <View style={styles.buttonContainer}>
+          {currentStep > 1 && (
+            <TouchableOpacity style={styles.secondaryButton} onPress={handlePrevious}>
+              <Text style={styles.secondaryButtonText}>Previous</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={[styles.primaryButton, currentStep === 1 && styles.fullWidthButton]}
+            onPress={currentStep === totalSteps ? handleSubmit : handleNext}
+          >
+            <Text style={styles.primaryButtonText}>
+              {currentStep === totalSteps ? (isEdit ? 'Update Listing' : 'Submit Listing') : 'Next'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
     </SafeWrapper>
   );
 };
@@ -934,9 +1125,15 @@ const handleSubmit = async () => {
 // File: FlatHomeForm.js
 
 const FlatHomeForm = () => {
-   const locationData = useSelector((state) => state.location.locationData);
+  // ✅ Get route parameters
+  const params = useLocalSearchParams();
+  const roomId = params.roomId;
+  const isEdit = params.isEdit === "true";
+
+  const locationData = useSelector((state) => state.location.locationData);
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 4;
+  const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -957,9 +1154,58 @@ const FlatHomeForm = () => {
     parking: '',
     contactPhone: '',
     showPhonePublic: true,
-    category:'flat_home',
+    category: 'flat_home',
   });
 
+  // ✅ Fetch room data for editing
+  useEffect(() => {
+    if (isEdit && roomId) {
+      fetchRoomData();
+    }
+  }, [isEdit, roomId]);
+
+  const fetchRoomData = async () => {
+    try {
+      setLoading(true);
+      console.log(`🔄 Fetching Flat/Home data for: ${roomId}`);
+
+      const response = await api.get(`/api/singleroom/${roomId}`);
+      const room = response.data.room;
+
+      // Transform API data to form data
+      setFormData({
+        title: room.title || '',
+        description: room.description || '',
+        location: room.location || null,
+        images: room.images?.map(img => img.originalUrl) || [],
+        propertyType: room.propertyType || '',
+        furnishedStatus: room.furnishedStatus || '',
+        monthlyRent: room.monthlyRent?.toString() || '',
+        securityDeposit: room.securityDeposit?.toString() || '',
+        squareFeet: room.squareFeet?.toString() || '',
+        bedrooms: room.bedrooms || 1,
+        bathrooms: room.bathrooms || 1,
+        balconies: room.balconies || 0,
+        floorNumber: room.floorNumber || 1,
+        totalFloors: room.totalFloors || 1,
+        tenantPreference: room.tenantPreference || '',
+        parking: room.parking || '',
+        contactPhone: room.contactPhone || '',
+        showPhonePublic: room.showPhonePublic ?? true,
+        category: room.category || 'flat_home',
+      });
+
+      console.log('✅ Flat/Home data loaded successfully');
+
+    } catch (error) {
+      console.error('Error fetching Flat/Home data:', error);
+      Alert.alert('Error', 'Failed to load property data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Your existing options remain the same...
   const propertyTypeOptions = [
     { label: 'Apartment/Flat', value: 'flat' },
     { label: 'Independent House', value: 'house' },
@@ -1003,8 +1249,9 @@ const FlatHomeForm = () => {
     }
   };
 
-  const handleSubmit = async () => {
-   try {
+  // ✅ UPDATED SUBMIT FUNCTION - Handles both create and update
+const handleSubmit = async () => {
+  try {
     console.log(locationData, "location--------");
 
     // 1️⃣ Validate required fields
@@ -1015,43 +1262,59 @@ const FlatHomeForm = () => {
     if (!formData.monthlyRent || isNaN(formData.monthlyRent)) errors.push("Monthly rent is required and must be a number.");
     if (!formData.securityDeposit || isNaN(formData.securityDeposit)) errors.push("Security deposit is required and must be a number.");
     if (!formData.contactPhone?.trim()) errors.push("Contact phone is required.");
+    if (!formData.propertyType?.trim()) errors.push("Property type is required.");
+    if (!formData.furnishedStatus?.trim()) errors.push("Furnished status is required.");
 
     if (errors.length > 0) {
       Alert.alert("Validation Error", errors.join("\n"));
       return;
     }
 
-    // 2️⃣ Compress images & create thumbnail
+    // 2️⃣ Separate existing and new images
+    const existingImages = formData.images.filter(img => img.startsWith('http'));
+    const newImageUris = formData.images.filter(img => !img.startsWith('http'));
+    
+    console.log(`📸 Images - Existing: ${existingImages.length}, New: ${newImageUris.length}, Total: ${formData.images.length}`);
+
+    // 3️⃣ Compress ONLY NEW images
     const timestamp = Date.now();
-    const compressedImages = await Promise.all(
-      formData.images.map(async (img, i) => {
-        let context = ImageManipulator.manipulate(img);
-        context.resize({ width: 1280 });
-        let result = await context.renderAsync();
-        let manip = await result.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
+    const compressedImages = [];
 
-        const info = await FileSystem.getInfoAsync(manip.uri);
-        if (info.size > 1000000) {
-          const context2 = ImageManipulator.manipulate(manip.uri);
-          const result2 = await context2.renderAsync();
-          manip = await result2.saveAsync({ compress: 0.5, format: SaveFormat.JPEG });
-        }
+    for (let i = 0; i < newImageUris.length; i++) {
+      const img = newImageUris[i];
 
-        // First image thumbnail
-        if (i === 0) {
-          const thumbContext = ImageManipulator.manipulate(manip.uri);
-          thumbContext.resize({ width: 300 });
-          const thumbResult = await thumbContext.renderAsync();
-          const thumb = await thumbResult.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
-          manip.thumbnail = thumb.uri;
-        }
+      let context = ImageManipulator.manipulate(img);
+      context.resize({ width: 1280 });
+      let result = await context.renderAsync();
+      let manip = await result.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
 
-        return manip;
-      })
-    );
+      const info = await FileSystem.getInfoAsync(manip.uri);
+      if (info.size > 1000000) {
+        const context2 = ImageManipulator.manipulate(manip.uri);
+        const result2 = await context2.renderAsync();
+        manip = await result2.saveAsync({ compress: 0.5, format: SaveFormat.JPEG });
+      }
 
-    // 3️⃣ Prepare FormData
+      // ✅ FIRST IMAGE THUMBNAIL - Only create thumbnail for first new image
+      if (i === 0 && existingImages.length === 0) {
+        const thumbContext = ImageManipulator.manipulate(manip.uri);
+        thumbContext.resize({ width: 300 });
+        const thumbResult = await thumbContext.renderAsync();
+        const thumb = await thumbResult.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
+        manip.thumbnail = thumb.uri;
+      }
+
+      compressedImages.push(manip);
+    }
+
+    // 4️⃣ Prepare FormData
     const uploadData = new FormData();
+
+    // ✅ CRITICAL: Send existing images that should be kept (only for edit mode)
+    if (isEdit && existingImages.length > 0) {
+      uploadData.append("existingImages", JSON.stringify(existingImages));
+      console.log('📤 Sending existing images to keep:', existingImages.length);
+    }
 
     // Append normal fields (EXCLUDING images and location)
     Object.entries(formData).forEach(([key, value]) => {
@@ -1073,7 +1336,7 @@ const FlatHomeForm = () => {
       uploadData.append("location", JSON.stringify(geoLocation));
     }
 
-    // Append images
+    // Append NEW images
     compressedImages.forEach((img, i) => {
       uploadData.append("images", {
         uri: img.uri,
@@ -1082,8 +1345,8 @@ const FlatHomeForm = () => {
       });
     });
 
-    // Append first image thumbnail
-    if (compressedImages[0]?.thumbnail) {
+    // ✅ Append thumbnail if it's the first image and we have new images
+    if (compressedImages[0]?.thumbnail && existingImages.length === 0) {
       uploadData.append("thumbnail", {
         uri: compressedImages[0].thumbnail,
         name: `thumbnail_${timestamp}.jpg`,
@@ -1091,23 +1354,44 @@ const FlatHomeForm = () => {
       });
     }
 
-    // 4️⃣ Upload to API
-    console.log("API calling started...", uploadData);
-    const res = await api.post(`${apiUrl}/api/rooms`, uploadData, {
-      timeout: 60000,
-      headers: { 'Content-Type': 'multipart/form-data' },
-      transformRequest: (data) => data,
-      onUploadProgress: (progressEvent) => {
-        console.log("Upload progress:", Math.round((progressEvent.loaded / progressEvent.total) * 100) + "%");
-      },
-    });
+    // 5️⃣ Make API call - CREATE or UPDATE
+    let res;
+    if (isEdit && roomId) {
+      // UPDATE request
+      console.log("🔄 Updating property...", roomId);
+      console.log("📤 Uploading:", {
+        existingImages: existingImages.length,
+        newImages: compressedImages.length,
+        totalImages: formData.images.length
+      });
+      
+      res = await api.put(`${apiUrl}/api/update/${roomId}`, uploadData, {
+        timeout: 60000,
+        headers: { 'Content-Type': 'multipart/form-data' },
+        transformRequest: (data) => data,
+      });
+    } else {
+      // CREATE request
+      console.log("🆕 Creating new property...");
+      res = await api.post(`${apiUrl}/api/rooms`, uploadData, {
+        timeout: 60000,
+        headers: { 'Content-Type': 'multipart/form-data' },
+        transformRequest: (data) => data,
+      });
+    }
 
-    console.log("✅ Uploaded successfully:", res.data);
-    Alert.alert("Success", "Your flat/home listing has been submitted!");
+    console.log("✅ Success:", res.data);
+    Alert.alert(
+      "Success",
+      isEdit ? "Your property listing has been updated!" : "Your property listing has been submitted!"
+    );
+
+    // Navigate back
+    router.back();
 
   } catch (err) {
-    console.error("❌ Upload failed:", err);
-    let errorMessage = "Something went wrong while submitting your listing.";
+    console.error("❌ Operation failed:", err);
+    let errorMessage = `Something went wrong while ${isEdit ? 'updating' : 'submitting'} your listing.`;
     if (err.code === 'NETWORK_ERROR') {
       errorMessage = "Network connection failed. Please check your internet connection.";
     } else if (err.response?.status) {
@@ -1115,32 +1399,40 @@ const FlatHomeForm = () => {
     }
     Alert.alert("Error", errorMessage);
   }
+};
+
+  // ✅ SIMPLE IMAGE REMOVAL - Just remove from local state
+  const handleRemoveImage = (index) => {
+    const newImages = formData.images.filter((_, i) => i !== index);
+    updateFormData('images', newImages);
   };
 
+  // Your existing renderStepContent function with minor updates
   const renderStepContent = () => {
     switch (currentStep) {
       case 1:
         return (
           <View style={styles.stepContainer}>
-            <InputField
-              label="Property Title"
-              value={formData.title}
-              onChangeText={(value) => updateFormData('title', value)}
-              placeholder="e.g., 2BHK Fully Furnished Flat near Kakkanad"
-              required
-              maxLength={100}
-            />
+      <InputField
+  label="Property Title"
+  value={formData.title}
+   multiline
+  onChangeText={(value) => updateFormData('title', value)}
+  placeholder="e.g., 2BHK Fully Furnished Flat near Kakkanad"
+  required
+  maxLength={100}
 
-            <InputField
-              label="Description"
-              value={formData.description}
-              onChangeText={(value) => updateFormData('description', value)}
-              placeholder="Describe your property, location advantages, and amenities..."
-              multiline
-              required
-              maxLength={500}
-            />
+/>
 
+<InputField
+  label="Description"
+  value={formData.description}
+  multiline
+  onChangeText={(value) => updateFormData('description', value)}
+  placeholder="Describe your property, location advantages, and amenities..."
+  required
+  maxLength={500}
+/>
             <LocationSection
               locationData={formData.location}
               onLocationChange={(value) => updateFormData('location', value)}
@@ -1157,6 +1449,7 @@ const FlatHomeForm = () => {
               onImagesChange={(value) => updateFormData('images', value)}
               maxImages={10}
               required
+              isEdit={isEdit}
             />
 
             <SelectionButton
@@ -1206,36 +1499,35 @@ const FlatHomeForm = () => {
             />
 
             <View style={styles.roomDetailsContainer}>
-          <ScrollView horizontal>
-  <View style={styles.horizontalContainer}>
-
-    <NumberPicker
-      label="Bedrooms"
-      value={formData.bedrooms}
-      onValueChange={(value) => updateFormData('bedrooms', value)}
-      min={1}
-      max={10}
-      required
-    />
- <View style={styles.separator} />
-    <NumberPicker
-      label="Bathrooms"
-      value={formData.bathrooms}
-      onValueChange={(value) => updateFormData('bathrooms', value)}
-      min={1}
-      max={10}
-      required
-    />
- <View style={styles.separator} />
-    <NumberPicker
-      label="Balconies"
-      value={formData.balconies}
-      onValueChange={(value) => updateFormData('balconies', value)}
-      min={0}
-      max={5}
-    />
-  </View>
-</ScrollView>
+              <ScrollView horizontal>
+                <View style={styles.horizontalContainer}>
+                  <NumberPicker
+                    label="Bedrooms"
+                    value={formData.bedrooms}
+                    onValueChange={(value) => updateFormData('bedrooms', value)}
+                    min={1}
+                    max={10}
+                    required
+                  />
+                  <View style={styles.separator} />
+                  <NumberPicker
+                    label="Bathrooms"
+                    value={formData.bathrooms}
+                    onValueChange={(value) => updateFormData('bathrooms', value)}
+                    min={1}
+                    max={10}
+                    required
+                  />
+                  <View style={styles.separator} />
+                  <NumberPicker
+                    label="Balconies"
+                    value={formData.balconies}
+                    onValueChange={(value) => updateFormData('balconies', value)}
+                    min={0}
+                    max={5}
+                  />
+                </View>
+              </ScrollView>
             </View>
           </View>
         );
@@ -1244,24 +1536,24 @@ const FlatHomeForm = () => {
         return (
           <View style={styles.stepContainer}>
             <View style={styles.floorContainer}>
-                     <ScrollView horizontal>
-  <View style={styles.horizontalContainer}>
-              <NumberPicker
-                label="Floor Number"
-                value={formData.floorNumber}
-                onValueChange={(value) => updateFormData('floorNumber', value)}
-                min={1}
-                max={50}
-              />
-<View style={styles.separator} />
-              <NumberPicker
-                label="Total Floors"
-                value={formData.totalFloors}
-                onValueChange={(value) => updateFormData('totalFloors', value)}
-                min={1}
-                max={50}
-              />
-              </View>
+              <ScrollView horizontal>
+                <View style={styles.horizontalContainer}>
+                  <NumberPicker
+                    label="Floor Number"
+                    value={formData.floorNumber}
+                    onValueChange={(value) => updateFormData('floorNumber', value)}
+                    min={1}
+                    max={50}
+                  />
+                  <View style={styles.separator} />
+                  <NumberPicker
+                    label="Total Floors"
+                    value={formData.totalFloors}
+                    onValueChange={(value) => updateFormData('totalFloors', value)}
+                    min={1}
+                    max={50}
+                  />
+                </View>
               </ScrollView>
             </View>
 
@@ -1300,31 +1592,24 @@ const FlatHomeForm = () => {
               onSelect={(value) => updateFormData('showPhonePublic', value)}
               required
             />
-    
 
-                                                            {formData.showPhonePublic === true && formData.contactPhone.length === 10 &&  (
-  <View style={styles.visibilityDisclaimer}>
-    <Ionicons name="information-circle" size={16} color="#7A5AF8" />
-    <Text style={styles.disclaimerTextShow}>
-      This number will be public
-    </Text>
-  </View>
-)}
+            {formData.showPhonePublic === true && formData.contactPhone.length === 10 && (
+              <View style={styles.visibilityDisclaimer}>
+                <Ionicons name="information-circle" size={16} color="#7A5AF8" />
+                <Text style={styles.disclaimerTextShow}>
+                  This number will be public
+                </Text>
+              </View>
+            )}
 
-{formData.showPhonePublic === false && formData.contactPhone.length === 10 && (
-  <View style={styles.visibilityDisclaimerHide}>
-    <Ionicons name="information-circle" size={16} color="#7A5AF8" /> 
-    <Text style={styles.disclaimerTextHide}>
-      Users must message to see it
-    </Text>
-  </View>
-)}
-
-
-
-
-
-
+            {formData.showPhonePublic === false && formData.contactPhone.length === 10 && (
+              <View style={styles.visibilityDisclaimerHide}>
+                <Ionicons name="information-circle" size={16} color="#7A5AF8" />
+                <Text style={styles.disclaimerTextHide}>
+                  Users must message to see it
+                </Text>
+              </View>
+            )}
 
             <View style={styles.summaryContainer}>
               <Text style={styles.summaryTitle}>📋 Listing Summary</Text>
@@ -1342,6 +1627,12 @@ const FlatHomeForm = () => {
                   {formData.bedrooms}BHK, {formData.bathrooms} Bath
                 </Text>
               </View>
+              {isEdit && (
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Mode:</Text>
+                  <Text style={styles.summaryValue}>Editing Existing Listing</Text>
+                </View>
+              )}
             </View>
           </View>
         );
@@ -1349,6 +1640,11 @@ const FlatHomeForm = () => {
       default:
         return null;
     }
+  };
+
+  // Update the header title based on mode
+  const getHeaderTitle = () => {
+    return isEdit ? "Edit Property" : "Property Listing";
   };
 
   const getStepTitle = () => {
@@ -1361,42 +1657,53 @@ const FlatHomeForm = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <SafeWrapper>
+        <View style={styles.loadingContainer}>
+          <Text>Loading property data...</Text>
+        </View>
+      </SafeWrapper>
+    );
+  }
+
   return (
     <SafeWrapper>
-    <View style={styles.container}>
-      <FormHeader title="Property Listing" />
-      <ProgressBar 
-        currentStep={currentStep} 
-        totalSteps={totalSteps} 
-        stepTitle={getStepTitle()} 
-      />
-<KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 30} // Adjust based on header height
-    >
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {renderStepContent()}
-      </ScrollView>
-</KeyboardAvoidingView>
-      <View style={styles.buttonContainer}>
-        {currentStep > 1 && (
-          <TouchableOpacity style={styles.secondaryButton} onPress={handlePrevious}>
-            <Text style={styles.secondaryButtonText}>Previous</Text>
-          </TouchableOpacity>
-        )}
-        
-        <TouchableOpacity 
-          style={[styles.primaryButton, currentStep === 1 && styles.fullWidthButton]} 
-          onPress={currentStep === totalSteps ? handleSubmit : handleNext}
-        >
-          <Text style={styles.primaryButtonText}>
-            {currentStep === totalSteps ? 'Submit Listing' : 'Next'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <View style={styles.container}>
+        <FormHeader title={getHeaderTitle()} />
+        <ProgressBar
+          currentStep={currentStep}
+          totalSteps={totalSteps}
+          stepTitle={getStepTitle()}
+        />
 
-    </View>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.container}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 30}
+        >
+          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            {renderStepContent()}
+          </ScrollView>
+        </KeyboardAvoidingView>
+
+        <View style={styles.buttonContainer}>
+          {currentStep > 1 && (
+            <TouchableOpacity style={styles.secondaryButton} onPress={handlePrevious}>
+              <Text style={styles.secondaryButtonText}>Previous</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={[styles.primaryButton, currentStep === 1 && styles.fullWidthButton]}
+            onPress={currentStep === totalSteps ? handleSubmit : handleNext}
+          >
+            <Text style={styles.primaryButtonText}>
+              {currentStep === totalSteps ? (isEdit ? 'Update Listing' : 'Submit Listing') : 'Next'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </SafeWrapper>
   );
 };
@@ -1404,48 +1711,48 @@ const FlatHomeForm = () => {
 // Common Styles for all forms
 const styles = StyleSheet.create({
   visibilityDisclaimer: {
-  flexDirection: 'row',
-  alignItems: 'flex-start',
-  backgroundColor: '#F3F0FF',
-  borderLeftWidth: 3,
-  borderLeftColor: '#7A5AF8',
-  paddingVertical: 12,
-  paddingHorizontal: 14,
-  borderRadius: 8,
-  marginTop: -10,
-  marginBottom: 20,
-  gap: 10,
-},
-disclaimerTextShow: {
-  flex: 1,
-  fontSize: 13,
-  // color: '#389E0D',
-  lineHeight: 18,
-},
-visibilityDisclaimerHide: {
-  flexDirection: 'row',
-  alignItems: 'flex-start',
-  backgroundColor: '#F3F0FF',
-  borderLeftWidth: 3,
-  borderLeftColor: '#7A5AF8',
-  paddingVertical: 12,
-  paddingHorizontal: 14,
-  borderRadius: 8,
-  marginTop: -10,
-  marginBottom: 20,
-  gap: 10,
-},
-disclaimerTextHide: {
-  flex: 1,
-  fontSize: 13,
-  // color: '#7A5AF8',
-  lineHeight: 18,
-},
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#F3F0FF',
+    borderLeftWidth: 3,
+    borderLeftColor: '#7A5AF8',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    marginTop: -10,
+    marginBottom: 20,
+    gap: 10,
+  },
+  disclaimerTextShow: {
+    flex: 1,
+    fontSize: 13,
+    // color: '#389E0D',
+    lineHeight: 18,
+  },
+  visibilityDisclaimerHide: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#F3F0FF',
+    borderLeftWidth: 3,
+    borderLeftColor: '#7A5AF8',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    marginTop: -10,
+    marginBottom: 20,
+    gap: 10,
+  },
+  disclaimerTextHide: {
+    flex: 1,
+    fontSize: 13,
+    // color: '#7A5AF8',
+    lineHeight: 18,
+  },
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-   scrollContent: {
+  scrollContent: {
     paddingBottom: 100, // Space for keyboard and buttons
   },
   content: {
@@ -1453,14 +1760,14 @@ disclaimerTextHide: {
     paddingHorizontal: 20,
   },
   stepContainer: {
-  
+
     paddingTop: 20,
     paddingBottom: 20,
   },
-   horizontalContainer: {
+  horizontalContainer: {
     flexDirection: 'row',
-    width: '100%', 
-    gap :20// Ensure the container takes full width
+    width: '100%',
+    gap: 20// Ensure the container takes full width
   },
   separator: {
     width: 1,

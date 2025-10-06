@@ -38,17 +38,21 @@ const FavoritesScreen = () => {
   // Fetch user's favorites
   const fetchFavorites = async () => {
     console.log(apiUrl,'apiUrl-----------');
-    
+         if (!user?._id) {
+      // console.log("⚠️ User not logged in, skipping favorite check");
+      router.push('/login');
+      return; // <-- must be inside braces
+    }
     try {
       setError(null);
-      const response = await api.get(`${apiUrl}/api/favorites/my-favorites`);
+      const response = await api.get(`${apiUrl}/api/my-favorites`);
       console.log('Favorites response:', response.data.favorites);
       if (response.data.success) {
         const favoritesData = response.data.favorites || [];
         
         // Extract rooms from favorites and add favoriteId for removal
         const roomsWithFavoriteId = favoritesData.map(fav => ({
-          ...fav.room,
+          ...fav,
           favoriteId: fav._id,
           isFavorited: true // Always true since these are favorites
         }));
@@ -69,8 +73,13 @@ const FavoritesScreen = () => {
 
   // Remove from favorites
   const removeFromFavorites = async (roomId, favoriteId) => {
+         if (!user?._id) {
+      // console.log("⚠️ User not logged in, skipping favorite check");
+      router.push('/login');
+      return; // <-- must be inside braces
+    }
     try {
-      const response = await api.delete(`${apiUrl}/api/favorites/remove`, {
+      const response = await api.delete(`${apiUrl}/api/remove`, {
         data: { roomId }
       });
 

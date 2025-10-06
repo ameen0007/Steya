@@ -25,25 +25,39 @@ export const InputField = ({
   required = false,
   maxLength,
 }) => {
+  // set initial height — 150 if description, else 40
+  const isDescription = label?.toLowerCase().includes('description');
+  const [inputHeight, setInputHeight] = useState(isDescription ? 150 : 40);
+
+  useEffect(() => {
+    // reset initial height when label changes (optional)
+    setInputHeight(isDescription ? 150 : 40);
+  }, [label]);
+
   return (
     <View style={styles.inputContainer}>
       <Text style={styles.inputLabel}>
         {label} {required && <Text style={styles.required}>*</Text>}
       </Text>
+
       <TextInput
         style={[
           styles.textInput,
-          multiline && styles.multilineInput
+          multiline && styles.multilineInput,
+          multiline && { height: Math.max(isDescription ? 150 : 40, inputHeight) },
         ]}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor="#999999"
         multiline={multiline}
-        numberOfLines={multiline ? 4 : 1}
         keyboardType={keyboardType}
         maxLength={maxLength}
+        onContentSizeChange={(e) =>
+          setInputHeight(e.nativeEvent.contentSize.height)
+        }
       />
+
       {maxLength && (
         <Text style={styles.charCount}>
           {value?.length || 0}/{maxLength}
@@ -350,7 +364,8 @@ export const ImageUploadSection = ({
   images, 
   onImagesChange, 
   maxImages = 5, 
-  required = false 
+  required = false,
+  isEdit = false
 }) => {
   
   const requestCameraPermission = async () => {
@@ -421,10 +436,10 @@ export const ImageUploadSection = ({
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: false, // Disable editing when multiple selection is enabled
+        allowsEditing: false,
         quality: 0.8,
         allowsMultipleSelection: true,
-        selectionLimit: remainingSlots, // Only allow selecting up to remaining slots
+        selectionLimit: remainingSlots,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -437,6 +452,7 @@ export const ImageUploadSection = ({
     }
   };
 
+  // ✅ SIMPLE REMOVE FUNCTION - No extra props needed
   const handleRemoveImage = (index) => {
     const newImages = images.filter((_, i) => i !== index);
     onImagesChange(newImages);
@@ -444,76 +460,74 @@ export const ImageUploadSection = ({
 
   const canAddMore = !images || images.length < maxImages;
 
-  
   return (
-<View style={styles.imageContainer}>
-  <Text style={styles.inputLabel}>
-    Property Images {required && <Text style={styles.required}>*</Text>}
-  </Text>
-  <Text style={styles.imageSubtext}>
-    Add up to {maxImages} photos to showcase your property
-  </Text>
-    <View style={styles.disclaimerContainer}>
-    <Ionicons name="information-circle" size={18} color="#7A5AF8" />
-    <Text style={styles.disclaimerText}>
-      First image will be used as thumbnail
-    </Text>
-  </View>
+    <View style={styles.imageContainer}>
+      <Text style={styles.inputLabel}>
+        Property Images {required && <Text style={styles.required}>*</Text>}
+      </Text>
+      <Text style={styles.imageSubtext}>
+        Add up to {maxImages} photos to showcase your property
+        {isEdit && " - Remove images by tapping the × button"}
+      </Text>
 
-  {/* Thumbnail Disclaimer */}
-
-
-  {/* Image Previews */}
-  <ScrollView 
-    horizontal 
-    showsHorizontalScrollIndicator={false} 
-    style={styles.imageScrollView}
-  >
-    {images?.map((imageUri, index) => (
-      <View key={index} style={styles.imagePreview}>
-        <Image source={{ uri: imageUri }} style={styles.previewImage} />
-        {index === 0 && (
-          <View style={styles.thumbnailBadge}>
-            <Text style={styles.thumbnailBadgeText}>Main</Text>
-          </View>
-        )}
-        <TouchableOpacity
-          style={styles.removeImageButton}
-          onPress={() => handleRemoveImage(index)}
-        >
-          <Text style={styles.removeImageText}>×</Text>
-        </TouchableOpacity>
+      <View style={styles.disclaimerContainer}>
+        <Ionicons name="information-circle" size={18} color="#7A5AF8" />
+        <Text style={styles.disclaimerText}>
+          First image will be used as thumbnail
+        </Text>
       </View>
-    ))}
-  </ScrollView>
 
-  {/* Action Buttons */}
-  {canAddMore && (
-    <View style={styles.buttonContainer}>
-      <TouchableOpacity 
-        style={styles.actionButton} 
-        onPress={handleTakePhoto}
+      {/* Image Previews */}
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false} 
+        style={styles.imageScrollView}
       >
-        <Ionicons name="camera" size={20} color="#7A5AF8" />
-        <Text style={styles.buttonText}>Take Photo</Text>
-      </TouchableOpacity>
+        {images?.map((imageUri, index) => (
+          <View key={index} style={styles.imagePreview}>
+            <Image source={{ uri: imageUri }} style={styles.previewImage} />
+            {index === 0 && (
+              <View style={styles.thumbnailBadge}>
+                <Text style={styles.thumbnailBadgeText}>Main</Text>
+              </View>
+            )}
+            <TouchableOpacity
+              style={styles.removeImageButton}
+              onPress={() => handleRemoveImage(index)}
+            >
+              <Text style={styles.removeImageText}>×</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+      </ScrollView>
 
-      <TouchableOpacity 
-        style={styles.actionButton} 
-        onPress={handleChooseFromGallery}
-      >
-        <Ionicons name="images" size={20} color="#7A5AF8" />
-        <Text style={styles.buttonText}>Choose from Gallery</Text>
-      </TouchableOpacity>
+      {/* Action Buttons */}
+      {canAddMore && (
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity 
+            style={styles.actionButton} 
+            onPress={handleTakePhoto}
+          >
+            <Ionicons name="camera" size={20} color="#7A5AF8" />
+            <Text style={styles.buttonText}>Take Photo</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.actionButton} 
+            onPress={handleChooseFromGallery}
+          >
+            <Ionicons name="images" size={20} color="#7A5AF8" />
+            <Text style={styles.buttonText}>Choose from Gallery</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {!canAddMore && (
+        <Text style={styles.limitText}>
+          Maximum {maxImages} images reached
+        </Text>
+      )}
     </View>
-  )}
-
-  {!canAddMore && (
-    <Text style={styles.limitText}>
-      Maximum {maxImages} images reached
-    </Text>
-  )}
-</View>
   );
 };
 
@@ -589,15 +603,17 @@ successText: {
   required: {
     color: '#E74C3C',
   },
-  textInput: {
+   textInput: {
     borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 15,
     fontSize: 16,
-    color: '#333333',
-    backgroundColor: '#FFFFFF',
+    color: '#000',
+  },
+  multilineInput: {
+    textAlignVertical: 'top',
   },
   disclaimerContainer: {
   flexDirection: 'row',
@@ -629,10 +645,7 @@ thumbnailBadgeText: {
   fontSize: 11,
   fontWeight: '600',
 },
-  multilineInput: {
-    height: 100,
-    textAlignVertical: 'top',
-  },
+
   charCount: {
     fontSize: 12,
     color: '#999999',

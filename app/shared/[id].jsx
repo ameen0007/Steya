@@ -39,6 +39,35 @@ const DetailsPage = () => {
   const [isFavoriteLoading, setIsFavoriteLoading] = useState(false);
   const user = useSelector((state) => state.user.userData);
 
+
+  const incrementViewCount = async () => {
+    try {
+      if (!id) return;
+      
+      console.log("🔄 Incrementing view count for room:", id);
+    
+      
+      const response = await axios.post(`${apiUrl}/api/${id}/view`, {
+        userId: user?._id // Send userId if user is logged in
+      });
+
+      if (response.data.success) {
+        console.log("✅ View count updated:", response.data.views);
+        
+        // Update the local item state with new view count
+        if (item) {
+          setItem(prevItem => ({
+            ...prevItem,
+            views: response.data.views
+          }));
+        }
+      }
+    } catch (error) {
+      console.error("❌ Error incrementing view count:", error);
+      // Don't show error to user as this is a background operation
+    }
+  };
+
   useEffect(() => {
     const fetchRoomData = async () => {
       try {
@@ -47,6 +76,10 @@ const DetailsPage = () => {
         const response = await axios.get(`${apiUrl}/api/singleroom/${id}`);
         setItem(response.data?.room);
         console.log("✅ Room data fetched:", response.data?.room);
+        
+        // ✅ CALL VIEW COUNT API AFTER SUCCESSFUL DATA FETCH
+        await incrementViewCount();
+        
       } catch (err) {
         console.error("❌ Error fetching room data:", err);
         setError(err.message || 'Failed to load room details');
@@ -61,32 +94,44 @@ const DetailsPage = () => {
   }, [id]);
 
   // Check if room is favorited
-  useEffect(() => {
-    const checkFavorite = async () => {
-      if (!id) return;
-      try {
-        const response = await api.get(`${apiUrl}/api/favorites/check/${id}`);
-        console.log('Favorite check response:', response.data);
-        
-        // ✅ FIXED: Handle both possible property names
-        const favoriteStatus = response.data.isFavorited ?? response.data.isFavorite ?? false;
-        setIsFavorite(favoriteStatus);
-      } catch (error) {
-        console.error('Error checking favorite status:', error);
-      }
-    };
+useEffect(() => {
+  const checkFavorite = async () => {
+    if (!id) return;
 
-    checkFavorite();
-  }, [id]);
+    if (!user?._id) {
+      console.log("⚠️ User not logged in, skipping favorite check");
+      return; // <-- must be inside braces
+    }
+
+    try {
+      const response = await api.get(`${apiUrl}/api/check/${id}`);
+      console.log('Favorite check response:', response.data);
+
+      // ✅ Handle both possible property names
+      const favoriteStatus = response.data.isFavorited ?? response.data.isFavorite ?? false;
+      setIsFavorite(favoriteStatus);
+    } catch (error) {
+      console.error('Error checking favorite status:', error);
+    }
+  };
+
+  checkFavorite();
+}, [id, user?._id]); 
+
 
   const handleChatPress = async () => {
-    console.log("Starting chat for product:", item._id);
+    console.log("Starting chat for product:", item?._id);
+     if (!user?._id) {
+      // console.log("⚠️ User not logged in, skipping favorite check");
+      router.push('/login');
+      return; // <-- must be inside braces
+    }
 
     try {
       setIsCreatingRoom(true);
 
       const checkResponse = await api.get(`${apiUrl}/api/chat/check-room`, {
-        params: { productId: item._id }
+        params: { productId: item?._id }
       });
 
       let roomId;
@@ -96,7 +141,7 @@ const DetailsPage = () => {
         console.log("Using existing room:", roomId, "Status:", checkResponse.data.status);
       } else {
         const createResponse = await api.post(`${apiUrl}/api/chat/create-room`, {
-          productId: item._id,
+          productId: item?._id,
           productTitle: item.title || 'Product Chat',
           ownerId: item?.createdBy?._id
         });
@@ -129,7 +174,7 @@ const DetailsPage = () => {
       setIsFavoriteLoading(true);
       console.log('🔄 Toggling favorite for room:', id);
       
-      const response = await api.post(`${apiUrl}/api/favorites/toggle`, {
+      const response = await api.post(`${apiUrl}/api/toggle`, {
         roomId: id
       });
 
@@ -250,7 +295,7 @@ const DetailsPage = () => {
               horizontal
               pagingEnabled
               showsHorizontalScrollIndicator={false}
-              keyExtractor={(img, index) => img._id || index.toString()}
+              keyExtractor={(img, index) => img?._id || index.toString()}
               onMomentumScrollEnd={(e) => {
                 const index = Math.floor(e.nativeEvent.contentOffset.x / width);
                 setCurrentImage(index);
@@ -486,7 +531,7 @@ const DetailsPage = () => {
             />
           </ScrollView>
 
-          {item.createdBy._id !== user._id ? (
+          {item.createdBy._id !== user?._id ? (
             <View style={{
               flexDirection: 'row',
               justifyContent: 'space-between',

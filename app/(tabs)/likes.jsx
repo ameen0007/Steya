@@ -16,6 +16,8 @@ import { Ionicons, MaterialIcons, Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import api from '../../services/intercepter';
+import { useSelector } from 'react-redux';
+import { router } from 'expo-router';
 
 const { width, height } = Dimensions.get('window');
 const apiUrl = process.env.EXPO_PUBLIC_API_URL;
@@ -28,12 +30,17 @@ export default function MyAds() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-
+ const user = useSelector((state) => state.user.userData);
   useEffect(() => {
     fetchMyAds();
   }, [statusFilter, categoryFilter, page]);
 
   const fetchMyAds = async () => {
+         if (!user?._id) {
+      // console.log("⚠️ User not logged in, skipping favorite check");
+      router.push('/login');
+      return; // <-- must be inside braces
+    }
     try {
       setLoading(true);
       const params = {
@@ -46,6 +53,9 @@ export default function MyAds() {
       const response = await api.get(`${apiUrl}/api/posts/my-posts`, { params });
       
       if (response.data.success) {
+        console.log('====================================');
+        console.log(response.data,"data in my ads");
+        console.log('====================================');
         setAds(response.data.posts);
         setTotalPages(response.data.pagination.pages);
       }
@@ -71,7 +81,7 @@ export default function MyAds() {
         ad._id === adId ? { ...ad, isActive: !currentStatus } : ad
       ));
 
-      const response = await api.patch(`${apiUrl}/api/posts/${adId}/toggle-status`);
+      const response = await api.patch(`${apiUrl}/api/posts/my-posts/${adId}/toggle-status`);
       
       if (!response.data.success) {
         // Revert on failure
@@ -90,32 +100,59 @@ export default function MyAds() {
     }
   };
 
-  const handleEdit = (adId) => {
-    // Navigate to edit screen
-    Alert.alert('Edit Ad', `Navigate to edit screen for ad ${adId}`);
+ // In your ads page or component
+const handleEdit = (roomId, category) => {
+  // Map categories to their respective form routes
+  const categoryRoutes = {
+    'shared': '/sharedroomform',
+    'pg_hostel': '/pghostelform', 
+    'flat_home': '/homeform'
   };
 
+  // Get the route for the category
+  const formRoute = categoryRoutes[category];
+  
+  if (!formRoute) {
+    Alert.alert('Error', 'Invalid category type');
+    return;
+  }
+
+  // Navigate to the appropriate form with params
+  router.push({
+    pathname: formRoute,
+    params: { 
+      roomId: roomId,
+      isEdit: "true",
+      category: category // Optional: pass category for debugging
+    }
+  });
+};
+
   const handleDelete = (adId) => {
-    Alert.alert(
-      'Delete Ad',
-      'Are you sure you want to delete this ad permanently?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await api.delete(`${apiUrl}/api/posts/${adId}`);
-              setAds(ads.filter(ad => ad._id !== adId));
-              Alert.alert('Success', 'Ad deleted successfully');
-            } catch (error) {
-              Alert.alert('Error', 'Failed to delete ad');
-            }
-          }
-        }
-      ]
-    );
+    // Alert.alert(
+    //   'Delete Ad',
+    //   'Are you sure you want to delete this ad permanently?',
+    //   [
+    //     { text: 'Cancel', style: 'cancel' },
+    //     {
+    //       text: 'Delete',
+    //       style: 'destructive',
+    //       onPress: async () => {
+    //         try {
+    //           await api.delete(`${apiUrl}/api/posts/my-posts/${adId}`);
+    //           setAds(ads.filter(ad => ad._id !== adId));
+    //           Alert.alert('Success', 'Ad deleted successfully');
+    //         } catch (error) {
+    //           Alert.alert('Error', 'Failed to delete ad');
+    //         }
+
+    //       }
+    //     }
+    //   ]
+    // );
+
+    alert("❌ Whoa there! You can’t delete this 😅🛑 Keep it safe!");
+
   };
 
   const getCategoryIcon = (category) => {
@@ -154,6 +191,9 @@ export default function MyAds() {
     return daysLeft > 0 ? daysLeft : 0;
   };
 
+
+
+
   const FilterChip = ({ label, value, active }) => (
     <TouchableOpacity
       style={[styles.filterChip, active && styles.filterChipActive]}
@@ -174,11 +214,8 @@ export default function MyAds() {
         style={styles.stickyHeader}
       >
         <View style={styles.headerContent}>
-          <Text style={styles.stickyHeaderTitle}>My Listings</Text>
-          <View style={styles.listingBadge}>
-            <Text style={styles.listingCount}>{ads.length}</Text>
-            <Text style={styles.listingLabel}>Rooms</Text>
-          </View>
+          <Text style={styles.stickyHeaderTitle}>My Ads</Text>
+         
         </View>
 
         {/* Filter Chips */}
@@ -186,7 +223,12 @@ export default function MyAds() {
           <FilterChip label="All" value="all" active={statusFilter === 'all'} />
           <FilterChip label="Active" value="active" active={statusFilter === 'active'} />
           <FilterChip label="Inactive" value="inactive" active={statusFilter === 'inactive'} />
+           <View style={styles.listingBadge}>
+            <Text style={styles.listingCount}>{ads.length}</Text>
+            <Text style={styles.listingLabel}>Rooms</Text>
+          </View>
         </View>
+        
       </LinearGradient>
     </View>
   );
@@ -306,7 +348,7 @@ export default function MyAds() {
                   </View>
                   <View style={styles.statItem}>
                     <Ionicons name="heart-outline" size={14} color="white" />
-                    <Text style={styles.statText}>{ad.favoriteCount || 0}</Text>
+                    <Text style={styles.statText}>{ad.favorites.length || 0}</Text>
                   </View>
                 </View>
               </View>
@@ -342,7 +384,7 @@ export default function MyAds() {
               <View style={styles.adFooter}>
                 <TouchableOpacity
                   style={styles.actionBtn}
-                  onPress={() => handleEdit(ad._id)}
+                  onPress={() => handleEdit(ad._id , ad.category)} 
                 >
                   <Feather name="edit-2" size={16} color="#7A5AF8" />
                   <Text style={styles.actionBtnText}>Edit</Text>
@@ -429,7 +471,7 @@ const styles = StyleSheet.create({
   },
   listingCount: {
     fontSize: 14,
-    color: '#006442',
+    color: 'white',
     fontWeight: '400',
   },
   listingLabel: {
