@@ -26,7 +26,7 @@ console.log("its come----------- ");
         const firstLaunchFlag = await AsyncStorage.getItem('isFirstLaunch');
         const type = await AsyncStorage.getItem('userType');
         
-        const isFirst = firstLaunchFlag === 'true';
+        const isFirst = firstLaunchFlag === 'true'; //  can be true or false
         const userType = type; // can be null or 'GuestUser'
         
        

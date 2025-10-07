@@ -157,7 +157,7 @@ const dispatch = useDispatch();
       };
      dispatch(setLocationData(locationData));
    if(user){
- await axios.put(`${apiUrl}/api/auth/update-location`, { location: locationData ,userId: user?._id});
+ await api.put(`${apiUrl}/api/auth/update-location`, { location: locationData ,userId: user?._id});
     }
       await refreshLocation();
       if (fromForm) {
@@ -284,44 +284,6 @@ const debouncedSearch = useMemo(() => debounce(performSearch, 300), []);
   );
    
 
-  //   console.log("[1] 🟢 Location button clicked");
-    
-  //   setLoading(true);
-  //   setError(null);
-    
-  //   try {
-  //     console.log("[2] 🔄 Attempting initial location fetch (silent mode)");
-  //     let result = await fetchCurrentLocation({ showAlert: true });
-
-  //     console.log("[3] 📦 Initial fetch result:", JSON.stringify(result, null, 2));
-      
-  //     if (!result.success && result.errorType === 'DENIED') {
-  //       console.log("[4] 🔴 First denial detected - trying forced request");
-  //       result = await fetchCurrentLocation({ 
-  //         forceRequest: true,
-  //         showAlert: true
-  //       });
-  //       console.log("[5] 🔄 Forced request result:", JSON.stringify(result, null, 2));
-  //     }
-      
-  //     if (result.success) {
-  //       console.log("[6] 🎯 Location fetch successful. Coordinates:", result.coordinates);
-  //       setCurrentLocation(result.coordinates);
-  //       console.log("[7] 📌 State updated with coordinates");
-  //     } else if (result.error) {
-  //       console.warn("[8] ⚠️ Error in location fetch:", result.error);
-  //       setError(result.error);
-  //     }
-      
-  //   } catch (error) {
-  //     console.error("[9] ❌ Unexpected error:", error);
-  //     setError('Unexpected location error');
-  //     Alert.alert('Error', 'Unexpected error getting location');
-  //   } finally {
-  //     console.log("[10] ⏹️ Final currentLocation state:", currentLocation);
-  //     setLoading(false);
-  //   }
-  // };
 
   const closeModal = () => {
     setModalVisible(false);
@@ -407,7 +369,7 @@ const debouncedSearch = useMemo(() => debounce(performSearch, 300), []);
      console.log(user,"current user");
      console.log('====================================');
     if(user){
- await axios.put(`${apiUrl}/api/auth/update-location`, { location: locationData ,userId: user?._id});
+ await api.put(`${apiUrl}/api/auth/update-location`, { location: locationData ,userId: user?._id});
     }
      
 
