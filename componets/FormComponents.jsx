@@ -8,12 +8,14 @@ import {
   ScrollView,
   Alert,
   Image,
+  Linking,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useSelector } from 'react-redux';
 import { router } from 'expo-router';
+import CustomAlert from '../componets/CustomAlert '
 // Input Field Component
 export const InputField = ({ 
   label, 
@@ -360,6 +362,196 @@ useEffect(() => {
 };
 
 // Image Upload Component
+// export const ImageUploadSection = ({ 
+//   images, 
+//   onImagesChange, 
+//   maxImages = 5, 
+//   required = false,
+//   isEdit = false
+// }) => {
+  
+//   const requestCameraPermission = async () => {
+//     const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    
+//     if (status !== 'granted') {
+//       Alert.alert(
+//         'Camera Permission Required',
+//         'Please allow camera access to take photos.',
+//         [{ text: 'OK' }]
+//       );
+//       return false;
+//     }
+//     return true;
+//   };
+
+//   const requestGalleryPermission = async () => {
+//     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    
+//     if (status !== 'granted') {
+//       Alert.alert(
+//         'Photo Library Permission Required',
+//         'Please allow photo library access to choose images.',
+//         [{ text: 'OK' }]
+//       );
+//       return false;
+//     }
+//     return true;
+//   };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+//   const handleTakePhoto = async () => {
+//     if (!images || images.length >= maxImages) {
+//       Alert.alert('Limit Reached', `You can only upload up to ${maxImages} images.`);
+//       return;
+//     }
+
+//     const hasPermission = await requestCameraPermission();
+//     if (!hasPermission) return;
+
+//     try {
+//       const result = await ImagePicker.launchCameraAsync({
+//         mediaTypes: ['images'],
+//         allowsEditing: true,
+//         aspect: [4, 3],
+//         quality: 0.8,
+//       });
+
+//       if (!result.canceled && result.assets && result.assets[0]) {
+//         const newImages = [...(images || []), result.assets[0].uri];
+//         onImagesChange(newImages);
+//       }
+//     } catch (error) {
+//       Alert.alert('Error', 'Failed to take photo. Please try again.');
+//     }
+//   };
+
+//   const handleChooseFromGallery = async () => {
+//     if (!images || images.length >= maxImages) {
+//       Alert.alert('Limit Reached', `You can only upload up to ${maxImages} images.`);
+//       return;
+//     }
+
+//     const hasPermission = await requestGalleryPermission();
+//     if (!hasPermission) return;
+
+//     const remainingSlots = maxImages - (images?.length || 0);
+
+//     try {
+//       const result = await ImagePicker.launchImageLibraryAsync({
+//         mediaTypes: ['images'],
+//         allowsEditing: false,
+//         quality: 0.8,
+//         allowsMultipleSelection: true,
+//         selectionLimit: remainingSlots,
+//       });
+
+//       if (!result.canceled && result.assets && result.assets.length > 0) {
+//         const newImageUris = result.assets.map(asset => asset.uri);
+//         const updatedImages = [...(images || []), ...newImageUris];
+//         onImagesChange(updatedImages);
+//       }
+//     } catch (error) {
+//       Alert.alert('Error', 'Failed to select images. Please try again.');
+//     }
+//   };
+
+//   // ✅ SIMPLE REMOVE FUNCTION - No extra props needed
+//   const handleRemoveImage = (index) => {
+//     const newImages = images.filter((_, i) => i !== index);
+//     onImagesChange(newImages);
+//   };
+
+//   const canAddMore = !images || images.length < maxImages;
+
+//   return (
+//     <View style={styles.imageContainer}>
+//       <Text style={styles.inputLabel}>
+//         Property Images {required && <Text style={styles.required}>*</Text>}
+//       </Text>
+//       <Text style={styles.imageSubtext}>
+//         Add up to {maxImages} photos to showcase your property
+//         {isEdit && " - Remove images by tapping the × button"}
+//       </Text>
+
+//       <View style={styles.disclaimerContainer}>
+//         <Ionicons name="information-circle" size={18} color="#7A5AF8" />
+//         <Text style={styles.disclaimerText}>
+//           First image will be used as thumbnail
+//         </Text>
+//       </View>
+
+//       {/* Image Previews */}
+//       <ScrollView 
+//         horizontal 
+//         showsHorizontalScrollIndicator={false} 
+//         style={styles.imageScrollView}
+//       >
+//         {images?.map((imageUri, index) => (
+//           <View key={index} style={styles.imagePreview}>
+//             <Image source={{ uri: imageUri }} style={styles.previewImage} />
+//             {index === 0 && (
+//               <View style={styles.thumbnailBadge}>
+//                 <Text style={styles.thumbnailBadgeText}>Main</Text>
+//               </View>
+//             )}
+//             <TouchableOpacity
+//               style={styles.removeImageButton}
+//               onPress={() => handleRemoveImage(index)}
+//             >
+//               <Text style={styles.removeImageText}>×</Text>
+//             </TouchableOpacity>
+//           </View>
+//         ))}
+//       </ScrollView>
+
+//       {/* Action Buttons */}
+//       {canAddMore && (
+//         <View style={styles.buttonContainer}>
+//           <TouchableOpacity 
+//             style={styles.actionButton} 
+//             onPress={handleTakePhoto}
+//           >
+//             <Ionicons name="camera" size={20} color="#7A5AF8" />
+//             <Text style={styles.buttonText}>Take Photo</Text>
+//           </TouchableOpacity>
+
+//           <TouchableOpacity 
+//             style={styles.actionButton} 
+//             onPress={handleChooseFromGallery}
+//           >
+//             <Ionicons name="images" size={20} color="#7A5AF8" />
+//             <Text style={styles.buttonText}>Choose from Gallery</Text>
+//           </TouchableOpacity>
+//         </View>
+//       )}
+
+//       {!canAddMore && (
+//         <Text style={styles.limitText}>
+//           Maximum {maxImages} images reached
+//         </Text>
+//       )}
+//     </View>
+//   );
+// };
+
 export const ImageUploadSection = ({ 
   images, 
   onImagesChange, 
@@ -367,18 +559,69 @@ export const ImageUploadSection = ({
   required = false,
   isEdit = false
 }) => {
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    title: '',
+    message: '',
+    buttons: []
+  });
   
+  // Track permission denials
+  const [cameraDenialCount, setCameraDenialCount] = useState(0);
+  const [galleryDenialCount, setGalleryDenialCount] = useState(0);
+
+  const showAlert = (title, message, buttons = [{ text: 'OK' }]) => {
+    setAlertConfig({ title, message, buttons });
+    setAlertVisible(true);
+  };
+
+  const openAppSettings = async () => {
+    try {
+      await Linking.openSettings();
+    } catch (error) {
+      console.error('Failed to open settings:', error);
+    }
+  };
+
   const requestCameraPermission = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     
     if (status !== 'granted') {
-      Alert.alert(
-        'Camera Permission Required',
-        'Please allow camera access to take photos.',
-        [{ text: 'OK' }]
-      );
+      setCameraDenialCount(prev => prev + 1);
+      
+      if (cameraDenialCount >= 0) {
+        // Second denial - show modal with settings option
+        showAlert(
+          'Camera Permission Required',
+          'Camera access is required to take photos. Please enable it in settings.',
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel',
+              onPress: () => setCameraDenialCount(0)
+            },
+            {
+              text: 'Go to Settings',
+              onPress: openAppSettings
+            }
+          ]
+        );
+      } else {
+        // First denial - show regular prompt
+        showAlert(
+          'Camera Permission Required',
+          'Please allow camera access to take photos.',
+          [{ 
+            text: 'OK',
+            onPress: () => {} 
+          }]
+        );
+      }
       return false;
     }
+    
+    // Reset counter if permission granted
+    setCameraDenialCount(0);
     return true;
   };
 
@@ -386,19 +629,51 @@ export const ImageUploadSection = ({
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     
     if (status !== 'granted') {
-      Alert.alert(
-        'Photo Library Permission Required',
-        'Please allow photo library access to choose images.',
-        [{ text: 'OK' }]
-      );
+      setGalleryDenialCount(prev => prev + 1);
+      
+      if (galleryDenialCount >= 1) {
+        // Second denial - show modal with settings option
+        showAlert(
+          'Photo Library Permission Required',
+          'Photo library access is required to choose images. Please enable it in settings.',
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel',
+              onPress: () => setGalleryDenialCount(0)
+            },
+            {
+              text: 'Go to Settings',
+              onPress: openAppSettings
+            }
+          ]
+        );
+      } else {
+        // First denial - show regular prompt
+        showAlert(
+          'Photo Library Permission Required',
+          'Please allow photo library access to choose images.',
+          [{ 
+            text: 'OK',
+            onPress: () => {} 
+          }]
+        );
+      }
       return false;
     }
+    
+    // Reset counter if permission granted
+    setGalleryDenialCount(0);
     return true;
   };
 
   const handleTakePhoto = async () => {
     if (!images || images.length >= maxImages) {
-      Alert.alert('Limit Reached', `You can only upload up to ${maxImages} images.`);
+      showAlert(
+        'Limit Reached', 
+        `You can only upload up to ${maxImages} images.`,
+        [{ text: 'OK' }]
+      );
       return;
     }
 
@@ -418,13 +693,21 @@ export const ImageUploadSection = ({
         onImagesChange(newImages);
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to take photo. Please try again.');
+      showAlert(
+        'Error', 
+        'Failed to take photo. Please try again.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
   const handleChooseFromGallery = async () => {
     if (!images || images.length >= maxImages) {
-      Alert.alert('Limit Reached', `You can only upload up to ${maxImages} images.`);
+      showAlert(
+        'Limit Reached', 
+        `You can only upload up to ${maxImages} images.`,
+        [{ text: 'OK' }]
+      );
       return;
     }
 
@@ -448,7 +731,11 @@ export const ImageUploadSection = ({
         onImagesChange(updatedImages);
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to select images. Please try again.');
+      showAlert(
+        'Error', 
+        'Failed to select images. Please try again.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
@@ -527,6 +814,15 @@ export const ImageUploadSection = ({
           Maximum {maxImages} images reached
         </Text>
       )}
+
+      {/* Custom Alert Modal */}
+      <CustomAlert
+        visible={alertVisible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        buttons={alertConfig.buttons}
+        onClose={() => setAlertVisible(false)}
+      />
     </View>
   );
 };

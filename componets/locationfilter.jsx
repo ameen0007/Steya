@@ -107,17 +107,9 @@ const handleApplyFilters = (filters) => {
         </TouchableOpacity>
 
     <View style={styles.rightIcons}>
-    {/* Notifications */}
-    <TouchableOpacity style={styles.iconButton}>
-      <Ionicons name="notifications-outline" size={24} color="#282C3F" />
-      {hasNotification && (
-        <View style={styles.badge} />
-      )}
-    </TouchableOpacity>
-
-    {/* Saved Ads (for now disabled) */}
+    
 <TouchableOpacity onPress={() => router.push('/favoritePage')} style={styles.iconButton}>
-  <Ionicons name="heart-outline" size={24} color="red" />
+  <Ionicons name="heart-outline" size={24} color="#403f41" />
 </TouchableOpacity>
 
   </View>

@@ -7,7 +7,8 @@ import '@/global.css'
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import store, { persistor } from '../app/Redux/store';
-
+import { setToastRef } from '../services/ToastService';
+import { ToastProvider, useToast } from 'react-native-toast-notifications';
 export default function RootLayout() {
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
@@ -21,6 +22,11 @@ export default function RootLayout() {
   return (
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
+         <ToastProvider   ref={(ref) => setToastRef(ref)}
+      placement="center"
+      duration={3000}
+      offset={50}
+      animationType="slide-in">
         <LocationProvider>
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="index" />
@@ -34,6 +40,9 @@ export default function RootLayout() {
               <Stack.Screen name="favoritePage"/>
           </Stack>
         </LocationProvider>
+       
+       
+        </ToastProvider>
       </PersistGate>
     </Provider>
   );

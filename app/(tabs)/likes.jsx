@@ -7,7 +7,6 @@ import {
   Image,
   TouchableOpacity,
   Dimensions,
-  Alert,
   ActivityIndicator,
   RefreshControl,
   Switch,
@@ -18,6 +17,7 @@ import { StatusBar } from 'expo-status-bar';
 import api from '../../services/intercepter';
 import { useSelector } from 'react-redux';
 import { router } from 'expo-router';
+import CustomAlert from '../../componets/CustomAlert ';
 
 const { width, height } = Dimensions.get('window');
 const apiUrl = process.env.EXPO_PUBLIC_API_URL;
@@ -26,20 +26,27 @@ export default function MyAds() {
   const [ads, setAds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [statusFilter, setStatusFilter] = useState('all'); // active, inactive, all
+  const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
- const user = useSelector((state) => state.user.userData);
+  const user = useSelector((state) => state.user.userData);
+
+  // Alert states
+  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+  const [showErrorAlert, setShowErrorAlert] = useState(false);
+  const [selectedAdId, setSelectedAdId] = useState(null);
+  const [errorMessage, setErrorMessage] = useState('');
+
   useEffect(() => {
     fetchMyAds();
   }, [statusFilter, categoryFilter, page]);
 
   const fetchMyAds = async () => {
-         if (!user?._id) {
-      // console.log("⚠️ User not logged in, skipping favorite check");
+    if (!user?._id) {
       router.push('/login');
-      return; // <-- must be inside braces
+      return;
     }
     try {
       setLoading(true);
@@ -54,14 +61,15 @@ export default function MyAds() {
       
       if (response.data.success) {
         console.log('====================================');
-        console.log(response.data,"data in my ads");
+        console.log(response.data, "data in my ads");
         console.log('====================================');
         setAds(response.data.posts);
         setTotalPages(response.data.pagination.pages);
       }
     } catch (error) {
       console.error('Error fetching ads:', error);
-      Alert.alert('Error', 'Failed to load your ads');
+      setErrorMessage('Failed to load your ads');
+      setShowErrorAlert(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -88,7 +96,8 @@ export default function MyAds() {
         setAds(ads.map(ad => 
           ad._id === adId ? { ...ad, isActive: currentStatus } : ad
         ));
-        Alert.alert('Error', 'Failed to update ad status');
+        setErrorMessage('Failed to update ad status');
+        setShowErrorAlert(true);
       }
     } catch (error) {
       console.error('Error toggling status:', error);
@@ -96,63 +105,51 @@ export default function MyAds() {
       setAds(ads.map(ad => 
         ad._id === adId ? { ...ad, isActive: currentStatus } : ad
       ));
-      Alert.alert('Error', 'Failed to update ad status');
+      setErrorMessage('Failed to update ad status');
+      setShowErrorAlert(true);
     }
   };
 
- // In your ads page or component
-const handleEdit = (roomId, category) => {
-  // Map categories to their respective form routes
-  const categoryRoutes = {
-    'shared': '/sharedroomform',
-    'pg_hostel': '/pghostelform', 
-    'flat_home': '/homeform'
-  };
+  const handleEdit = (roomId, category) => {
+    const categoryRoutes = {
+      'shared': '/sharedroomform',
+      'pg_hostel': '/pghostelform', 
+      'flat_home': '/homeform'
+    };
 
-  // Get the route for the category
-  const formRoute = categoryRoutes[category];
-  
-  if (!formRoute) {
-    Alert.alert('Error', 'Invalid category type');
-    return;
-  }
-
-  // Navigate to the appropriate form with params
-  router.push({
-    pathname: formRoute,
-    params: { 
-      roomId: roomId,
-      isEdit: "true",
-      category: category // Optional: pass category for debugging
+    const formRoute = categoryRoutes[category];
+    
+    if (!formRoute) {
+      setErrorMessage('Invalid category type');
+      setShowErrorAlert(true);
+      return;
     }
-  });
-};
+
+    router.push({
+      pathname: formRoute,
+      params: { 
+        roomId: roomId,
+        isEdit: "true",
+        category: category
+      }
+    });
+  };
 
   const handleDelete = (adId) => {
-    // Alert.alert(
-    //   'Delete Ad',
-    //   'Are you sure you want to delete this ad permanently?',
-    //   [
-    //     { text: 'Cancel', style: 'cancel' },
-    //     {
-    //       text: 'Delete',
-    //       style: 'destructive',
-    //       onPress: async () => {
-    //         try {
-    //           await api.delete(`${apiUrl}/api/posts/my-posts/${adId}`);
-    //           setAds(ads.filter(ad => ad._id !== adId));
-    //           Alert.alert('Success', 'Ad deleted successfully');
-    //         } catch (error) {
-    //           Alert.alert('Error', 'Failed to delete ad');
-    //         }
+    setSelectedAdId(adId);
+    setShowDeleteAlert(true);
+  };
 
-    //       }
-    //     }
-    //   ]
-    // );
-
-    alert("❌ Whoa there! You can’t delete this 😅🛑 Keep it safe!");
-
+  const performDelete = async () => {
+    try {
+      await api.delete(`${apiUrl}/api/posts/my-posts/${selectedAdId}`);
+      setAds(ads.filter(ad => ad._id !== selectedAdId));
+      setShowSuccessAlert(true);
+    } catch (error) {
+      console.error('Error deleting ad:', error);
+      setErrorMessage('Failed to delete ad. Please try again.');
+      setShowErrorAlert(true);
+    }
   };
 
   const getCategoryIcon = (category) => {
@@ -185,14 +182,11 @@ const handleEdit = (roomId, category) => {
   const calculateDaysLeft = (createdAt) => {
     const created = new Date(createdAt);
     const expiry = new Date(created);
-    expiry.setDate(created.getDate() + 30); // Assuming 30 days validity
+    expiry.setDate(created.getDate() + 30);
     const now = new Date();
     const daysLeft = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
     return daysLeft > 0 ? daysLeft : 0;
   };
-
-
-
 
   const FilterChip = ({ label, value, active }) => (
     <TouchableOpacity
@@ -215,20 +209,17 @@ const handleEdit = (roomId, category) => {
       >
         <View style={styles.headerContent}>
           <Text style={styles.stickyHeaderTitle}>My Ads</Text>
-         
         </View>
 
-        {/* Filter Chips */}
         <View style={styles.filterContainer}>
           <FilterChip label="All" value="all" active={statusFilter === 'all'} />
           <FilterChip label="Active" value="active" active={statusFilter === 'active'} />
           <FilterChip label="Inactive" value="inactive" active={statusFilter === 'inactive'} />
-           <View style={styles.listingBadge}>
+          <View style={styles.listingBadge}>
             <Text style={styles.listingCount}>{ads.length}</Text>
             <Text style={styles.listingLabel}>Rooms</Text>
           </View>
         </View>
-        
       </LinearGradient>
     </View>
   );
@@ -384,7 +375,7 @@ const handleEdit = (roomId, category) => {
               <View style={styles.adFooter}>
                 <TouchableOpacity
                   style={styles.actionBtn}
-                  onPress={() => handleEdit(ad._id , ad.category)} 
+                  onPress={() => handleEdit(ad._id, ad.category)} 
                 >
                   <Feather name="edit-2" size={16} color="#7A5AF8" />
                   <Text style={styles.actionBtnText}>Edit</Text>
@@ -409,6 +400,52 @@ const handleEdit = (roomId, category) => {
         
         <View style={styles.bottomSpacing} />
       </ScrollView>
+
+      {/* Custom Alerts */}
+      <CustomAlert
+        visible={showDeleteAlert}
+        title="Delete Ad"
+        message="Are you sure you want to delete this ad permanently? This action cannot be undone."
+        buttons={[
+          {
+            text: 'Cancel',
+            style: 'cancel',
+            onPress: () => {},
+          },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: performDelete,
+          },
+        ]}
+        onClose={() => setShowDeleteAlert(false)}
+      />
+
+      <CustomAlert
+        visible={showSuccessAlert}
+        title="Success"
+        message="Your ad has been deleted successfully."
+        buttons={[
+          {
+            text: 'OK',
+            onPress: () => {},
+          },
+        ]}
+        onClose={() => setShowSuccessAlert(false)}
+      />
+
+      <CustomAlert
+        visible={showErrorAlert}
+        title="Error"
+        message={errorMessage}
+        buttons={[
+          {
+            text: 'OK',
+            onPress: () => {},
+          },
+        ]}
+        onClose={() => setShowErrorAlert(false)}
+      />
     </View>
   );
 }
