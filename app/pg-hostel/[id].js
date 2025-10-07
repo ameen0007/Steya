@@ -1,25 +1,161 @@
 import { useRef, useState, useEffect } from 'react';
-import { ScrollView, TouchableOpacity, Text, View, Image, Modal, Dimensions, Platform, FlatList, StyleSheet } from 'react-native';
+import { ScrollView, TouchableOpacity, Text, View, Image, Modal, Dimensions, Platform, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather, FontAwesome5, Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import SafeWrapper from '../../services/Safewrapper'; // Adjust this path if needed
 import TopFadeGradient from '../../componets/topgradient';
 const { width } = Dimensions.get('window');
-
-import { dummyListings } from '../../services/dummyListings';
+const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+import { useSelector } from 'react-redux';
 import  StaticMap  from '../../componets/map'; 
+import axios from 'axios';
+import SkeletonLoader from '../../componets/individualloader';
+import api from '../../services/intercepter';
 export default function PgHostelDetails() {
+   const user = useSelector ((state) => state.user.userData);
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const { id } = useLocalSearchParams();
-  const item = dummyListings.find((item) => item._id === id);
+   const [item, setItem] = useState(null);
   const router = useRouter();
+    const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const modalFlatListRef = useRef(null);
   const [currentImage, setCurrentImage] = useState(0);
+
   const [modalCurrentImage, setModalCurrentImage] = useState(0);
   const [isFavorite, setIsFavorite] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [initialImageIndex, setInitialImageIndex] = useState(0);
+    
   
+
+  const incrementViewCount = async () => {
+    try {
+      if (!id) return;
+      
+      console.log("🔄 Incrementing view count for room:", id);
+    
+      
+      const response = await axios.post(`${apiUrl}/api/${id}/view`, {
+        userId: user?._id // Send userId if user is logged in
+      });
+
+      if (response.data.success) {
+        console.log("✅ View count updated:", response.data.views);
+        
+        // Update the local item state with new view count
+        if (item) {
+          setItem(prevItem => ({
+            ...prevItem,
+            views: response.data.views
+          }));
+        }
+      }
+    } catch (error) {
+      console.error("❌ Error incrementing view count:", error);
+      // Don't show error to user as this is a background operation
+    }
+  };
+
+  useEffect(() => {
+    const fetchRoomData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await axios.get(`${apiUrl}/api/singleroom/${id}`);
+        setItem(response.data?.room);
+        console.log("✅ Room data fetched:", response.data?.room);
+        
+        // ✅ CALL VIEW COUNT API AFTER SUCCESSFUL DATA FETCH
+        await incrementViewCount();
+        
+      } catch (err) {
+        console.error("❌ Error fetching room data:", err);
+        setError(err.message || 'Failed to load room details');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchRoomData();
+    }
+  }, [id]);
+
+  // Check if room is favorited
+useEffect(() => {
+  const checkFavorite = async () => {
+    if (!id) return;
+
+    if (!user?._id) {
+      console.log("⚠️ User not logged in, skipping favorite check");
+      return; // <-- must be inside braces
+    }
+
+    try {
+      const response = await api.get(`${apiUrl}/api/check/${id}`);
+      console.log('Favorite check response:', response.data);
+
+      // ✅ Handle both possible property names
+      const favoriteStatus = response.data.isFavorited ?? response.data.isFavorite ?? false;
+      setIsFavorite(favoriteStatus);
+    } catch (error) {
+      console.error('Error checking favorite status:', error);
+    }
+  };
+
+  checkFavorite();
+}, [id, user?._id]); 
+
+
+  const handleChatPress = async () => {
+  console.log("Starting chat for product:", item._id);
+       if (!user?._id) {
+      // console.log("⚠️ User not logged in, skipping favorite check");
+      router.push('/login');
+      return; // <-- must be inside braces
+    }
+  try {
+    setIsCreatingRoom(true);
+
+    // First, check if room already exists
+    const checkResponse = await api.get(`${apiUrl}/api/chat/check-room`, {
+      params: { productId: item._id }
+    });
+
+    let roomId;
+
+    if (checkResponse.data.exists) {
+      // Use existing room (could be pending or active)
+      roomId = checkResponse.data.roomId;
+      console.log("Using existing room:", roomId, "Status:", checkResponse.data.status);
+    } else {
+      // Create new PENDING room
+      const createResponse = await api.post(`${apiUrl}/api/chat/create-room`, {
+        productId: item._id,
+        productTitle: item.title || 'Product Chat',
+        ownerId: item?.createdBy?._id 
+      });
+      
+      roomId = createResponse.data.roomId;
+      console.log("Created new pending room:", roomId);
+    }
+
+    // Navigate to chat
+    router.push({
+      pathname: '/chat/[id]',
+      params: { id: roomId }
+    });
+
+  } catch (error) {
+    console.error('Error creating chat room:', error);
+    alert('Failed to start chat. Please try again.');
+  } finally {
+    setIsCreatingRoom(false);
+  }
+};
+
   const handleBackPress = () => {
     router.back(); // Go back to the previous screen
   };
@@ -65,42 +201,51 @@ export default function PgHostelDetails() {
   };
 
   return (
+    <>
+    {loading || !item ? (
+    <SkeletonLoader />
+  ) : (
+   
     <SafeWrapper>
       <ScrollView>
         {/* Image Carousel */}
-        <FlatList
-          data={item.images}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={(imageUrl, index) => index.toString()}
-          onMomentumScrollEnd={(e) => {
-            const index = Math.floor(e.nativeEvent.contentOffset.x / width);
-            setCurrentImage(index);
-          }}
-          renderItem={({ item: imageUrl, index }) => (
-            <View style={{ width, justifyContent: 'center', alignItems: 'center' }}>
-              <TouchableOpacity activeOpacity={0.9} onPress={() => openImageModal(index)}>
-              <TopFadeGradient /> 
-                <Image source={{ uri: imageUrl }} style={{ width, height: 250 }} resizeMode="cover" />
-              
-                <View style={{
-                  position: 'absolute',
-                  bottom: 10,
-                  right: 10,
-                  backgroundColor: '#0009',
-                  paddingHorizontal: 10,
-                  paddingVertical: 5,
-                  borderRadius: 12
-                }}>
-                  <Text style={{ color: 'white', fontSize: 12 }}>
-                    {index === currentImage ? currentImage + 1 : index + 1}/{item.images.length}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            </View>
-          )}
+      <FlatList
+  data={item?.images}
+  horizontal
+  pagingEnabled
+  showsHorizontalScrollIndicator={false}
+  keyExtractor={(image) => image._id} // use _id from backend
+  onMomentumScrollEnd={(e) => {
+    const index = Math.floor(e.nativeEvent.contentOffset.x / width);
+    setCurrentImage(index);
+  }}
+  renderItem={({ item: image, index }) => ( // renamed from imageUrl → image
+    <View style={{ width, justifyContent: 'center', alignItems: 'center' }}>
+      <TouchableOpacity activeOpacity={0.9} onPress={() => openImageModal(index)}>
+        <TopFadeGradient /> 
+        <Image 
+          source={{ uri: image.originalUrl }} // use originalUrl
+          style={{ width, height: 250 }} 
+          resizeMode="cover" 
         />
+        <View style={{
+          position: 'absolute',
+          bottom: 10,
+          right: 10,
+          backgroundColor: '#0009',
+          paddingHorizontal: 10,
+          paddingVertical: 5,
+          borderRadius: 12
+        }}>
+          <Text style={{ color: 'white', fontSize: 12 }}>
+            {index === currentImage ? currentImage + 1 : index + 1}/{item?.images.length}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    </View>
+  )}
+/>
+
 
         {/* PG Info */}
         <View style={styles.container}>
@@ -108,23 +253,23 @@ export default function PgHostelDetails() {
   <View style={styles.rowBetween}>
   <View style={styles.priceContainer}>
       <Text style={styles.priceText}>
-        ₹{item.priceRange.min} - ₹{item.priceRange.max}
+        ₹{item?.priceRange.min} - ₹{item?.priceRange.max}
       </Text>
     </View>
   <View style={styles.locationContainer}>
     <Ionicons name="location-sharp" size={16} color="#7A5AF8" />
-    <Text numberOfLines={1} style={styles.locationText}>{item.location.fullAddress}</Text>
+    <Text numberOfLines={1} style={styles.locationText}>{item?.location.fullAddress}</Text>
   </View>
   
   
   </View>
-  <Text style={styles.title}>{item.title}</Text>
+  <Text style={styles.title}>{item?.title}</Text>
   {/* Location */}
  
 
   {/* Description */}
   <View style={styles.descriptionContainer}>
-    <Text style={styles.descriptionText}>{item.description}</Text>
+    <Text style={styles.descriptionText}>{item?.description}</Text>
   </View>
 
   {/* Details Section */}
@@ -139,8 +284,8 @@ export default function PgHostelDetails() {
         <View style={styles.detailContent}>
           <Text style={styles.detailLabel}>Category</Text>
           <Text style={styles.detailValue}>
-            {item.pgGenderCategory === 'ladies' ? 'Ladies Only' : 
-             item.pgGenderCategory === 'gents' ? 'Gents Only' : 'Co-ed'}
+            {item?.pgGenderCategory === 'ladies' ? 'Ladies Only' : 
+             item?.pgGenderCategory === 'gents' ? 'Gents Only' : 'Co-ed'}
           </Text>
         </View>
       </View>
@@ -152,7 +297,7 @@ export default function PgHostelDetails() {
         </View>
         <View style={styles.detailContent}>
           <Text style={styles.detailLabel}>Available</Text>
-          <Text style={styles.detailValue}>{item.AvailableSpace} Beds</Text>
+          <Text style={styles.detailValue}>{item?.availableSpace} Beds</Text>
         </View>
       </View>
     </View>
@@ -166,7 +311,7 @@ export default function PgHostelDetails() {
         <View style={styles.detailContent}>
           <Text style={styles.detailLabel}>Room Types</Text>
           <Text style={styles.detailValue}>
-            {item.roomTypesAvailable.map(type => 
+            {item?.roomTypesAvailable?.map(type => 
               type.charAt(0).toUpperCase() + type.slice(1)).join(', ')}
           </Text>
         </View>
@@ -180,7 +325,7 @@ export default function PgHostelDetails() {
         <View style={styles.detailContent}>
           <Text style={styles.detailLabel}>Meals Included</Text>
           <Text style={styles.detailValue}>
-            {item.mealsProvided.map(meal => 
+            {item?.mealsProvided?.map(meal => 
               meal.charAt(0).toUpperCase() + meal.slice(1)).join(', ')}
           </Text>
         </View>
@@ -196,7 +341,7 @@ export default function PgHostelDetails() {
         <View style={styles.detailContent}>
           <Text style={styles.detailLabel}>Amenities</Text>
           <Text style={styles.detailValue}>
-            {item.amenities.map(amenity => 
+            {item?.amenities?.map(amenity => 
               formatAmenity(amenity)).join(', ')}
           </Text>
         </View>
@@ -208,7 +353,7 @@ export default function PgHostelDetails() {
 {/* Rules Section */}
 <Text style={styles.sectionTitle}>PG/Hostel Rules</Text>
 <View style={styles.detailsContainer}>
-  {item.rules.map((rule, index) => {
+  {item?.rules.map((rule, index) => {
     // Only create new row for even indexes
     if (index % 2 === 0) {
       return (
@@ -228,7 +373,7 @@ export default function PgHostelDetails() {
           </View>
 
           {/* Second Rule in row if exists */}
-          {item.rules[index + 1] && (
+          {item?.rules[index + 1] && (
             <View style={styles.detailBox}>
               <View style={styles.iconCircle}>
                 <MaterialIcons name="info" size={16} color="#ffffff" />
@@ -236,8 +381,8 @@ export default function PgHostelDetails() {
               <View style={styles.detailContent}>
                 <Text style={styles.detailLabel}>Rule {index + 2}</Text>
                 <Text style={styles.detailValue}>
-                  {item.rules[index + 1] === 'no_late_entry' ? 'No Late Entry After 10 PM' : 
-                  item.rules[index + 1].replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  {item?.rules[index + 1] === 'no_late_entry' ? 'No Late Entry After 10 PM' : 
+                  item?.rules[index + 1].replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                 </Text>
               </View>
             </View>
@@ -253,14 +398,17 @@ export default function PgHostelDetails() {
   <Text style={styles.sectionTitle}>Posted By</Text>
   <View style={styles.postedByContainer}>
     <Image 
-      source={{ uri: item.postedBy.profileImage }} 
+      source={{ uri: item?.createdBy.picture }} 
       style={styles.profileImage} 
     />
     <View style={styles.posterInfo}>
-      <Text style={styles.posterName}>{item.postedBy.name}</Text>
-      <Text style={styles.postedDate}>
-        Posted on {format(new Date(item.createdAt), 'dd MMM yyyy')}
-      </Text>
+      <Text style={styles.posterName}>{item?.createdBy.name}</Text>
+     <Text style={styles.postedDate}>
+  {new Date(item?.createdAt).toLocaleDateString('en-US', {
+    month: 'short',
+    day: '2-digit',
+  })}
+</Text>
     </View>
   </View>
 </View>
@@ -296,11 +444,16 @@ export default function PgHostelDetails() {
             <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={25} color={isFavorite ? "#FF4081" : 'white'}/> 
           </TouchableOpacity>
         </View>
-        <StaticMap latitude={item?.location?.latitude} longitude={item?.location?.longitude} />
+            <StaticMap
+  latitude={item?.location?.coordinates[1]}   // latitude
+  longitude={item?.location?.coordinates[0]}  // longitude
+  placeName={item?.location?.fullAddress}
+/>
       </ScrollView>
 
       {/* Bottom Buttons */}
-      <View style={{
+    {item.createdBy._id !== user._id ? (
+    <View style={{
   flexDirection: 'row',
   justifyContent: 'space-between',
   padding: 16,
@@ -308,25 +461,34 @@ export default function PgHostelDetails() {
   borderColor: '#eee',
   backgroundColor: '#fff'
 }}>
-  <TouchableOpacity
-    style={{
-      flex: 1,
-      flexDirection: 'row', // horizontal
-      backgroundColor: '#7A5AF8',
-      padding: 14,
-      borderRadius: 10,
-      alignItems: 'center',
-      justifyContent: 'center', // center both icon and text
-      marginRight: 10
-    }}
-    onPress={() => console.log('Chat clicked')}
-  >
-    <Feather name="message-circle" size={20} color="white" />
-    <Text style={{ color: 'white', marginLeft: 8 }}>Chat</Text>
-  </TouchableOpacity>
+
+   <TouchableOpacity
+      style={{
+        flex: 1,
+        flexDirection: 'row',
+        backgroundColor: '#7A5AF8',
+        padding: 14,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+        opacity: isCreatingRoom ? 0.6 : 1
+      }}
+      onPress={handleChatPress}
+      disabled={isCreatingRoom}
+    >
+      {isCreatingRoom ? (
+        <ActivityIndicator size="small" color="white" />
+      ) : (
+        <>
+          <Feather name="message-circle" size={20} color="white" />
+          <Text style={{ color: 'white', marginLeft: 8 }}>Chat</Text>
+        </>
+      )}
+    </TouchableOpacity>
 
   <TouchableOpacity
-    disabled={!item.showPhonePublic}
+    disabled={!item?.showPhonePublic}
     onPress={() => console.log('Calling:', item.contactPhone)}
     style={{
       flex: 1,
@@ -341,7 +503,13 @@ export default function PgHostelDetails() {
     <Feather name="phone-call" size={20} color="white" />
     <Text style={{ color: 'white', marginLeft: 8 }}>Call</Text>
   </TouchableOpacity>
-</View>
+</View> 
+
+) : (
+  <View style={styles.chatDisabled}>
+    <Text style={styles.chatDisabledText}>This is your product</Text>
+  </View>
+)}
 
 
       {/* Image Modal */}
@@ -366,25 +534,30 @@ export default function PgHostelDetails() {
           </TouchableOpacity>
 
           {/* Image Modal with FlatList - Fixed with getItemLayout and ref */}
-          <FlatList
-            ref={modalFlatListRef}
-            data={item.images}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            getItemLayout={getItemLayout}
-            initialScrollIndex={modalCurrentImage}
-            onMomentumScrollEnd={(event) => {
-              const newIndex = Math.round(event.nativeEvent.contentOffset.x / width);
-              setModalCurrentImage(newIndex); // Update the modal's current image index
-            }}
-            renderItem={({ item, index }) => (
-              <View style={{ width, justifyContent: 'center', alignItems: 'center' }}>
-                <Image source={{ uri: item }} style={{ width, height: 400 }} resizeMode="contain" />
-              </View>
-            )}
-            keyExtractor={(item, index) => index.toString()}
-          />
+         <FlatList
+  ref={modalFlatListRef}
+  data={item?.images} // safe access
+  horizontal
+  pagingEnabled
+  showsHorizontalScrollIndicator={false}
+  getItemLayout={getItemLayout}
+  initialScrollIndex={modalCurrentImage}
+  onMomentumScrollEnd={(event) => {
+    const newIndex = Math.round(event.nativeEvent.contentOffset.x / width);
+    setModalCurrentImage(newIndex); // Update the modal's current image index
+  }}
+  renderItem={({ item: image, index }) => ( // rename for clarity
+    <View style={{ width, justifyContent: 'center', alignItems: 'center' }}>
+      <Image 
+        source={{ uri: image.originalUrl }} // use originalUrl
+        style={{ width, height: 400 }} 
+        resizeMode="contain" 
+      />
+    </View>
+  )}
+  keyExtractor={(image) => image._id} // use _id from backend
+/>
+
 
           {/* Image Indicator */}
           <View style={{
@@ -404,6 +577,8 @@ export default function PgHostelDetails() {
         </View>
       </Modal>
     </SafeWrapper>
+    )}
+</>
   );
 }
 const greybg = '#FBFAFF';
@@ -411,6 +586,21 @@ const maintext = '#212121';
 const lighttext = '#757575';
 const mainbg = '#7A5AF8';
 const styles = StyleSheet.create({
+    chatDisabled: {
+  paddingVertical: 10,
+  paddingHorizontal: 16,
+  backgroundColor: '#E5E7EB', // light gray to indicate disabled
+  borderRadius: 8,
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginTop: 8,
+},
+
+chatDisabledText: {
+  color: '#9CA3AF', // gray text
+  fontSize: 14,
+  fontWeight: '500',
+},
   container: {
    
    flex: 1,

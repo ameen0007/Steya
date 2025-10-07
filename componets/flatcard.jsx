@@ -1,110 +1,125 @@
 import { router } from 'expo-router';
-import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { Ionicons, MaterialIcons,MaterialCommunityIcons, FontAwesome5, FontAwesome6 } from '@expo/vector-icons';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Ionicons, MaterialIcons, MaterialCommunityIcons, FontAwesome5, FontAwesome6 } from '@expo/vector-icons';
 
-const FlatHomeCard = ({ data, activeFilter }) => {
-  // Extract data or provide defaults
-  const images = data.images && data.images.length > 0 
-    ? data.images 
-    : ["https://via.placeholder.com/300x200.png?text=No+Image"];
-  
-  const distance = data.distance || '2.5 km';
-  const bedrooms = data.bedrooms || 2;
-  const bathrooms = data.bathrooms || 2;
-  const propertyType = data.propertyType || 'flat';
-  const furnishedStatus = data.furnishedStatus || 'furnished';
-  const tenantPreference = data.tenantPreference || 'family';
-  const price = data.price || '₹20,000';
-  const id = data._id 
+const FlatHomeCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) => {
+  const [loading, setLoading] = useState(false);
+
+  const id = data._id;
+
+  // Toggle favorite - calls parent function
+  const toggleFavorite = async () => {
+    try {
+      setLoading(true);
+      await onToggleFavorite(id);
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <TouchableOpacity
       style={styles.cardWrapper}
-onPress={() => router.push({
-  pathname: '/RentalHomes/[id]',
-  params: { id }
-})}
-      activeOpacity={0.8} 
+      onPress={() => router.push({
+        pathname: '/RentalHomes/[id]',
+        params: { id }
+      })}
+      activeOpacity={0.8}
     >
       <View style={styles.cardContainer}>
         {/* Top image section with distance and favorite button */}
         <View style={styles.imageContainer}>
-          <Image source={{ uri: images[0] }} style={styles.image} />
+          <Image source={{ uri: data?.thumbnail?.url }} style={styles.image} />
           <View style={styles.topOverlay}>
-            <View style={styles.distanceBadge}>
-              <Ionicons name="location-sharp" size={16} color="#7A5AF8" />
-              <Text style={styles.distanceText}>{distance}</Text>
+            <View>
+              {activeFilter === 'All' &&
+                <View style={styles.categoryBadge}>
+                  <MaterialCommunityIcons name='home-city' size={16} color='#6ED5D0' />
+                </View>
+              }
             </View>
-            <TouchableOpacity style={styles.favoriteButton}>
-              <Ionicons name="heart-outline" size={23} color="#FF4081" />
+
+            {/* Favorite Button */}
+            <TouchableOpacity 
+              style={styles.favoriteButton}
+              onPress={(e) => {
+                e.stopPropagation(); // Prevent card navigation
+                toggleFavorite();
+              }}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color="#FF4081" />
+              ) : (
+                <Ionicons 
+                  name={isFavorited ? "heart" : "heart-outline"} 
+                  size={23} 
+                  color={isFavorited ? "#FF4081" : "#FF4081"} 
+                />
+              )}
             </TouchableOpacity>
           </View>
         </View>
-        
+
         {/* Content section */}
         <View style={styles.contentContainer}>
           <View style={styles.headerRow}>
-            <Text numberOfLines={2} style={styles.title}>{data.title}</Text>
-             {
-                          activeFilter === 'All' && <View style={styles.categoryBadge}>
-                          <MaterialCommunityIcons 
-                               name='home-city' 
-                               size={16} 
-                               color='#7A5AF8'
-                           
-                             />
-                        </View>
-}
+            <Text numberOfLines={2} style={styles.title}>{data?.title}</Text>
+            <Text style={styles.postedDate}>
+              {new Date(data?.createdAt).toLocaleDateString("en-US", {
+                month: "short",
+                day: "2-digit",
+              })}
+            </Text>
           </View>
-          
+
           <Text style={styles.description} numberOfLines={2}>
-            {data.description}
+            {data?.description}
           </Text>
-          
+
           {/* Property details */}
           <View style={styles.detailsContainer}>
-               
-          <View style={styles.detailItem}>
+            <View style={styles.detailItem}>
               <MaterialIcons name="label" size={16} color="#7A5AF8" />
               <Text style={styles.detailText}>
-              {propertyType.charAt(0).toUpperCase() + propertyType.slice(1)}
+                {data?.propertyType.charAt(0).toUpperCase() + data?.propertyType.slice(1)}
               </Text>
             </View>
             <View style={styles.detailItem}>
               <MaterialCommunityIcons name="bed" size={18} color="#7A5AF8" />
-              <Text style={styles.detailText}>{bedrooms} BR</Text>
+              <Text style={styles.detailText}>{data?.bedrooms} BR</Text>
             </View>
-            
+
             <View style={styles.detailItem}>
               <FontAwesome6 name="bath" size={16} color="#7A5AF8" />
-              <Text style={styles.detailText}>{bathrooms} Bath</Text>
+              <Text style={styles.detailText}>{data?.bathrooms} Bath</Text>
             </View>
-         
           </View>
-          
+
           {/* Tenant preference and price */}
           <View style={styles.bottomRow}>
             <View style={styles.tenantBadge}>
-
-              
-            {tenantPreference === 'family' ? (
-  <MaterialIcons name="family-restroom" size={18} color="#7A5AF8" />
-) : (
-  <FontAwesome6 name="people-group" size={17} color="#7A5AF8" />
-)}
+              {data?.tenantPreference === 'family' ? (
+                <MaterialIcons name="family-restroom" size={18} color="#7A5AF8" />
+              ) : (
+                <FontAwesome6 name="people-group" size={17} color="#7A5AF8" />
+              )}
 
               <Text style={styles.tenantText}>
                 {
-                  tenantPreference === 'family' ? 'Only For ' : 'For '
+                  data?.tenantPreference === 'family' ? 'Only For ' : 'For '
                 }
-                 {tenantPreference.charAt(0).toUpperCase() + tenantPreference.slice(1)}
+                {data?.tenantPreference.charAt(0).toUpperCase() + data?.tenantPreference.slice(1)}
               </Text>
             </View>
-            
-            <Text style={styles.price}>{price}</Text>
+
+            <Text style={styles.price}>
+              ₹{data?.monthlyRent?.toLocaleString()}
+            </Text>
           </View>
-          
-        
         </View>
       </View>
     </TouchableOpacity>
@@ -134,6 +149,11 @@ const styles = StyleSheet.create({
   imageContainer: {
     position: 'relative',
   },
+  postedDate: {
+    fontFamily: 'Poppinssm',
+    fontSize: 10,
+    color: lighttext
+  },
   image: {
     width: '100%',
     height: 180,
@@ -162,9 +182,18 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   favoriteButton: {
-    backgroundColor: greybg,
-    padding: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    padding: 8,
     borderRadius: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   contentContainer: {
     padding: 16,
@@ -172,12 +201,10 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 8,
   },
   title: {
     fontSize: 17,
- 
     flex: 1,
     fontWeight: 'bold',
     color: maintext,
@@ -197,7 +224,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#666',
     marginBottom: 12,
-    fontFamily:'Poppinsssm'
+    fontFamily: 'Poppinsssm'
   },
   detailsContainer: {
     flexDirection: 'row',
@@ -205,11 +232,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   detailItem: {
-  
     flexDirection: 'row',
     alignItems: 'center',
     marginRight: 16,
-    backgroundColor:greybg,
+    backgroundColor: greybg,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 20,
@@ -217,7 +243,7 @@ const styles = StyleSheet.create({
   detailText: {
     fontSize: 12,
     color: '#444',
-    fontWeight:'bold',
+    fontWeight: 'bold',
     marginLeft: 3,
   },
   bottomRow: {

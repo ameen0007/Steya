@@ -15,5 +15,5 @@
     "expo-env.d.ts",
     "app/(tabs)/index.jsx",
     "nativewind-env.d.ts"
-, "app/shared/[id].jsx"  ]
+, "app/shared/[id].jsx", "app/_layout.jsx"  ]
 }

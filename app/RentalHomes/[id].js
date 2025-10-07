@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
-import { ScrollView, TouchableOpacity, Text, View, Image, Modal, Dimensions, Platform, FlatList, StyleSheet } from 'react-native';
+import { ScrollView, TouchableOpacity, Text, View, Image, Modal, Dimensions, Platform, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather, FontAwesome5, Ionicons, MaterialCommunityIcons, MaterialIcons, Entypo } from '@expo/vector-icons';
 import { format } from 'date-fns';
@@ -8,9 +8,14 @@ import { dummyListings } from '../../services/dummyListings';
 const { width } = Dimensions.get('window');
 import TopFadeGradient from '../../componets/topgradient';
 import  StaticMap  from '../../componets/map'; 
+import SkeletonLoader from '../../componets/individualloader';
+import axios from 'axios';
+import api from '../../services/intercepter';
+import { useSelector } from 'react-redux';
 const FlatHomeDetailsPage = () => {
       const { id } = useLocalSearchParams();
-      const item = dummyListings.find((item) => item._id === id);
+const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const router = useRouter();
   const modalFlatListRef = useRef(null);
   const [currentImage, setCurrentImage] = useState(0);
@@ -18,7 +23,141 @@ const FlatHomeDetailsPage = () => {
   const [isFavorite, setIsFavorite] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [initialImageIndex, setInitialImageIndex] = useState(0);
-  
+    const [item, setItem] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+   const user = useSelector((state) => state.user.userData);
+
+
+
+
+  const incrementViewCount = async () => {
+    try {
+      if (!id) return;
+      
+      console.log("🔄 Incrementing view count for room:", id);
+    
+      
+      const response = await axios.post(`${apiUrl}/api/${id}/view`, {
+        userId: user?._id // Send userId if user is logged in
+      });
+
+      if (response.data.success) {
+        console.log("✅ View count updated:", response.data.views);
+        
+        // Update the local item state with new view count
+        if (item) {
+          setItem(prevItem => ({
+            ...prevItem,
+            views: response.data.views
+          }));
+        }
+      }
+    } catch (error) {
+      console.error("❌ Error incrementing view count:", error);
+      // Don't show error to user as this is a background operation
+    }
+  };
+
+  useEffect(() => {
+    const fetchRoomData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await axios.get(`${apiUrl}/api/singleroom/${id}`);
+        setItem(response.data?.room);
+        console.log("✅ Room data fetched:", response.data?.room);
+        
+        // ✅ CALL VIEW COUNT API AFTER SUCCESSFUL DATA FETCH
+        await incrementViewCount();
+        
+      } catch (err) {
+        console.error("❌ Error fetching room data:", err);
+        setError(err.message || 'Failed to load room details');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchRoomData();
+    }
+  }, [id]);
+
+  // Check if room is favorited
+useEffect(() => {
+  const checkFavorite = async () => {
+    if (!id) return;
+
+    if (!user?._id) {
+      console.log("⚠️ User not logged in, skipping favorite check");
+      return; // <-- must be inside braces
+    }
+
+    try {
+      const response = await api.get(`${apiUrl}/api/check/${id}`);
+      console.log('Favorite check response:', response.data);
+
+      // ✅ Handle both possible property names
+      const favoriteStatus = response.data.isFavorited ?? response.data.isFavorite ?? false;
+      setIsFavorite(favoriteStatus);
+    } catch (error) {
+      console.error('Error checking favorite status:', error);
+    }
+  };
+
+  checkFavorite();
+}, [id, user?._id]); 
+
+
+  const handleChatPress = async () => {
+  console.log("Starting chat for product:", item._id);
+       if (!user?._id) {
+      // console.log("⚠️ User not logged in, skipping favorite check");
+      router.push('/login');
+      return; // <-- must be inside braces
+    }
+  try {
+    setIsCreatingRoom(true);
+
+    // First, check if room already exists
+    const checkResponse = await api.get(`${apiUrl}/api/chat/check-room`, {
+      params: { productId: item._id }
+    });
+
+    let roomId;
+
+    if (checkResponse.data.exists) {
+      // Use existing room (could be pending or active)
+      roomId = checkResponse.data.roomId;
+      console.log("Using existing room:", roomId, "Status:", checkResponse.data.status);
+    } else {
+      // Create new PENDING room
+      const createResponse = await api.post(`${apiUrl}/api/chat/create-room`, {
+        productId: item._id,
+        productTitle: item.title || 'Product Chat',
+        ownerId: item?.createdBy?._id 
+      });
+      
+      roomId = createResponse.data.roomId;
+      console.log("Created new pending room:", roomId);
+    }
+
+    // Navigate to chat
+    router.push({
+      pathname: '/chat/[id]',
+      params: { id: roomId }
+    });
+
+  } catch (error) {
+    console.error('Error creating chat room:', error);
+    alert('Failed to start chat. Please try again.');
+  } finally {
+    setIsCreatingRoom(false);
+  }
+};
+
+
   const handleBackPress = () => {
     router.back(); // Go back to the previous screen
   };
@@ -91,61 +230,71 @@ const FlatHomeDetailsPage = () => {
   };
 
   return (
+   <>
+   {loading || !item ? (
+    <SkeletonLoader />
+  ) : (
     <SafeWrapper>
       <ScrollView>
         {/* Image Carousel */}
-        <FlatList
-          data={item.images}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={(imageUrl, index) => index.toString()}
-          onMomentumScrollEnd={(e) => {
-            const index = Math.floor(e.nativeEvent.contentOffset.x / width);
-            setCurrentImage(index);
-          }}
-          renderItem={({ item: imageUrl, index }) => (
-            <View style={{ width, justifyContent: 'center', alignItems: 'center' }}>
-              <TouchableOpacity activeOpacity={0.8} onPress={() => openImageModal(index)}>
-                <TopFadeGradient/>
-                <Image source={{ uri: imageUrl }} style={{ width, height: 250 }} resizeMode="cover" />
-                <View style={{
-                  position: 'absolute',
-                  bottom: 10,
-                  right: 10,
-                  backgroundColor: '#0009',
-                  paddingHorizontal: 10,
-                  paddingVertical: 5,
-                  borderRadius: 12
-                }}>
-                  <Text style={{ color: 'white', fontSize: 12 }}>
-                    {index === currentImage ? currentImage + 1 : index + 1}/{item.images.length}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            </View>
-          )}
+    <FlatList
+  data={item?.images} // safe access
+  horizontal
+  pagingEnabled
+  showsHorizontalScrollIndicator={false}
+  keyExtractor={(image) => image._id} // use _id from backend
+  onMomentumScrollEnd={(e) => {
+    const index = Math.floor(e.nativeEvent.contentOffset.x / width);
+    setCurrentImage(index);
+  }}
+  renderItem={({ item: image, index }) => (
+    <View style={{ width, justifyContent: 'center', alignItems: 'center' }}>
+      <TouchableOpacity activeOpacity={0.8} onPress={() => openImageModal(index)}>
+        <TopFadeGradient />
+        <Image 
+          source={{ uri: image.originalUrl }} // use originalUrl
+          style={{ width, height: 250 }} 
+          resizeMode="cover" 
         />
+        <View style={{
+          position: 'absolute',
+          bottom: 10,
+          right: 10,
+          backgroundColor: '#0009',
+          paddingHorizontal: 10,
+          paddingVertical: 5,
+          borderRadius: 12
+        }}>
+          <Text style={{ color: 'white', fontSize: 12 }}>
+            {index === currentImage ? currentImage + 1 : index + 1}/{item?.images?.length || item?.images?.length} 
+            {/* or use item.images.length from parent if needed */}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    </View>
+  )}
+/>
+
 
         {/* Flat Info */}
         <View style={styles.container}>
   {/* Title and Price Row */}
   <View style={styles.rowBetween}>
         <View style={styles.priceContainer}>
-          <Text style={styles.priceText}>₹{item.monthlyRent}/month</Text>
+          <Text style={styles.priceText}>₹{item?.monthlyRent}/month</Text>
         </View>
         <View style={styles.locationContainer}>
           <Ionicons name="location-sharp" size={16} color="#7A5AF8" />
-          <Text style={styles.locationText}>{item.location.fullAddress}</Text>
+          <Text style={styles.locationText}>{item?.location?.fullAddress}</Text>
         </View>
       </View>
-  <Text style={styles.title}>{item.title}</Text>
+  <Text style={styles.title}>{item?.title}</Text>
   {/* Location */}
 
 
   {/* Description */}
   <View style={styles.descriptionContainer}>
-    <Text style={styles.descriptionText}>{item.description}</Text>
+    <Text style={styles.descriptionText}>{item?.description}</Text>
   </View>
 
   {/* Property Details Section */}
@@ -160,7 +309,7 @@ const FlatHomeDetailsPage = () => {
         <View style={styles.detailContent}>
           <Text style={styles.detailLabel}>Property Type</Text>
           <Text style={styles.detailValue}>
-            {item.propertyType.charAt(0).toUpperCase() + item.propertyType.slice(1)}
+            {item?.propertyType?.charAt(0).toUpperCase() + item?.propertyType?.slice(1)}
           </Text>
         </View>
       </View>
@@ -171,7 +320,7 @@ const FlatHomeDetailsPage = () => {
         </View>
         <View style={styles.detailContent}>
           <Text style={styles.detailLabel}>Furnishing</Text>
-          <Text style={styles.detailValue}>{formatFurnishedStatus(item.furnishedStatus)}</Text>
+          <Text style={styles.detailValue}>{formatFurnishedStatus(item?.furnishedStatus)}</Text>
         </View>
       </View>
     </View>
@@ -184,7 +333,7 @@ const FlatHomeDetailsPage = () => {
         </View>
         <View style={styles.detailContent}>
           <Text style={styles.detailLabel}>Area</Text>
-          <Text style={styles.detailValue}>{item.squareFeet} sq.ft</Text>
+          <Text style={styles.detailValue}>{item?.squareFeet} sq.ft</Text>
         </View>
       </View>
 
@@ -194,7 +343,7 @@ const FlatHomeDetailsPage = () => {
         </View>
         <View style={styles.detailContent}>
           <Text style={styles.detailLabel}>Floor</Text>
-          <Text style={styles.detailValue}>{item.floorNumber}/{item.totalFloors}</Text>
+          <Text style={styles.detailValue}>{item?.floorNumber}/{item?.totalFloors}</Text>
         </View>
       </View>
     </View>
@@ -207,7 +356,7 @@ const FlatHomeDetailsPage = () => {
         </View>
         <View style={styles.detailContent}>
           <Text style={styles.detailLabel}>Tenant Pref</Text>
-          <Text style={styles.detailValue}>{formatTenantPreference(item.tenantPreference)}</Text>
+          <Text style={styles.detailValue}>{formatTenantPreference(item?.tenantPreference)}</Text>
         </View>
       </View>
 
@@ -217,7 +366,7 @@ const FlatHomeDetailsPage = () => {
         </View>
         <View style={styles.detailContent}>
           <Text style={styles.detailLabel}>Parking</Text>
-          <Text style={styles.detailValue}>{formatParking(item.parking)}</Text>
+          <Text style={styles.detailValue}>{formatParking(item?.parking)}</Text>
         </View>
       </View>
     </View>
@@ -228,15 +377,15 @@ const FlatHomeDetailsPage = () => {
   <View style={[styles.detailsContainer, {flexDirection: 'row', flexWrap: 'wrap'}]}>
     <View style={styles.chip}>
       <MaterialIcons name="king-bed" size={16} color="#7A5AF8" />
-      <Text style={styles.chipText}>{item.bedrooms} Bed</Text>
+      <Text style={styles.chipText}>{item?.bedrooms} Bed</Text>
     </View>
     <View style={styles.chip}>
       <MaterialIcons name="bathtub" size={16} color="#7A5AF8" />
-      <Text style={styles.chipText}>{item.bathrooms} Bath</Text>
+      <Text style={styles.chipText}>{item?.bathrooms} Bath</Text>
     </View>
     <View style={styles.chip}>
       <MaterialIcons name="balcony" size={16} color="#7A5AF8" />
-      <Text style={styles.chipText}>{item.balconies} Balcony</Text>
+      <Text style={styles.chipText}>{item?.balconies} Balcony</Text>
     </View>
   </View>
 
@@ -244,14 +393,17 @@ const FlatHomeDetailsPage = () => {
   <Text style={styles.sectionTitle}>Posted By</Text>
   <View style={styles.postedByContainer}>
     <Image 
-      source={{ uri: item.postedBy.profileImage }} 
+      source={{ uri: item?.createdBy.picture }} 
       style={styles.profileImage} 
     />
     <View style={styles.posterInfo}>
-      <Text style={styles.posterName}>{item.postedBy.name}</Text>
-      <Text style={styles.postedDate}>
-        Posted on {format(new Date(item.createdAt), 'dd MMM yyyy')}
-      </Text>
+      <Text style={styles.posterName}>{item?.createdBy.name}</Text>
+        <Text style={styles.postedDate}>
+  {new Date(item.createdAt).toLocaleDateString('en-US', {
+    month: 'short',
+    day: '2-digit',
+  })}
+</Text>
     </View>
   </View>
 </View>
@@ -287,11 +439,17 @@ const FlatHomeDetailsPage = () => {
             <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={25} color={isFavorite ? '#FF4081' : 'white'}/> 
           </TouchableOpacity>
         </View>
-        <StaticMap latitude={item?.location?.latitude} longitude={item?.location?.longitude} />
+            
+       <StaticMap
+  latitude={item?.location?.coordinates[1]}   // latitude
+  longitude={item?.location?.coordinates[0]}  // longitude
+  placeName={item?.location?.fullAddress}
+/>
       </ScrollView>
 
       {/* Bottom Buttons */}
-      <View style={{
+    {item.createdBy._id !== user._id ? (
+    <View style={{
   flexDirection: 'row',
   justifyContent: 'space-between',
   padding: 16,
@@ -299,25 +457,34 @@ const FlatHomeDetailsPage = () => {
   borderColor: '#eee',
   backgroundColor: '#fff'
 }}>
-  <TouchableOpacity
-    style={{
-      flex: 1,
-      flexDirection: 'row', // horizontal
-      backgroundColor: '#7A5AF8',
-      padding: 14,
-      borderRadius: 10,
-      alignItems: 'center',
-      justifyContent: 'center', // center both icon and text
-      marginRight: 10
-    }}
-    onPress={() => console.log('Chat clicked')}
-  >
-    <Feather name="message-circle" size={20} color="white" />
-    <Text style={{ color: 'white', marginLeft: 8 }}>Chat</Text>
-  </TouchableOpacity>
+
+   <TouchableOpacity
+      style={{
+        flex: 1,
+        flexDirection: 'row',
+        backgroundColor: '#7A5AF8',
+        padding: 14,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+        opacity: isCreatingRoom ? 0.6 : 1
+      }}
+      onPress={handleChatPress}
+      disabled={isCreatingRoom}
+    >
+      {isCreatingRoom ? (
+        <ActivityIndicator size="small" color="white" />
+      ) : (
+        <>
+          <Feather name="message-circle" size={20} color="white" />
+          <Text style={{ color: 'white', marginLeft: 8 }}>Chat</Text>
+        </>
+      )}
+    </TouchableOpacity>
 
   <TouchableOpacity
-    disabled={!item.showPhonePublic}
+    disabled={!item?.showPhonePublic}
     onPress={() => console.log('Calling:', item.contactPhone)}
     style={{
       flex: 1,
@@ -332,8 +499,13 @@ const FlatHomeDetailsPage = () => {
     <Feather name="phone-call" size={20} color="white" />
     <Text style={{ color: 'white', marginLeft: 8 }}>Call</Text>
   </TouchableOpacity>
-</View>
+</View> 
 
+) : (
+  <View style={styles.chatDisabled}>
+    <Text style={styles.chatDisabledText}>This is your product</Text>
+  </View>
+)}
 
       {/* Image Modal */}
       <Modal visible={isModalVisible} transparent={true} animationType="fade" onRequestClose={closeImageModal}>
@@ -357,25 +529,30 @@ const FlatHomeDetailsPage = () => {
           </TouchableOpacity>
 
           {/* Image Modal with FlatList - Fixed with getItemLayout and ref */}
-          <FlatList
-            ref={modalFlatListRef}
-            data={item.images}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            getItemLayout={getItemLayout}
-            initialScrollIndex={modalCurrentImage}
-            onMomentumScrollEnd={(event) => {
-              const newIndex = Math.round(event.nativeEvent.contentOffset.x / width);
-              setModalCurrentImage(newIndex); // Update the modal's current image index
-            }}
-            renderItem={({ item, index }) => (
-              <View style={{ width, justifyContent: 'center', alignItems: 'center' }}>
-                <Image source={{ uri: item }} style={{ width, height: 400 }} resizeMode="contain" />
-              </View>
-            )}
-            keyExtractor={(item, index) => index.toString()}
-          />
+      <FlatList
+  ref={modalFlatListRef}
+  data={item?.images} // safe access
+  horizontal
+  pagingEnabled
+  showsHorizontalScrollIndicator={false}
+  getItemLayout={getItemLayout}
+  initialScrollIndex={modalCurrentImage}
+  onMomentumScrollEnd={(event) => {
+    const newIndex = Math.round(event.nativeEvent.contentOffset.x / width);
+    setModalCurrentImage(newIndex); // Update the modal's current image index
+  }}
+  renderItem={({ item: image, index }) => (
+    <View style={{ width, justifyContent: 'center', alignItems: 'center' }}>
+      <Image 
+        source={{ uri: image.originalUrl }} // use originalUrl
+        style={{ width, height: 400 }} 
+        resizeMode="contain" 
+      />
+    </View>
+  )}
+  keyExtractor={(image) => image._id} // use _id from backend
+/>
+
 
           {/* Image Indicator */}
           <View style={{
@@ -389,19 +566,38 @@ const FlatHomeDetailsPage = () => {
             paddingBottom: '10%'
           }}>
             <Text style={{ color: 'white', fontSize: 12 }}>
-              {modalCurrentImage + 1}/{item.images?.length}
+              {modalCurrentImage + 1}/{item?.images?.length}
             </Text>
           </View> 
         </View>
       </Modal>
     </SafeWrapper>
+
+  )}
+    </>
   );
 };
 const greybg = '#FBFAFF';
 const maintext = '#212121';
 const lighttext = '#757575';
 const mainbg = '#7A5AF8';
+
 const styles = StyleSheet.create({
+    chatDisabled: {
+  paddingVertical: 10,
+  paddingHorizontal: 16,
+  backgroundColor: '#E5E7EB', // light gray to indicate disabled
+  borderRadius: 8,
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginTop: 8,
+},
+
+chatDisabledText: {
+  color: '#9CA3AF', // gray text
+  fontSize: 14,
+  fontWeight: '500',
+},
   container: {
    
    flex: 1,

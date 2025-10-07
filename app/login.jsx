@@ -1,34 +1,182 @@
-import { View, Text, StyleSheet, TouchableOpacity, Image, ImageBackground } from 'react-native';
-import { SplashScreen, useRouter } from 'expo-router';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ImageBackground, ScrollView, BackHandler } from 'react-native';
+import { SplashScreen, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect } from 'react';
-import { BlurView } from 'expo-blur';
-// import Svg, { Path } from 'react-native-svg';
+import { use, useCallback, useEffect, useLayoutEffect, useState } from 'react';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { ForeignObject, G, Path, Defs, ClipPath } from "react-native-svg"
+import { setUserData } from './Redux/userSlice';
 
+ import {
+  GoogleSignin,
+  GoogleSigninButton,
+  isErrorWithCode,
+  isSuccessResponse,
+  statusCodes,
+} from '@react-native-google-signin/google-signin';
+
+import axios from "axios";
+import { preventDoubleTap } from '../services/debounfunc';
+
+
+  import { useDispatch, useSelector } from 'react-redux';
+import { setLocationData } from './Redux/LocationSlice';
+import { initializePushNotifications } from '../services/notificationHandler';
 export default function Login() {
 
+ const apiUrl = process.env.EXPO_PUBLIC_API_URL
+
+ const dispatch = useDispatch();
+
+const [isReady, setIsReady] = useState(false);
+GoogleSignin.configure({
+  webClientId: "593177901144-ttbib4ng7ff5trbq1csuhhec9m8ddmi5.apps.googleusercontent.com",
+  offlineAccess: true,
+});
+
+
   const router = useRouter();
+       const locationData = useSelector((state) => state.location.locationData);
+
+  const { from } = useLocalSearchParams(); // get flag
+
   useEffect(() => {
-    SplashScreen.hideAsync(); // Ensure it's hidden when this screen loads
-  }, []);
-  const handleDummyGoogleLogin = async () => {
-    try {
-      await AsyncStorage.setItem('user_token', 'abcd');
-      console.log('Login successful, token stored');
-      router.replace('/locationScreen'); // Navigate to home after login
-    } catch (error) {
-      console.error('Error storing token:', error);
+    if (from === "protected") {
+      const backAction = () => {
+        router.replace("(tabs)"); // 👈 go Home ONLY if redirected
+        return true;
+      };
+
+      const backHandler = BackHandler.addEventListener("hardwareBackPress", backAction);
+      return () => backHandler.remove();
     }
-  };
+  }, [from]);
+
+
+const handleGuestLogin = async () => {
+  try {
+  
+
+
+    // Check if user is already a guest
+    const userType = await AsyncStorage.getItem("userType");
+    
+    // Set guest user flag if not already
+    if (userType !== "GuestUser") {
+      await AsyncStorage.setItem("userType", "GuestUser");
+    }
+
+    // Set isFirstLaunch only if not set before
+    const isFirstLaunch = await AsyncStorage.getItem("isFirstLaunch");
+    if (!isFirstLaunch) {
+      await AsyncStorage.setItem("isFirstLaunch", "true");
+    }
+
+    // Navigate based on location data
+    if (locationData) {
+      router.replace("(tabs)");
+    } else {
+      console.log("======================in guest location");
+      
+      router.push("/locationScreen");
+    }
+
+  } catch (error) {
+    console.log("Error handling guest login:", error);
+  }
+};
+
+useEffect(() => {
+  setIsReady(true);
+}, []);
+
+useFocusEffect(
+  useCallback(() => {
+    if (!isReady) return; // wait until mounted
+    handleGoogleLogin();
+  }, [isReady])
+);
+
+// login.js - CORRECTED FOR EAS BUILD
+
+
+const handleGoogleLogin = async () => {
+  preventDoubleTap(async () => {
+    try {
+      console.log("🔄 Starting Google login...");
+      await GoogleSignin.hasPlayServices();
+      
+      const userInfo = await GoogleSignin.signIn();
+      
+      if (isSuccessResponse(userInfo)) {
+        const idToken = userInfo.data?.idToken;
+        if (!idToken) {
+          console.log("❌ No idToken found");
+          return;
+        }
+
+        // API call
+        console.log("🌐 Calling backend for authentication...");
+        const res = await axios.post(`${apiUrl}/api/auth/google-login`, { idToken });
+
+        // Save location
+        if (res.data.user?.location) {
+          console.log("📍 Setting location data");
+          dispatch(setLocationData(res.data.user.location));
+        }
+
+        // Save auth token and user data
+        await AsyncStorage.setItem("authToken", res.data.accessToken);
+        await AsyncStorage.setItem("userId", res.data.user._id);
+        dispatch(setUserData(res.data.user));
+        
+        console.log("✅ User authenticated successfully");
+
+        // ✅ SETUP PUSH NOTIFICATIONS AFTER LOGIN (Non-blocking)
+        // This will work perfectly after EAS build
+        console.log("📱 Initializing push notifications...");
+        initializePushNotifications(apiUrl)
+          .then(pushToken => {
+            if (pushToken) {
+              console.log("✅ Push notifications ready:", pushToken);
+            } else {
+              console.log("⚠️ Push notifications not available (user may have denied permissions)");
+            }
+          })
+          .catch(pushError => {
+            console.error("⚠️ Push notification setup error:", pushError.message);
+            // Login continues successfully even if push fails
+          });
+
+        // Navigate immediately (don't wait for push notifications)
+        if (res.data.user?.location || locationData) {
+          console.log("➡️ Navigating to home");
+          router.replace("(tabs)");
+        } else {
+          console.log("➡️ Navigating to location setup");
+          router.replace("/locationScreen");
+        }
+      } else {
+        console.log("⚠️ Google sign-in cancelled by user");
+      }
+    } catch (error) {
+      console.error("❌ Login error:", error.message);
+      // Show user-friendly error
+      if (error.response?.status === 401) {
+        alert("Authentication failed. Please try again.");
+      } else if (error.message?.includes('network')) {
+        alert("Network error. Please check your connection.");
+      } else {
+        alert("Login failed. Please try again.");
+      }
+    }
+  });
+};
+
 
   return (
     <>
-      <StatusBar
-        translucent // Makes status bar transparent
-        backgroundColor="transparent" // Fully transparent status bar
-      />
+      <StatusBar style="dark" />
       <ImageBackground
         source={require('../assets/images/home.png')} // Your background image
         style={styles.backgroundImage} // Full screen styling
@@ -39,9 +187,16 @@ export default function Login() {
 
 
           <View style={styles.inner1}>
-            <Text style={styles.title}>Steya</Text>
 
 
+
+            {/* <Text style={styles.title}>Steya</Text> */}
+     <Image 
+  source={require('../assets/images/splash.png')} 
+  style={styles.logo} 
+  resizeMode="contain" 
+/>
+            
 
             <Text style={styles.description}>
               Say goodbye to room-hunting stress!
@@ -88,23 +243,32 @@ export default function Login() {
  <View  style={styles.btncontainer}>
                <TouchableOpacity
       style={styles.googleButton}
-      onPress={handleDummyGoogleLogin}
+      onPress={handleGoogleLogin}
     >
       <Image
-        source={{ uri: 'https://cdn-icons-png.flaticon.com/512/2991/2991148.png' }}
-        style={styles.googleIcon}
+        source={require('../assets/images/googleLogo.png')}
+        style={styles.googleIcon1}
       />
       <Text style={styles.googleButtonText}>Login with google</Text>
     </TouchableOpacity>
+  <View style={styles.orContainer}>
+    <View style={styles.line} />
+    <Text style={styles.orText}>OR</Text>
+    <View style={styles.line} />
+  </View>
     <TouchableOpacity
       style={styles.googleButton}
-      onPress={() => router.push('/locationScreen')}
+     onPress={() =>
+    preventDoubleTap(() => {
+      handleGuestLogin();
+    })
+  }
     >
       <Image
-     source={{ uri: 'https://cdn-icons-png.flaticon.com/128/14591/14591158.png' }}
+     source={require('../assets/images/guestlogo.png')}
         style={styles.googleIcon}
       />
-      <Text style={styles.googleButtonText}>Uhh... not now</Text>
+      <Text style={styles.googleButtonText}>Continue as Guest</Text>
     </TouchableOpacity>
     </View>
 
@@ -195,7 +359,11 @@ paddingHorizontal:30,
 // backgroundColor:'green'
 
 },
-
+logo: {
+  width: 150,   // adjust as needed
+  height: 150,  // adjust as needed
+  marginBottom: 20,
+},
   title: {
     color: 'white',
     fontSize: 48,
@@ -221,29 +389,49 @@ paddingHorizontal:30,
 ,   paddingHorizontal:20
 ,    fontFamily:'Poppinssm'
   },
+  orContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginVertical: 15,
+},
+line: {
+  flex: 1,
+  height: 1,
+  backgroundColor: '#ccc',
+},
+orText: {
+  marginHorizontal: 10,
+  fontSize: 14,
+  color: 'white',
+},
   googleButton: {
     flexDirection: 'row',
     backgroundColor: 'white',
-    paddingVertical: 11,
+    paddingVertical: 9,
     paddingHorizontal: 50,
     borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    marginBottom: 24,
+    // marginBottom: 24,
     // fontFamily:'Poppinssm'
     // opacity:'1',
     // position:'absolute',
     // top:50,
 
   },
+  googleIcon1: {
+    width: 30,
+    height: 30,
+    marginRight: 12,
+  },
   googleIcon: {
-    width: 24,
-    height: 24,
+    width: 27,
+    height: 27,
     marginRight: 12,
   },
   googleButtonText: {
-    color: '#090909',
+    color: '#333333',
     fontSize: 16,
     fontWeight:'700',
     // fontFamily:'Poppinssm'

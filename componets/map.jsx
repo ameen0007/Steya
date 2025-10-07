@@ -1,56 +1,68 @@
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity, Linking } from 'react-native';
-import MapView, { Circle, PROVIDER_GOOGLE } from 'react-native-maps';
+import { View, TouchableOpacity, StyleSheet, Linking } from 'react-native';
+import { WebView } from 'react-native-webview';
 
-export default function StaticMap({ latitude, longitude }) {
+export default function StaticMap({ latitude, longitude ,placeName}) {
   const handlePress = () => {
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
-    Linking.openURL(url);
+    const googleMapUrl = `https://www.google.com/maps?q=${placeName}@${latitude},${longitude}`;
+    Linking.openURL(googleMapUrl);
   };
+
+  const leafletHTML = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+      <style>
+        #map { height: 100%; width: 100%; border-radius: 20px; }
+        html, body { margin: 0; height: 100%; }
+      </style>
+    </head>
+    <body>
+      <div id="map"></div>
+      <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+      <script>
+        var map = L.map('map', { zoomControl: false }).setView([${latitude}, ${longitude}], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19
+        }).addTo(map);
+        L.circle([${latitude}, ${longitude}], {
+          color: '#795FFC',
+          fillColor: '#795FFC55',
+          fillOpacity: 0.5,
+          radius: 130
+        }).addTo(map);
+      </script>
+    </body>
+    </html>
+  `;
 
   return (
     <TouchableOpacity onPress={handlePress} activeOpacity={0.9}>
-      <View style={styles.mapContainer}>
-        <MapView
+      <View style={styles.container}>
+        <WebView
+          source={{ html: leafletHTML }}
           style={styles.map}
-          provider={PROVIDER_GOOGLE}
-          initialRegion={{
-            latitude,
-            longitude,
-            latitudeDelta: 0.0001,  // Extremely small delta for maximum zoom
-            longitudeDelta: 0.0001, // Extremely small delta for maximum zoom
-          }}
-          zoomEnabled={false}       // Prevent user from zooming out
-          scrollEnabled={false}     // Prevent map panning
-          rotateEnabled={false}     // Prevent map rotation
-          pitchEnabled={false}      // Prevent 3D view changes
-          toolbarEnabled={false}    // Hide toolbar (Android)
-          moveOnMarkerPress={false} // Prevent centering on marker press
-          maxZoomLevel={19}         // For Android
-          minZoomLevel={15}         // For Android
-          cameraZoomRange={{ maxZoom: 20, minZoom: 20 }} // For iOS
-        >
-          <Circle
-            center={{ latitude, longitude }}
-            radius={130}  // Smaller radius to match zoom level (50 meters)
-            strokeColor="#795FFC"
-            fillColor="rgba(121, 95, 252, 0.3)"
-          />
-        </MapView>
+          scrollEnabled={false}
+        />
       </View>
     </TouchableOpacity>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  mapContainer: {
-    height: 180,
-    borderRadius: 30,
+  container: {
+    height: 200,
+    borderRadius: 20,
     overflow: 'hidden',
     marginVertical: 10,
-    paddingHorizontal:10
+    marginHorizontal: 16,
   },
   map: {
     flex: 1,
   },
 });
+
+
+

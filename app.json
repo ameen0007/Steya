@@ -12,6 +12,7 @@
       "supportsTablet": true
     },
     "android": {
+      "runtimeVersion": "1.0.0",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/applogo.png",
         "backgroundColor": "#ffffff"
@@ -20,10 +21,13 @@
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_MEDIA_IMAGES",
+        "WRITE_EXTERNAL_STORAGE"
       ],
-      "package": "com.ameen007.Steya"
+      "package": "com.ameen007.Steya",
+      "googleServicesFile": "./google-services.json"   
     },
     "androidNavigationBar": {
       "barStyle": "light-content",
@@ -52,7 +56,31 @@
           "locationWhenInUsePermission": "Allow Steya to use your location"
         }
       ],
-      "expo-font"
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Steya to access your camera",
+          "microphonePermission": "Allow Steya to access your microphone",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/applogo.png",
+          "color": "#7A5AF8",
+          "defaultChannel": "chat-messages",
+          "enableBackgroundRemoteNotifications": false
+        }
+      ],
+      "expo-font",
+      "expo-web-browser",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps._some_id_here_"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

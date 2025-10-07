@@ -1,57 +1,73 @@
 import { router } from 'expo-router';
-import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
-const PGHostelCard = ({ data, activeFilter }) => {
-  // Extract data or provide defaults
+const PGHostelCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) => {
+  const [loading, setLoading] = useState(false);
 
   const greybg = '#F4F4F4'
   const maintext = '#212121'
   const lighttext = '#757575'
   const mainbg = '#7A5AF8'
 
+  const id = data._id 
 
-  const images = data.images && data.images.length > 0
-    ? data.images
-    : ["https://via.placeholder.com/300x200.png?text=No+Image"];
+  // Toggle favorite - calls parent function
+  const toggleFavorite = async () => {
+    try {
+      setLoading(true);
+      await onToggleFavorite(id);
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const distance = data.distance || '2.5 km';
-  const genderCategory = data.pgGenderCategory || 'ladies';
-  const priceMin = data.priceRange?.min || 6000;
-  const priceMax = data.priceRange?.max || 8000;
-  const priceText = `₹${priceMin} - ₹${priceMax}`;
-  const space = data.AvailableSpace
-  const createdAt = data.createdAt;
-  const postedDate = new Date(createdAt).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short", // You can use "long" for full month name
-  });
-    const id = data._id 
   return (
     <TouchableOpacity
       style={styles.cardWrapper}
       activeOpacity={0.8}
-
- onPress={() =>
-  router.push({
-  pathname: '/pg-hostel/[id]',
-  params: { id }
-})
-}
+      onPress={() =>
+        router.push({
+          pathname: '/pg-hostel/[id]',
+          params: { id }
+        })
+      }
     >
       <View style={styles.cardContainer}>
         {/* Top image section with distance and favorite button */}
         <View style={styles.imageContainer}>
-          <Image source={{ uri: images[0] }} style={styles.image} />
+          <Image source={{ uri: data?.thumbnail?.url }} style={styles.image} />
           <View style={styles.topOverlay}>
 
             <View style={styles.distanceBadge}>
-              <Ionicons name="location-sharp" size={16} color="#7A5AF8" />
-              <Text style={styles.distanceText}>{distance}</Text>
-            </View>
-            <TouchableOpacity style={styles.favoriteButton}>
-              <Ionicons name="heart-outline" size={23} color="#FF4081" />
+              {activeFilter === 'All' &&
+                <View style={styles.categoryBadge}>
+                  <Ionicons name='business-sharp' size={16} color='#FF6B6B' /> 
+                </View>
+              }
+            </View> 
+
+            {/* Favorite Button */}
+            <TouchableOpacity 
+              style={styles.favoriteButton}
+              onPress={(e) => {
+                e.stopPropagation(); // Prevent card navigation
+                toggleFavorite();
+              }}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color="#FF4081" />
+              ) : (
+                <Ionicons 
+                  name={isFavorited ? "heart" : "heart-outline"} 
+                  size={23} 
+                  color={isFavorited ? "#FF4081" : "#FF4081"} 
+                />
+              )}
             </TouchableOpacity>
 
           </View>
@@ -60,22 +76,19 @@ const PGHostelCard = ({ data, activeFilter }) => {
         {/* Content section */}
         <View style={styles.contentContainer}>
           <View style={styles.headerRow}>
-            <Text style={styles.title}>{data.title}</Text>
-            {
-              activeFilter === 'All' && <View style={styles.categoryBadge}>
-                <Ionicons
-                  name='business-sharp'
-                  size={16}
-                  color='#7A5AF8'
-
-                />
-              </View>
-            }
-
+            <Text style={styles.title}>{data?.title}</Text>
+            <View style={styles.date}>
+              <Text style={styles.postedDate}>
+                {new Date(data?.createdAt).toLocaleDateString("en-US", {
+                  month: "short", 
+                  day: "2-digit",
+                })}
+              </Text>
+            </View>
           </View>
 
           <Text style={styles.description} numberOfLines={2}>
-            {data.description}
+            {data?.description}
           </Text>
 
           {/* Gender and price info */}
@@ -84,17 +97,16 @@ const PGHostelCard = ({ data, activeFilter }) => {
 
               <View style={styles.firstinner} >
                 <MaterialCommunityIcons
-                  name={genderCategory === 'ladies' ? 'human-female' : 'human-male'}
+                  name={data?.pgGenderCategory === 'ladies' ? 'human-female' : 'human-male'}
                   size={16}
-                  color={genderCategory === 'ladies' ? '#FF4081' : '#2196F3'}
+                  color={data?.pgGenderCategory === 'ladies' ? '#FF4081' : '#2196F3'}
                 />
                 <Text style={[
                   styles.genderText,
-                  { color: genderCategory === 'ladies' ? '#FF4081' : '#2196F3' }
+                  { color: data?.pgGenderCategory === 'ladies' ? '#FF4081' : '#2196F3' }
                 ]}>
-                  {genderCategory.charAt(0).toUpperCase() + genderCategory.slice(1)}
+                  {data?.pgGenderCategory?.charAt(0).toUpperCase() + data?.pgGenderCategory?.slice(1)}
                 </Text>
-
               </View>
 
               <View style={styles.innercon}>
@@ -105,26 +117,19 @@ const PGHostelCard = ({ data, activeFilter }) => {
                   style={{ marginRight: 3 }}
                 />
                 <Text style={{
-                  //   color: maintext, 
-                  //   // fontFamily: 'Poppins', 
-                  //   fontWeight:'600',
-                  //   fontSize: 14, 
                   marginRight: 4,
                   paddingTop: 2,
                   fontWeight: 'bold',
                   fontSize: 12,
                   color: '#444',
-
                 }}>
-                  {space}
+                  {data?.availableSpace}
                 </Text>
                 <Text style={{
                   fontSize: 12,
                   fontWeight: 'bold',
-                  fontSize: 12,
                   paddingTop: 2,
                   color: '#444',
-
                 }}>
                   Left
                 </Text>
@@ -132,16 +137,12 @@ const PGHostelCard = ({ data, activeFilter }) => {
 
             </View>
 
-
-
-            <Text style={styles.price}>{priceText}</Text>
+            <Text style={styles.price}>
+              {data.priceRange && data.priceRange.min != null && data.priceRange.max != null
+                ? `₹${data.priceRange.min.toLocaleString()} - ₹${data.priceRange.max.toLocaleString()}`
+                : "₹0 - ₹0"}
+            </Text>
           </View>
-
-
-        </View>
-        
-        <View style={styles.date}>
-          <Text style={styles.postedDate}>{postedDate}</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -184,67 +185,49 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     padding: 10,
-
   },
-  date: {
-    flex: 1,
-    justifyContent: 'flex-start',
-    alignItems: 'flex-end',
-    paddingTop: 5,
-    paddingRight: 15
-  },
+  date: {},
   postedDate: {
     fontFamily: 'Poppinssm',
     fontSize: 10,
     color: lighttext
   },
-  distanceBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 24,
-    backgroundColor: greybg,
-    paddingHorizontal: 10,
-    borderRadius: 20,
-  },
-  distanceText: {
-
-    fontWeight: '600',
-    marginLeft: 4,
-    includeFontPadding: false,
-    textAlignVertical: 'center',
-    color: maintext
-  },
   favoriteButton: {
-    backgroundColor: greybg,
-    padding: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    padding: 8,
     borderRadius: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   contentContainer: {
     padding: 16,
-    paddingBottom: 0
+    paddingBottom: 10
   },
   innercon: {
     backgroundColor: greybg,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 20,
-    flexDirection: 'row',      // Added this
-    alignItems: 'center',      // Center vertically
+    flexDirection: 'row',
+    alignItems: 'center',
     alignSelf: 'flex-start',
-    marginLeft:7
-
-    // Optional: keeps it as small as needed
+    marginLeft: 7
   },
-
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 8,
+    gap: 5
   },
   title: {
     fontSize: 17,
-
     flex: 1,
     fontWeight: 'bold',
     color: maintext,
@@ -253,7 +236,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: 100,
   },
   categoryText: {
     color: '#555',
@@ -271,15 +254,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: 8,
-
   },
   genderContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-   
-
   },
-  firstinner:{
+  firstinner: {
     flexDirection: 'row',
     backgroundColor: greybg,
     paddingHorizontal: 6,
