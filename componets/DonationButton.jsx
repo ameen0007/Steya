@@ -3,12 +3,12 @@ import {
   TouchableOpacity,
   Text,
   StyleSheet,
-  Alert,
   ActivityIndicator
 } from 'react-native';
 import RazorpayCheckout from 'react-native-razorpay';
 import { useSelector } from 'react-redux';
 import api from '../services/intercepter';
+import { showToast } from '../services/ToastService';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -65,12 +65,12 @@ const DonationButton = ({
       );
 
       if (onSuccess) onSuccess(paymentData);
-      Alert.alert('Success', 'Thank you for your donation! 🥰');
+    showToast('Success', 'Thank you for your donation! 🥰');
 
     } catch (error) {
       console.log('Payment Error:', error);
       if (error.code !== 2) {
-        Alert.alert('Payment Failed', error.description || 'Payment was not completed. Please try again.');
+       showToast('Payment Failed', error.description || 'Payment was not completed. Please try again.');
       }
       if (onError) onError(error);
     } finally {

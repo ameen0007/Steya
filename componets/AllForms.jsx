@@ -6,7 +6,6 @@ import {
   Text,
   StyleSheet,
   SafeAreaView,
-  Alert,
   TextInput,
   KeyboardAvoidingView,
   Platform,
@@ -30,7 +29,7 @@ import axios from 'axios';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as FileSystem from "expo-file-system";
 import api from '../services/intercepter';
-import { useSelector } from 'react-redux';
+import { shallowEqual, useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL
@@ -38,6 +37,7 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL
 
 
 import { router, useLocalSearchParams } from 'expo-router';
+import { showToast } from '../services/ToastService';
 
 const SharedRoomForm = () => {
   // ✅ Get route parameters
@@ -102,7 +102,7 @@ const SharedRoomForm = () => {
 
     } catch (error) {
       console.error('Error fetching room data:', error);
-      Alert.alert('Error', 'Failed to load room data');
+     showToast('Error', 'Failed to load room data');
     } finally {
       setLoading(false);
     }
@@ -167,7 +167,7 @@ const handleSubmit = async () => {
     if (formData.habitPreferences && !Array.isArray(formData.habitPreferences)) errors.push("Please select at least one habit preference.");
 
     if (errors.length > 0) {
-      Alert.alert("Validation Error", errors.join("\n"));
+     showToast("Validation Error", errors.join("\n"));
       return;
     }
 
@@ -280,7 +280,7 @@ const handleSubmit = async () => {
     }
 
     console.log("✅ Success:", res.data);
-    Alert.alert(
+    showToast(
       "Success", 
       isEdit ? "Your room listing has been updated!" : "Your room listing has been submitted!"
     );
@@ -295,7 +295,7 @@ const handleSubmit = async () => {
     } else if (err.response?.status) {
       errorMessage = `Server error (${err.response.status}): ${err.response.data?.message || 'Unknown error'}`;
     }
-    Alert.alert("Error", errorMessage);
+   showToast("Error", errorMessage);
   }
 };
 
@@ -603,7 +603,7 @@ const PGHostelForm = () => {
 
     } catch (error) {
       console.error('Error fetching PG/Hostel data:', error);
-      Alert.alert('Error', 'Failed to load PG/Hostel data');
+      showToast('Error', 'Failed to load PG/Hostel data');
     } finally {
       setLoading(false);
     }
@@ -706,7 +706,7 @@ const handleSubmit = async () => {
       errors.push("Price range min cannot be greater than max.");
 
     if (errors.length > 0) {
-      Alert.alert("Validation Error", errors.join("\n"));
+      showToast("Validation Error", errors.join("\n"));
       return;
     }
 
@@ -817,7 +817,7 @@ const handleSubmit = async () => {
     }
 
     console.log("✅ Success:", res.data);
-    Alert.alert(
+    showToast(
       "Success",
       isEdit ? "Your PG/Hostel listing has been updated!" : "Your PG/Hostel listing has been submitted!"
     );
@@ -833,7 +833,7 @@ const handleSubmit = async () => {
     } else if (err.response?.status) {
       errorMessage = `Server error (${err.response.status}): ${err.response.data?.message || 'Unknown error'}`;
     }
-    Alert.alert("Error", errorMessage);
+    showToast("Error", errorMessage);
   }
 };
 
@@ -1199,7 +1199,7 @@ const FlatHomeForm = () => {
 
     } catch (error) {
       console.error('Error fetching Flat/Home data:', error);
-      Alert.alert('Error', 'Failed to load property data');
+      showToast('Error', 'Failed to load property data');
     } finally {
       setLoading(false);
     }
@@ -1266,7 +1266,7 @@ const handleSubmit = async () => {
     if (!formData.furnishedStatus?.trim()) errors.push("Furnished status is required.");
 
     if (errors.length > 0) {
-      Alert.alert("Validation Error", errors.join("\n"));
+      showToast("Validation Error", errors.join("\n"));
       return;
     }
 
@@ -1381,7 +1381,7 @@ const handleSubmit = async () => {
     }
 
     console.log("✅ Success:", res.data);
-    Alert.alert(
+   showToast(
       "Success",
       isEdit ? "Your property listing has been updated!" : "Your property listing has been submitted!"
     );
@@ -1397,7 +1397,7 @@ const handleSubmit = async () => {
     } else if (err.response?.status) {
       errorMessage = `Server error (${err.response.status}): ${err.response.data?.message || 'Unknown error'}`;
     }
-    Alert.alert("Error", errorMessage);
+    showToast("Error", errorMessage);
   }
 };
 

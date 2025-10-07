@@ -12,6 +12,7 @@ import SkeletonLoader from '../../componets/individualloader';
 import axios from 'axios';
 import api from '../../services/intercepter';
 import { useSelector } from 'react-redux';
+import { showToast } from '../../services/ToastService';
 const FlatHomeDetailsPage = () => {
       const { id } = useLocalSearchParams();
 const apiUrl = process.env.EXPO_PUBLIC_API_URL;
@@ -151,7 +152,7 @@ useEffect(() => {
 
   } catch (error) {
     console.error('Error creating chat room:', error);
-    alert('Failed to start chat. Please try again.');
+    showToast('Failed to start chat. Please try again.');
   } finally {
     setIsCreatingRoom(false);
   }

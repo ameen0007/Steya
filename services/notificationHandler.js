@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import api from '../services/intercepter';
+import { showToast } from './ToastService';
 // Configure notification behavior
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -44,7 +45,7 @@ export async function registerForPushNotificationsAsync() {
   // Check if running on physical device
   if (!Device.isDevice) {
     console.warn('⚠️ Must use physical device for Push Notifications');
-    alert('Push notifications only work on physical devices');
+    showToast('Push notifications only work on physical devices');
     return null;
   }
 
@@ -63,7 +64,7 @@ export async function registerForPushNotificationsAsync() {
     }
     
     if (finalStatus !== 'granted') {
-      alert('Failed to get push notification permissions!');
+      showToast('Failed to get push notification permissions!');
       console.warn('⚠️ Push notification permissions not granted');
       return null;
     }
@@ -92,7 +93,7 @@ export async function registerForPushNotificationsAsync() {
         }
       }, null, 2));
       
-      alert('Missing Expo Project ID! Check console for instructions.');
+      showToast('Missing Expo Project ID! Check console for instructions.');
       return null;
     }
 

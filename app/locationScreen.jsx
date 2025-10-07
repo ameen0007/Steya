@@ -9,7 +9,7 @@ import {
   FlatList ,
   ActivityIndicator,
   Modal,
-  Button,Alert, Linking, Platform, 
+  Button, Linking, Platform, 
 
   
 } from 'react-native';

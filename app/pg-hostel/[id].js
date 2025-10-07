@@ -12,6 +12,7 @@ import  StaticMap  from '../../componets/map';
 import axios from 'axios';
 import SkeletonLoader from '../../componets/individualloader';
 import api from '../../services/intercepter';
+import { showToast } from '../../services/ToastService';
 export default function PgHostelDetails() {
    const user = useSelector ((state) => state.user.userData);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
@@ -150,7 +151,7 @@ useEffect(() => {
 
   } catch (error) {
     console.error('Error creating chat room:', error);
-    alert('Failed to start chat. Please try again.');
+    showToast('Failed to start chat. Please try again.');
   } finally {
     setIsCreatingRoom(false);
   }

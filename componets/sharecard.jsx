@@ -1,10 +1,10 @@
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { 
-  View, Text, StyleSheet, Image, TouchableOpacity, 
-  Alert, ActivityIndicator 
+  View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator 
 } from 'react-native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { showToast } from '@/services/ToastService';
 
 const SharedRoomCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) => {
   const [loading, setLoading] = useState(false);
@@ -33,7 +33,7 @@ const SharedRoomCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) =
       onPress={() => {
         try {
           if (!id) {
-            Alert.alert("Missing ID", "No ID was found for this item.");
+           showToast("Missing ID", "No ID was found for this item.");
             return;
           }
           router.push({
@@ -42,7 +42,7 @@ const SharedRoomCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) =
           });
         } catch (error) {
           console.error("Navigation error:", error);
-          Alert.alert("Navigation Failed", "Unable to open the detail page.");
+         showToast("Navigation Failed", "Unable to open the detail page.");
         }
       }}
     >

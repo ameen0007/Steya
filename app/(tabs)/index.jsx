@@ -9,6 +9,7 @@ import SafeWrapper from "../../services/Safewrapper";
 import axios from "axios";
 import { useSelector } from "react-redux";
 import api from "../../services/intercepter";
+import { showToast } from "@/services/ToastService";
 
 const filterMap = {
   All: "all",
@@ -92,7 +93,7 @@ const HomeScreen = () => {
       }
     } catch (error) {
       console.error('Error toggling favorite:', error);
-      Alert.alert('Error', error.response?.data?.message || 'Failed to update favorites');
+     showToast('Error', error.response?.data?.message || 'Failed to update favorites');
     }
   };
 

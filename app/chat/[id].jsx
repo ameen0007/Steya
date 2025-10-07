@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { 
   View, Text, TouchableOpacity, FlatList, StyleSheet, 
   ActivityIndicator, Image, TextInput, KeyboardAvoidingView, Platform,
-  RefreshControl, Alert
+  RefreshControl
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { io } from 'socket.io-client';
@@ -13,6 +13,7 @@ import { conversationTree, getNextOptions } from '../../services/chattree';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
+import { showToast } from '../../services/ToastService';
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 
@@ -252,7 +253,7 @@ const ChatScreen = () => {
     // Validation
     const validation = validateMessage(messageInput);
     if (!validation.isValid) {
-      Alert.alert('Invalid Message', validation.error);
+     showToast('Invalid Message', validation.error);
       return;
     }
 

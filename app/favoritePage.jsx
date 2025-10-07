@@ -6,7 +6,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
-  Alert,
   ActivityIndicator,
   Dimensions
 } from 'react-native';
@@ -22,6 +21,7 @@ import PGCard from '../componets/pgcard';
 import FlatCard from '../componets/flatcard';
 import SafeWrapper from '../services/Safewrapper';
 import api from '../services/intercepter';
+import { showToast } from '../services/ToastService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -89,7 +89,7 @@ const FavoritesScreen = () => {
       }
     } catch (error) {
       console.error('Error removing favorite:', error);
-      Alert.alert('Error', 'Failed to remove from favorites');
+      showToast('Error',"Failed to remove from favorites")
     }
   };
 

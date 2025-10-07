@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
-import { ScrollView, TouchableOpacity, Text, View, Image, Modal, Dimensions, Platform, FlatList, StyleSheet, ActivityIndicator, Share, TextInput, Alert } from 'react-native';
+import { ScrollView, TouchableOpacity, Text, View, Image, Modal, Dimensions, Platform, FlatList, StyleSheet, ActivityIndicator, Share, TextInput } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather, FontAwesome5, Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 
@@ -15,6 +15,7 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 
 import api from '../../services/intercepter';
 import { useSelector } from 'react-redux';
+import { showToast } from '@/services/ToastService';
 
 const DetailsPage = () => {
   console.log("✅ DetailsPage loaded");
@@ -157,7 +158,7 @@ useEffect(() => {
 
     } catch (error) {
       console.error('Error creating chat room:', error);
-      Alert.alert('Error', 'Failed to start chat. Please try again.');
+     showToast('Error', 'Failed to start chat. Please try again.');
     } finally {
       setIsCreatingRoom(false);
     }
@@ -187,7 +188,7 @@ useEffect(() => {
     } catch (error) {
       console.error('❌ Error toggling favorite:', error);
       console.error('❌ Error response:', error.response?.data);
-      Alert.alert('Error', 'Failed to update favorite status');
+      showToast('Error', 'Failed to update favorite status');
     } finally {
       setIsFavoriteLoading(false);
     }
@@ -205,13 +206,13 @@ useEffect(() => {
       }
     } catch (error) {
       console.error('Error sharing:', error);
-      Alert.alert('Error', 'Failed to share');
+      showToast('Error', 'Failed to share');
     }
   };
 
   const handleReportSubmit = async () => {
     if (!reportReason) {
-      Alert.alert('Error', 'Please select a reason for reporting');
+      showToast('Error', 'Please select a reason for reporting');
       return;
     }
 
@@ -223,14 +224,14 @@ useEffect(() => {
         description: reportDescription
       });
 
-      Alert.alert('Success', 'Room reported successfully. Our team will review it shortly.');
+      showToast('Success', 'Room reported successfully. Our team will review it shortly.');
       setIsReportModalVisible(false);
       setReportReason('');
       setReportDescription('');
     } catch (error) {
       console.error('Error reporting room:', error);
       const errorMessage = error.response?.data?.message || 'Failed to report room';
-      Alert.alert('Error', errorMessage);
+      showToast('Error', errorMessage);
     } finally {
       setIsSubmittingReport(false);
     }

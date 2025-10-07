@@ -22,6 +22,7 @@ import { preventDoubleTap } from '../services/debounfunc';
   import { useDispatch, useSelector } from 'react-redux';
 import { setLocationData } from './Redux/LocationSlice';
 import { initializePushNotifications } from '../services/notificationHandler';
+import { showToast } from '../services/ToastService';
 export default function Login() {
 
  const apiUrl = process.env.EXPO_PUBLIC_API_URL
@@ -163,11 +164,11 @@ const handleGoogleLogin = async () => {
       console.error("❌ Login error:", error.message);
       // Show user-friendly error
       if (error.response?.status === 401) {
-        alert("Authentication failed. Please try again.");
+        showToast("Authentication failed. Please try again.")
       } else if (error.message?.includes('network')) {
-        alert("Network error. Please check your connection.");
+        showToast("Network error. Please check your connection.");
       } else {
-        alert("Login failed. Please try again.");
+        showToast("Login failed. Please try again.");
       }
     }
   });

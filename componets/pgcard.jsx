@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 const PGHostelCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) => {
