@@ -81,7 +81,8 @@
           "redux-persist",
           "redux-devtools-expo-dev-plugin",
           "react-native-razorpay",
-          "socket.io-client"
+          "socket.io-client",
+          "react-native-toast-notifications"
         ]
       }
     }
