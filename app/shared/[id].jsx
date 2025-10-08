@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
-import { ScrollView, TouchableOpacity, Text, View, Image, Modal, Dimensions, Platform, FlatList, StyleSheet, ActivityIndicator, Share, TextInput } from 'react-native';
+import { ScrollView, TouchableOpacity, Text, View, Image, Modal, Dimensions, Platform, FlatList, StyleSheet, ActivityIndicator, Share, TextInput, Linking } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather, FontAwesome5, Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 
@@ -14,9 +14,14 @@ import SkeletonLoader from '../../componets/individualloader';
 const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 
 import api from '../../services/intercepter';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { showToast } from '@/services/ToastService';
-
+import { preventDoubleTap } from '@/services/debounfunc';
+import { setLocationData } from '../Redux/LocationSlice';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { setUserData } from '../Redux/userSlice';
+import { GoogleSignin, isSuccessResponse } from '@react-native-google-signin/google-signin';
+import { initializePushNotifications } from '../../services/notificationHandler';
 const DetailsPage = () => {
   console.log("✅ DetailsPage loaded");
 
@@ -40,10 +45,12 @@ const DetailsPage = () => {
   const [isFavoriteLoading, setIsFavoriteLoading] = useState(false);
   const user = useSelector((state) => state.user.userData);
 
+  const dispatch = useDispatch();
 
   const incrementViewCount = async () => {
     try {
       if (!id) return;
+     
       
       console.log("🔄 Incrementing view count for room:", id);
     
@@ -120,19 +127,64 @@ useEffect(() => {
 }, [id, user?._id]); 
 
 
-  const handleChatPress = async () => {
-    console.log("Starting chat for product:", item?._id);
-     if (!user?._id) {
-      // console.log("⚠️ User not logged in, skipping favorite check");
-      router.push('/login');
-      return; // <-- must be inside braces
-    }
+const handleChatPress  = async () => {
+  preventDoubleTap(async () => {
+    console.log("Starting chat for product:", item._id);
 
     try {
+      // --------------------------
+      // Step 1: Google Login if needed
+      // --------------------------
+      if (!user?._id) {
+        console.log("User not logged in. Initiating Google login...");
+
+        await GoogleSignin.hasPlayServices();
+        const userInfo = await GoogleSignin.signIn();
+
+        if (!isSuccessResponse(userInfo)) {
+          console.log("⚠️ Google sign-in cancelled by user");
+          return; // Stop if user cancelled
+        }
+
+        const idToken = userInfo.data?.idToken;
+        if (!idToken) {
+          console.log("❌ No idToken found");
+          return;
+        }
+
+        // Call backend for authentication
+        console.log("🌐 Calling backend for authentication...");
+        const res = await axios.post(`${apiUrl}/api/auth/google-login`, { idToken });
+
+        // Save location if available
+        if (res.data.user?.location) {
+          console.log("📍 Setting location data");
+          dispatch(setLocationData(res.data.user.location));
+        }
+
+        // Save auth token and user data
+        await AsyncStorage.setItem("authToken", res.data.accessToken);
+        await AsyncStorage.setItem("userId", res.data.user._id);
+        dispatch(setUserData(res.data.user));
+
+        console.log("✅ User authenticated successfully");
+
+        // Initialize push notifications (non-blocking)
+        initializePushNotifications(apiUrl)
+          .then(pushToken => {
+            if (pushToken) console.log("✅ Push notifications ready:", pushToken);
+            else console.log("⚠️ Push notifications not available");
+          })
+          .catch(pushError => console.error("⚠️ Push setup error:", pushError.message));
+      }
+
+      // --------------------------
+      // Step 2: Create/Check Chat Room
+      // --------------------------
       setIsCreatingRoom(true);
 
       const checkResponse = await api.get(`${apiUrl}/api/chat/check-room`, {
-        params: { productId: item?._id }
+        params: { productId: item._id }
       });
 
       let roomId;
@@ -142,7 +194,7 @@ useEffect(() => {
         console.log("Using existing room:", roomId, "Status:", checkResponse.data.status);
       } else {
         const createResponse = await api.post(`${apiUrl}/api/chat/create-room`, {
-          productId: item?._id,
+          productId: item._id,
           productTitle: item.title || 'Product Chat',
           ownerId: item?.createdBy?._id
         });
@@ -151,18 +203,22 @@ useEffect(() => {
         console.log("Created new pending room:", roomId);
       }
 
+      // Navigate to chat
       router.push({
         pathname: '/chat/[id]',
         params: { id: roomId }
       });
 
     } catch (error) {
-      console.error('Error creating chat room:', error);
-     showToast('Error', 'Failed to start chat. Please try again.');
+      console.error("❌ Error in chat/login flow:", error);
+      showToast('Failed to start chat. Please try again.');
     } finally {
       setIsCreatingRoom(false);
     }
-  };
+  });
+};
+
+
 
   const handleBackPress = () => {
     router.back();
@@ -282,6 +338,15 @@ useEffect(() => {
     { value: 'wrong_info', label: 'Wrong Information' },
     { value: 'other', label: 'Other' }
   ];
+const makePhoneCall = (phoneNumber) => {
+  if (!phoneNumber) return;
+
+  // Remove everything except digits
+  const cleanedNumber = phoneNumber.replace(/\D/g, '');
+
+  Linking.openURL(`tel:${cleanedNumber}`)
+    .catch((err) => console.error('Error opening dialer:', err));
+};
 
   return (
     <>
@@ -568,7 +633,7 @@ useEffect(() => {
 
               <TouchableOpacity
                 disabled={!item?.showPhonePublic}
-                onPress={() => console.log('Calling:', item.contactPhone)}
+                    onPress={() => makePhoneCall(item.contactPhone)}
                 style={{
                   flex: 1,
                   flexDirection: 'row',

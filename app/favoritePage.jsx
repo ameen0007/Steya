@@ -22,6 +22,7 @@ import FlatCard from '../componets/flatcard';
 import SafeWrapper from '../services/Safewrapper';
 import api from '../services/intercepter';
 import { showToast } from '../services/ToastService';
+import ProtectedRoute from './protectedroute';
 
 const { width, height } = Dimensions.get('window');
 
@@ -39,9 +40,9 @@ const FavoritesScreen = () => {
   const fetchFavorites = async () => {
     console.log(apiUrl,'apiUrl-----------');
          if (!user?._id) {
-      // console.log("⚠️ User not logged in, skipping favorite check");
-      router.push('/login');
-      return; // <-- must be inside braces
+   
+     
+      return; 
     }
     try {
       setError(null);
@@ -146,6 +147,7 @@ const FavoritesScreen = () => {
 
   // Classy Empty State
   const EmptyFavorites = () => (
+    <ProtectedRoute>
     <View style={styles.emptyContainer}>
       <View style={styles.emptyIconContainer}>
         <View style={styles.emptyIconBackground}>
@@ -167,11 +169,13 @@ const FavoritesScreen = () => {
         <Text style={styles.exploreButtonText}>Browse Rooms</Text>
       </TouchableOpacity>
     </View>
+    </ProtectedRoute>
   );
 
   // Classy Loading State
   if (loading) {
     return (
+          <ProtectedRoute>
       <SafeWrapper>
         <StatusBar style="dark" />
         <View style={styles.loadingContainer}>
@@ -185,12 +189,14 @@ const FavoritesScreen = () => {
           </View>
         </View>
       </SafeWrapper>
+      </ProtectedRoute>
     );
   }
 
   // Classy Error State
   if (error && !loading) {
     return (
+      <ProtectedRoute>
       <SafeWrapper>
         <StatusBar style="dark" />
         <View style={styles.errorContainer}>
@@ -213,10 +219,12 @@ const FavoritesScreen = () => {
           </View>
         </View>
       </SafeWrapper>
+      </ProtectedRoute>
     );
   }
 
   return (
+     <ProtectedRoute>
     <SafeWrapper>
       <StatusBar style="dark" />
       
@@ -275,6 +283,7 @@ const FavoritesScreen = () => {
         ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
     </SafeWrapper>
+    </ProtectedRoute>
   );
 };
 

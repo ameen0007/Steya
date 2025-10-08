@@ -7,12 +7,18 @@ import SafeWrapper from '../../services/Safewrapper'; // Adjust this path if nee
 import TopFadeGradient from '../../componets/topgradient';
 const { width } = Dimensions.get('window');
 const apiUrl = process.env.EXPO_PUBLIC_API_URL;
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import  StaticMap  from '../../componets/map'; 
 import axios from 'axios';
 import SkeletonLoader from '../../componets/individualloader';
 import api from '../../services/intercepter';
 import { showToast } from '../../services/ToastService';
+import { GoogleSignin, isSuccessResponse } from '@react-native-google-signin/google-signin';
+import { preventDoubleTap } from '../../services/debounfunc';
+import { setLocationData } from '../Redux/LocationSlice';
+import { setUserData } from '../Redux/userSlice';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { initializePushNotifications } from '../../services/notificationHandler';
 export default function PgHostelDetails() {
    const user = useSelector ((state) => state.user.userData);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
@@ -28,7 +34,7 @@ export default function PgHostelDetails() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [initialImageIndex, setInitialImageIndex] = useState(0);
-    
+     const dispatch = useDispatch();
   
 
   const incrementViewCount = async () => {
@@ -110,52 +116,100 @@ useEffect(() => {
 }, [id, user?._id]); 
 
 
-  const handleChatPress = async () => {
-  console.log("Starting chat for product:", item._id);
-       if (!user?._id) {
-      // console.log("⚠️ User not logged in, skipping favorite check");
-      router.push('/login');
-      return; // <-- must be inside braces
-    }
-  try {
-    setIsCreatingRoom(true);
+const handleChatPress  = async () => {
+  preventDoubleTap(async () => {
+    console.log("Starting chat for product:", item._id);
 
-    // First, check if room already exists
-    const checkResponse = await api.get(`${apiUrl}/api/chat/check-room`, {
-      params: { productId: item._id }
-    });
+    try {
+      // --------------------------
+      // Step 1: Google Login if needed
+      // --------------------------
+      if (!user?._id) {
+        console.log("User not logged in. Initiating Google login...");
 
-    let roomId;
+        await GoogleSignin.hasPlayServices();
+        const userInfo = await GoogleSignin.signIn();
 
-    if (checkResponse.data.exists) {
-      // Use existing room (could be pending or active)
-      roomId = checkResponse.data.roomId;
-      console.log("Using existing room:", roomId, "Status:", checkResponse.data.status);
-    } else {
-      // Create new PENDING room
-      const createResponse = await api.post(`${apiUrl}/api/chat/create-room`, {
-        productId: item._id,
-        productTitle: item.title || 'Product Chat',
-        ownerId: item?.createdBy?._id 
+        if (!isSuccessResponse(userInfo)) {
+          console.log("⚠️ Google sign-in cancelled by user");
+          return; // Stop if user cancelled
+        }
+
+        const idToken = userInfo.data?.idToken;
+        if (!idToken) {
+          console.log("❌ No idToken found");
+          return;
+        }
+
+        // Call backend for authentication
+        console.log("🌐 Calling backend for authentication...");
+        const res = await axios.post(`${apiUrl}/api/auth/google-login`, { idToken });
+
+        // Save location if available
+        if (res.data.user?.location) {
+          console.log("📍 Setting location data");
+          dispatch(setLocationData(res.data.user.location));
+        }
+
+        // Save auth token and user data
+        await AsyncStorage.setItem("authToken", res.data.accessToken);
+        await AsyncStorage.setItem("userId", res.data.user._id);
+        dispatch(setUserData(res.data.user));
+
+        console.log("✅ User authenticated successfully");
+
+        // Initialize push notifications (non-blocking)
+        initializePushNotifications(apiUrl)
+          .then(pushToken => {
+            if (pushToken) console.log("✅ Push notifications ready:", pushToken);
+            else console.log("⚠️ Push notifications not available");
+          })
+          .catch(pushError => console.error("⚠️ Push setup error:", pushError.message));
+      }
+
+      // --------------------------
+      // Step 2: Create/Check Chat Room
+      // --------------------------
+      setIsCreatingRoom(true);
+
+      const checkResponse = await api.get(`${apiUrl}/api/chat/check-room`, {
+        params: { productId: item._id }
       });
-      
-      roomId = createResponse.data.roomId;
-      console.log("Created new pending room:", roomId);
+
+      let roomId;
+
+      if (checkResponse.data.exists) {
+        roomId = checkResponse.data.roomId;
+        console.log("Using existing room:", roomId, "Status:", checkResponse.data.status);
+      } else {
+        const createResponse = await api.post(`${apiUrl}/api/chat/create-room`, {
+          productId: item._id,
+          productTitle: item.title || 'Product Chat',
+          ownerId: item?.createdBy?._id
+        });
+
+        roomId = createResponse.data.roomId;
+        console.log("Created new pending room:", roomId);
+      }
+
+      // Navigate to chat
+      router.push({
+        pathname: '/chat/[id]',
+        params: { id: roomId }
+      });
+
+    } catch (error) {
+      console.error("❌ Error in chat/login flow:", error);
+      showToast('Failed to start chat. Please try again.');
+    } finally {
+      setIsCreatingRoom(false);
     }
-
-    // Navigate to chat
-    router.push({
-      pathname: '/chat/[id]',
-      params: { id: roomId }
-    });
-
-  } catch (error) {
-    console.error('Error creating chat room:', error);
-    showToast('Failed to start chat. Please try again.');
-  } finally {
-    setIsCreatingRoom(false);
-  }
+  });
 };
+
+
+
+
 
   const handleBackPress = () => {
     router.back(); // Go back to the previous screen
@@ -215,7 +269,7 @@ useEffect(() => {
   horizontal
   pagingEnabled
   showsHorizontalScrollIndicator={false}
-  keyExtractor={(image) => image._id} // use _id from backend
+  keyExtractor={(image) => image?._id} // use _id from backend
   onMomentumScrollEnd={(e) => {
     const index = Math.floor(e.nativeEvent.contentOffset.x / width);
     setCurrentImage(index);
@@ -453,7 +507,7 @@ useEffect(() => {
       </ScrollView>
 
       {/* Bottom Buttons */}
-    {item.createdBy._id !== user._id ? (
+    {item?.createdBy?._id !== user?._id ? (
     <View style={{
   flexDirection: 'row',
   justifyContent: 'space-between',
@@ -556,7 +610,7 @@ useEffect(() => {
       />
     </View>
   )}
-  keyExtractor={(image) => image._id} // use _id from backend
+  keyExtractor={(image) => image?._id} // use _id from backend
 />
 
 

@@ -24,7 +24,7 @@ const filters = {
     { 
       key: 'genderPreference', 
       label: 'Gender Preference', 
-      options: ['Male', 'Female', 'Any'] 
+      options: ['male', 'female', 'any'] // Changed to match database
     },
     { 
       key: 'habitPreferences', 
@@ -43,7 +43,7 @@ const filters = {
     { 
       key: 'pgGenderCategory', 
       label: 'Gender Category', 
-      options: ['Ladies', 'Gents', 'Co'] 
+      options: ['ladies', 'gents', 'coed'] // Changed to match database
     },
     { 
       key: 'roomTypesAvailable', 
@@ -62,69 +62,64 @@ const filters = {
     },
   ],
   rental: [
- { 
-    key: 'propertyType', 
-    label: 'Property Type', 
-    options: ['Flats', 'Apartment', 'Houses'] 
-  },
-  { 
-    key: 'furnishedStatus', 
-    label: 'Furnishing', 
-    options: ['Furnished', 'Semi-furnished', 'Unfurnished'] 
-  },
-  {
-    key: 'preferredTenant',
-    label: 'Preferred Tenant',
-    options: ['Only Family', 'Any']
-  },
-
-  // 📐 Size & Layout
-  { 
-    key: 'squareFeet', 
-    label: 'Square Feet', 
-    type: 'range', 
-    min: 100, 
-    max: 5000, 
-    step: 100 
-  },
-  { 
-    key: 'bedrooms', 
-    label: 'Bedrooms', 
-    type: 'range', 
-    min: 1, 
-    max: 5, 
-    step: 1 
-  },
-  { 
-    key: 'bathrooms', 
-    label: 'Bathrooms', 
-    type: 'range', 
-    min: 1, 
-    max: 5, 
-    step: 1 
-  },
-
-  // 💰 Cost Filters
-  { 
-    key: 'securityDeposit', 
-    label: 'Security Deposit (₹)', 
-    type: 'range', 
-    min: 0, 
-    max: 200000, 
-    step: 5000 
-  },
-  { 
-    key: 'monthlyRent', 
-    label: 'Monthly Rent (₹)', 
-    type: 'range', 
-    min: 5000, 
-    max: 100000, 
-    step: 1000 
-  },
-
- 
-]
-
+    { 
+      key: 'propertyType', 
+      label: 'Property Type', 
+      options: ['Flats', 'Apartment', 'Houses'] 
+    },
+    { 
+      key: 'furnishedStatus', 
+      label: 'Furnishing', 
+      options: ['furnished', 'semi_furnished', 'unfurnished'] // Changed to match database
+    },
+    {
+      key: 'preferredTenant',
+      label: 'Preferred Tenant',
+      options: ['Only Family', 'Any'] // Note: Check if this matches 'tenantPreference' in database
+    },
+    // 📐 Size & Layout
+    { 
+      key: 'squareFeet', 
+      label: 'Square Feet', 
+      type: 'range', 
+      min: 100, 
+      max: 5000, 
+      step: 100 
+    },
+    { 
+      key: 'bedrooms', 
+      label: 'Bedrooms', 
+      type: 'range', 
+      min: 1, 
+      max: 5, 
+      step: 1 
+    },
+    { 
+      key: 'bathrooms', 
+      label: 'Bathrooms', 
+      type: 'range', 
+      min: 1, 
+      max: 5, 
+      step: 1 
+    },
+    // 💰 Cost Filters
+    { 
+      key: 'securityDeposit', 
+      label: 'Security Deposit (₹)', 
+      type: 'range', 
+      min: 0, 
+      max: 200000, 
+      step: 5000 
+    },
+    { 
+      key: 'monthlyRent', 
+      label: 'Monthly Rent (₹)', 
+      type: 'range', 
+      min: 5000, 
+      max: 100000, 
+      step: 1000 
+    },
+  ]
 };
 
 // Map activeFilter values to filter keys

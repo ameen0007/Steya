@@ -109,7 +109,7 @@ export const conversationTree = {
   CONTACT_RESPONSE: {
     role: 'owner',
     options: [
-      { id: 'share_contact', text: 'Sure: +91 98765 43210', next: 'AFTER_OWNER_CONTACT' },
+      { id: 'share_contact', text: 'Sure i will share', next: 'AFTER_OWNER_CONTACT' },
       { id: 'ask_inquirer_contact', text: 'Can you share yours first?', next: 'INQUIRER_CONTACT' }
     ]
   },

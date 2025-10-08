@@ -10,6 +10,7 @@ import SafeWrapper from '../../services/Safewrapper';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
+import ProtectedRoute from '../protectedroute';
 
 export default function Add() {
   const router = useRouter();
@@ -94,6 +95,7 @@ export default function Add() {
   // Render loading state
   if (loading) {
     return (
+      <ProtectedRoute>
       <View style={styles.loadingContainer}>
         <StatusBar style='dark' />
         <LinearGradient
@@ -104,12 +106,14 @@ export default function Add() {
         </LinearGradient>
         <Text style={styles.loadingText}>Loading conversations...</Text>
       </View>
+      </ProtectedRoute>
     );
   }
 
   // Render error state
   if (error && !loading) {
     return (
+            <ProtectedRoute>
       <SafeWrapper>
         <StatusBar style='dark' />
         <View style={styles.errorContainer}>
@@ -135,6 +139,7 @@ export default function Add() {
           </TouchableOpacity>
         </View>
       </SafeWrapper>
+      </ProtectedRoute>
     );
   }
 
@@ -225,6 +230,7 @@ export default function Add() {
   };
 
   return (
+    <ProtectedRoute>
     <SafeWrapper>
       <StatusBar style='dark' />
       <View style={styles.container}>
@@ -275,6 +281,7 @@ export default function Add() {
         </View>
       </View>
     </SafeWrapper>
+    </ProtectedRoute>
   );
 }
 

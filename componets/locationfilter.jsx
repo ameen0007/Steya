@@ -1,34 +1,37 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Image } from 'react-native';
-import { FontAwesome5,MaterialCommunityIcons, Ionicons ,Entypo,FontAwesome6 } from '@expo/vector-icons';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { FontAwesome5, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useLocation } from '../context/LocationContext';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import FilterModal from '../componets/modalfilter';
 import { useSelector } from 'react-redux';
 
-
-export const LocationHeader = ({ setActiveFilter, activeFilter }) => {
-  // const { locationDetails } = useLocation();
-const user = useSelector((state) => state.user.userData);
+export const LocationHeader = ({ 
+  setActiveFilter, 
+  activeFilter, 
+  onApplyFilters, 
+  appliedFilters // This comes from parent as prop
+}) => {
+  const user = useSelector((state) => state.user.userData);
   const filters = ['All', 'Shared Rooms', 'PG/Hostels', 'Rental Property'];
-const [contentWidth, setContentWidth] = useState(0);
+  const [contentWidth, setContentWidth] = useState(0);
   const [scrollViewWidth, setScrollViewWidth] = useState(0);
   const isScrollable = contentWidth > scrollViewWidth;
-  // const displayText = locationDetails?.name || 'Select location';
-const [appliedFilters, setAppliedFilters] = useState({});
-const [activeCategory, setActiveCategory] = useState("shared");
- const [showModal, setShowModal] = useState(false);
- const [Onlyfilterdata , setOnlyfilterdata] = useState([]);
-  const [activeFiltersCouDnt, setActiveFiltersCount] = useState(0);
- const locationData = useSelector((state) => state.location.locationData);
+  
+  // Remove this duplicate state declaration since we get it as prop
+  // const [appliedFilters, setAppliedFilters] = useState({});
+  
+  const [activeCategory, setActiveCategory] = useState("shared");
+  const [showModal, setShowModal] = useState(false);
+  const [Onlyfilterdata, setOnlyfilterdata] = useState([]);
+  const [activeFiltersCount, setActiveFiltersCount] = useState(0);
+  const locationData = useSelector((state) => state.location.locationData);
+
   const handleLocationPress = () => {
-     console.log("--------in in press");
+    console.log("--------in in press");
     router.push('/locationScreen');
   };
-
-
-
 
   const getFilterIcon = (filterName) => {
     switch(filterName) {
@@ -38,60 +41,30 @@ const [activeCategory, setActiveCategory] = useState("shared");
     }
   };
 
-const handleApplyFilters = (filters) => {
-  const cleaned = {};
-  let count = 0;
-
-  for (const key in filters) {
-    const item = filters[key];
-
-    if (item.selected) {
-      count++;
-
-      // For option-based filters
-      if (item.options && Array.isArray(item.options)) {
-        const selectedOptions = item.options
-          .filter(opt => opt.selected)
-          .map(opt => opt.label);
-
-        if (selectedOptions.length) {
-          cleaned[key] = selectedOptions;
-        }
-      }
-
-      // For range-based filters
-      else if ('currentMin' in item && 'currentMax' in item) {
-        // Only include if user changed the range
-        const isModified = item.currentMin !== item.min || item.currentMax !== item.max;
-
-        if (isModified) {
-          cleaned[key] = {
-            min: item.currentMin,
-            max: item.currentMax,
-          };
-        }
-      }
+  // Updated handleApplyFilters function
+  const handleApplyFilters = (filters) => {
+    // Calculate active count for badge
+    const activeCount = Object.values(filters).filter(filter => filter.selected).length;
+    setActiveFiltersCount(activeCount);
+    setOnlyfilterdata(filters); // Use this for local state if needed
+    
+    // Pass filters to parent component (HomeScreen)
+    if (onApplyFilters) {
+      onApplyFilters(filters);
     }
-  }
+    
+    console.log("✅ Applied filters:", filters);
+  };
 
-  setAppliedFilters(filters); // Now you're storing only cleaned data
-  setActiveFiltersCount(count);
-  setOnlyfilterdata(cleaned);
-  console.log("✅ Cleaned applied filters:", cleaned);
+ // In LocationHeader component, replace the handlechangeFilter function:
+// In LocationHeader component, fix the handlechangeFilter function:
+const handlechangeFilter = (filter) => {
+  // This should call the parent's handleFilterChange function
+  if (setActiveFilter) {
+    setActiveFilter(filter);
+  }
 };
-
-
-
-
-
-  const handlechangeFilter = (filter) => {
-   setActiveFilter(filter)
-    setAppliedFilters({}); // Reset applied filters when changing the main filter
-    setActiveFiltersCount(0); // Reset active filters count
-    setShowModal(false); // Close the modal when changing the main filter
-  }
-
-   const hasNotification = true; // or from redux state
+  const hasNotification = true; // or from redux state
 
   return (
     <View style={styles.container}>
@@ -106,73 +79,70 @@ const handleApplyFilters = (filters) => {
           </Text>
         </TouchableOpacity>
 
-    <View style={styles.rightIcons}>
-    
-<TouchableOpacity onPress={() => router.push('/favoritePage')} style={styles.iconButton}>
-  <Ionicons name="heart-outline" size={24} color="#403f41" />
-</TouchableOpacity>
-
-  </View>
-
+        <View style={styles.rightIcons}>
+          <TouchableOpacity onPress={() => router.push('/favoritePage')} style={styles.iconButton}>
+            <Ionicons name="heart-outline" size={24} color="#403f41" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.filterContainer}>
         <View style={styles.scrollWrapper}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filtersScrollContent}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filtersScrollContent}
             onContentSizeChange={(w) => setContentWidth(w)}
             onLayout={(e) => setScrollViewWidth(e.nativeEvent.layout.width)}
-        >
-          {filters.map((filter) => {
-            const iconName = getFilterIcon(filter);
-            return (
-              <TouchableOpacity
-              key={filter}
-              style={[
-                styles.filterPill,
-                activeFilter === filter ? styles.selectedFilter : styles.unselectedFilter,
-              ]}
-              onPress={()=>handlechangeFilter(filter)}
-            >
-              <View style={styles.filterContent}>
-              {iconName && (
-  filter === 'Shared Rooms' ? (
-    <Ionicons 
-      name={iconName} 
-      size={16} 
-      color={activeFilter === filter ? '#fff' : '#7A5AF8'} 
-      style={styles.filterIcon}
-    />
-  ) : filter === 'Rental Property' ? (
-    <MaterialCommunityIcons 
-      name={iconName}
-      size={16}
-      color={activeFilter === filter ? '#fff' : '#6ED5D0'}
-      style={styles.filterIcon}
-    />
-  ) : (
-    <Ionicons 
-      name={iconName} 
-      size={16} 
-      color={activeFilter === filter ? '#fff' : '#FF6B6B'} 
-      style={styles.filterIcon}
-    />
-  )
-)}
-                <Text style={[
-                  styles.filterText,
-                  activeFilter === filter ? styles.selectedFilterText : styles.unselectedFilterText,
-                ]}>
-                  {filter}
-                </Text>
-              </View>
-            </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-         {isScrollable && (
+          >
+            {filters.map((filter) => {
+              const iconName = getFilterIcon(filter);
+              return (
+                <TouchableOpacity
+                  key={filter}
+                  style={[
+                    styles.filterPill,
+                    activeFilter === filter ? styles.selectedFilter : styles.unselectedFilter,
+                  ]}
+                  onPress={() => handlechangeFilter(filter)}
+                >
+                  <View style={styles.filterContent}>
+                    {iconName && (
+                      filter === 'Shared Rooms' ? (
+                        <Ionicons 
+                          name={iconName} 
+                          size={16} 
+                          color={activeFilter === filter ? '#fff' : '#7A5AF8'} 
+                          style={styles.filterIcon}
+                        />
+                      ) : filter === 'Rental Property' ? (
+                        <MaterialCommunityIcons 
+                          name={iconName}
+                          size={16}
+                          color={activeFilter === filter ? '#fff' : '#6ED5D0'}
+                          style={styles.filterIcon}
+                        />
+                      ) : (
+                        <Ionicons 
+                          name={iconName} 
+                          size={16} 
+                          color={activeFilter === filter ? '#fff' : '#FF6B6B'} 
+                          style={styles.filterIcon}
+                        />
+                      )
+                    )}
+                    <Text style={[
+                      styles.filterText,
+                      activeFilter === filter ? styles.selectedFilterText : styles.unselectedFilterText,
+                    ]}>
+                      {filter}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+          {isScrollable && (
             <LinearGradient
               colors={['rgba(255,255,255,0)', 'rgba(255,255,255,1)']}
               start={{ x: 0, y: 0 }}
@@ -183,41 +153,39 @@ const handleApplyFilters = (filters) => {
           )}
         </View>
 
-      {activeFilter !== 'All' && 
-        <View style={styles.filtermainbox}>
-        <View style={styles.filterbox}>
-          <TouchableOpacity   onPress={() => setShowModal(true)} style={styles.filterButton}>
-            <View style={styles.insidemain}>
-            <View style={styles.filtericons}>
-            <Ionicons name="funnel" size={16} color="#fff" />
+        {activeFilter !== 'All' && 
+          <View style={styles.filtermainbox}>
+            <View style={styles.filterbox}>
+              <TouchableOpacity onPress={() => setShowModal(true)} style={styles.filterButton}>
+                <View style={styles.insidemain}>
+                  <View style={styles.filtericons}>
+                    <Ionicons name="funnel" size={16} color="#fff" />
+                  </View>
+                  {activeFiltersCount > 0 && (
+                    <Text style={styles.badgeText}>{activeFiltersCount}</Text>
+                  )}
+                </View>
+              </TouchableOpacity>
             </View>
-           
-         
- {activeFiltersCouDnt > 0 && (
-                  <Text style={styles.badgeText}>{activeFiltersCouDnt}</Text>
-                )}
-            </View>
-          </TouchableOpacity>
-        </View>
-        </View>
+          </View>
         }
-            <FilterModal 
-        visible={showModal}
-        onClose={() => setShowModal(false)}
-        activeFilter={activeFilter}
-        onApplyFilters={handleApplyFilters}
-        appliedFilters={appliedFilters}
-      />
+        
+        <FilterModal 
+          visible={showModal}
+          onClose={() => setShowModal(false)}
+          activeFilter={activeFilter}
+          onApplyFilters={handleApplyFilters}
+          appliedFilters={appliedFilters} // Pass the prop from parent
+        />
       </View>
     </View>
   );
 };
 
 const greybg = '#FBFAFF';
-const borderc ='#EBE7FF'
-const styles = StyleSheet.create({
+const borderc = '#EBE7FF';
 
-// Keep all existing styles the same
+const styles = StyleSheet.create({
   container: {
     backgroundColor: '#FFFFFF',
     padding: 16,
@@ -256,10 +224,6 @@ const styles = StyleSheet.create({
     textAlign: 'left',
     width: '83%',
   },
-  profileIcon: {
-    marginLeft: 20,
-    marginRight: -5,
-  },
   filterContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -268,32 +232,20 @@ const styles = StyleSheet.create({
   filtersScrollContent: {
     paddingRight: 10,
     paddingLeft: 0,
-  
   },
   rightIcons: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  marginRight: 5,
-},
-iconButton: {
-  marginLeft: 15,
-},
-badge: {
-  position: 'absolute',
-  top: 4,
-  right: 4,
-  backgroundColor: 'red',
-  borderRadius: 6,
-  width: 8,
-  height: 8,
-},
-
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 5,
+  },
+  iconButton: {
+    marginLeft: 15,
+  },
   filterPill: {
     paddingHorizontal: 14,
     paddingVertical: 5,
     borderRadius: 20,
     marginRight: 8,
-
   },
   selectedFilter: {
     backgroundColor: '#7A5AF8',
@@ -302,78 +254,54 @@ badge: {
     backgroundColor: greybg,
     borderWidth: 1,
     borderColor: borderc,
- 
- 
   },
-  insidemain:{
-    flex:1,
-  //  paddingHorizontal:5,
-    flexDirection:"row",
-    justifyContent:'center',
-    alignItems:'center',
-     backgroundColor: '#7A5AF8',
-     borderRadius: 100,
-    //  padding:10
+  insidemain: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#7A5AF8',
+    borderRadius: 100,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
   filterText: {
-  fontSize: 12,
+    fontSize: 12,
     color: '#212121',
     fontFamily: 'Poppinssm',
     fontWeight: '500',
     letterSpacing: 0.2,
-    // fontFamily: 'Poppinssm',
-    marginTop:3
+    marginTop: 3
   },
   selectedFilterText: {
     color: '#fff',
   },
-  filtericons:{
-  
-  },
   unselectedFilterText: {
     color: '#212121',
   },
-  filtermainbox:{
-  
-    paddingLeft:5
+  filtermainbox: {
+    paddingLeft: 5
   },
   filterButton: {
-    // backgroundColor: '#7A5AF8',
-  Width: 38,
+    Width: 38,
     height: 35,
     borderRadius: 18,
- 
     justifyContent: 'center',
     alignItems: 'center',
-  
-  },
-  badgeContainer: {
-
-  
-    borderRadius: 10,
-    // width: 18,
-    // height: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-   
-    
   },
   badgeText: {
-   marginLeft:4,
+    marginLeft: 4,
     fontSize: 12,
     fontWeight: 'bold',
     color: 'white',
   },
-scrollWrapper: {
+  scrollWrapper: {
     flex: 1,
     position: 'relative',
-   
   },
-   filterContent: {
+  filterContent: {
     flexDirection: 'row',
-    alignItems: 'center', // This ensures vertical centering
+    alignItems: 'center',
     justifyContent: 'center',
   },
   gradientOverlay: {
@@ -383,23 +311,7 @@ scrollWrapper: {
     bottom: 0,
     width: 30,
   },
-  filterContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
-    position: 'relative',
-  },
   filterIcon: {
     marginRight: 6,
   },
 });
-
-
-
-
-
-
-
-
-
-

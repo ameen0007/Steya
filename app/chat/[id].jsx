@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { showToast } from '../../services/ToastService';
+import { BeautifulLoader } from '../../componets/beatifullLoader';
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 
@@ -66,6 +67,17 @@ const ChatScreen = () => {
     timeout: 10000
   }), []);
 
+  // Check if all essential data is loaded
+  const isDataLoaded = useMemo(() => {
+    return (
+      !isConnecting && 
+      roomInfo !== null && 
+      otherUser !== null && 
+      userRole !== null &&
+      userId !== null
+    );
+  }, [isConnecting, roomInfo, otherUser, userRole, userId]);
+
   // Enhanced connection monitoring
   useEffect(() => {
     if (roomInfo?.participants && userId) {
@@ -108,6 +120,7 @@ const ChatScreen = () => {
     isInitializedRef.current = true;
 
     const socket = io(apiUrl, socketConfig);
+    
     socketRef.current = socket;
 
     socket.on('connect', () => {
@@ -348,18 +361,14 @@ const ChatScreen = () => {
     </View>
   ), []);
 
-  if (isConnecting) {
+  // Show full page loader until all data is ready
+  if (!isDataLoaded || isConnecting) {
     return (
       <SafeWrapper style={styles.container}>
         <StatusBar style="dark" />
-        <View style={styles.loadingContainer}>
-          <LinearGradient
-            colors={['#8E6AFB', '#7A5AF8']}
-            style={styles.loadingIconBackground}
-          >
-            <Ionicons name="chatbubble-ellipses" size={32} color="#FFFFFF" />
-          </LinearGradient>
-          <Text style={styles.loadingText}>Connecting to chat...</Text>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
+          <BeautifulLoader/>
+
         </View>
       </SafeWrapper>
     );

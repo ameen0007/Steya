@@ -18,6 +18,8 @@ import api from '../../services/intercepter';
 import { useSelector } from 'react-redux';
 import { router } from 'expo-router';
 import CustomAlert from '../../componets/CustomAlert ';
+import { BeautifulLoader } from '../../componets/beatifullLoader';
+import ProtectedRoute from '../protectedroute';
 
 const { width, height } = Dimensions.get('window');
 const apiUrl = process.env.EXPO_PUBLIC_API_URL;
@@ -84,6 +86,7 @@ export default function MyAds() {
 
   const toggleActiveStatus = async (adId, currentStatus) => {
     try {
+      setLoading(true);
       // Update UI optimistically
       setAds(ads.map(ad => 
         ad._id === adId ? { ...ad, isActive: !currentStatus } : ad
@@ -98,7 +101,9 @@ export default function MyAds() {
         ));
         setErrorMessage('Failed to update ad status');
         setShowErrorAlert(true);
+         setLoading(false);
       }
+      setLoading(false);
     } catch (error) {
       console.error('Error toggling status:', error);
       // Revert on error
@@ -107,6 +112,7 @@ export default function MyAds() {
       ));
       setErrorMessage('Failed to update ad status');
       setShowErrorAlert(true);
+      setLoading(false);
     }
   };
 
@@ -141,14 +147,17 @@ export default function MyAds() {
   };
 
   const performDelete = async () => {
+     setLoading(true);
     try {
       await api.delete(`${apiUrl}/api/posts/my-posts/${selectedAdId}`);
       setAds(ads.filter(ad => ad._id !== selectedAdId));
       setShowSuccessAlert(true);
+       setLoading(false);
     } catch (error) {
       console.error('Error deleting ad:', error);
       setErrorMessage('Failed to delete ad. Please try again.');
       setShowErrorAlert(true);
+       setLoading(flase);
     }
   };
 
@@ -189,6 +198,7 @@ export default function MyAds() {
   };
 
   const FilterChip = ({ label, value, active }) => (
+    <ProtectedRoute>
     <TouchableOpacity
       style={[styles.filterChip, active && styles.filterChipActive]}
       onPress={() => setStatusFilter(value)}
@@ -197,9 +207,11 @@ export default function MyAds() {
         {label}
       </Text>
     </TouchableOpacity>
+    </ProtectedRoute>
   );
 
   const StickyHeader = () => (
+     <ProtectedRoute>
     <View style={styles.stickyHeaderContainer}>
       <LinearGradient
         colors={['#7A5AF8', '#9B7DF7', '#B998F5']}
@@ -222,23 +234,23 @@ export default function MyAds() {
         </View>
       </LinearGradient>
     </View>
+    </ProtectedRoute>
   );
 
   if (loading && !refreshing) {
     return (
-      <View style={styles.container}>
-        <StatusBar style="dark" />
-        <StickyHeader />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#7A5AF8" />
-          <Text style={styles.loadingText}>Loading your ads...</Text>
-        </View>
-      </View>
+      <ProtectedRoute>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
+               <BeautifulLoader/>
+     
+             </View>
+             </ProtectedRoute>
     );
   }
 
   if (ads.length === 0) {
     return (
+       <ProtectedRoute>
       <View style={styles.container}>
         <StatusBar style="dark" />
         <StickyHeader />
@@ -255,21 +267,15 @@ export default function MyAds() {
           <Text style={styles.emptySubtitle}>
             Start by posting your first rental property or shared accommodation to reach potential tenants
           </Text>
-          <TouchableOpacity style={styles.createAdButton}>
-            <LinearGradient
-              colors={['#7A5AF8', '#9B7DF7']}
-              style={styles.createAdButtonGradient}
-            >
-              <Ionicons name="add" size={20} color="white" />
-              <Text style={styles.createAdButtonText}>Post Your First Ad</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+          
         </View>
       </View>
+      </ProtectedRoute>
     );
   }
 
   return (
+    <ProtectedRoute>
     <View style={styles.container}>
       <StatusBar style="dark" />
       <StickyHeader />
@@ -447,6 +453,7 @@ export default function MyAds() {
         onClose={() => setShowErrorAlert(false)}
       />
     </View>
+    </ProtectedRoute>
   );
 }
 

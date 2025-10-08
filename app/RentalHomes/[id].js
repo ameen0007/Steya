@@ -11,8 +11,14 @@ import  StaticMap  from '../../componets/map';
 import SkeletonLoader from '../../componets/individualloader';
 import axios from 'axios';
 import api from '../../services/intercepter';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { showToast } from '../../services/ToastService';
+import { GoogleSignin, isSuccessResponse } from '@react-native-google-signin/google-signin';
+import { preventDoubleTap } from '../../services/debounfunc';
+import { setLocationData } from '../Redux/LocationSlice';
+import { setUserData } from '../Redux/userSlice';
+import { initializePushNotifications } from '../../services/notificationHandler';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 const FlatHomeDetailsPage = () => {
       const { id } = useLocalSearchParams();
 const apiUrl = process.env.EXPO_PUBLIC_API_URL;
@@ -28,7 +34,8 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
    const user = useSelector((state) => state.user.userData);
-
+const dispatch = useDispatch();
+  const locationData = useSelector((state) => state.location.locationData);
 
 
 
@@ -111,52 +118,92 @@ useEffect(() => {
 }, [id, user?._id]); 
 
 
-  const handleChatPress = async () => {
-  console.log("Starting chat for product:", item._id);
-       if (!user?._id) {
-      // console.log("⚠️ User not logged in, skipping favorite check");
-      router.push('/login');
-      return; // <-- must be inside braces
-    }
-  try {
-    setIsCreatingRoom(true);
 
-    // First, check if room already exists
-    const checkResponse = await api.get(`${apiUrl}/api/chat/check-room`, {
-      params: { productId: item._id }
-    });
+const handleChatPress = async () => {
+  preventDoubleTap(async () => {
+    console.log("Starting chat for product:", item._id);
+    setLoading(true); // <-- Start global loading
 
-    let roomId;
+    try {
+      // --------------------------
+      // Step 1: Google Login if needed
+      // --------------------------
+      if (!user?._id) {
+        console.log("User not logged in. Initiating Google login...");
 
-    if (checkResponse.data.exists) {
-      // Use existing room (could be pending or active)
-      roomId = checkResponse.data.roomId;
-      console.log("Using existing room:", roomId, "Status:", checkResponse.data.status);
-    } else {
-      // Create new PENDING room
-      const createResponse = await api.post(`${apiUrl}/api/chat/create-room`, {
-        productId: item._id,
-        productTitle: item.title || 'Product Chat',
-        ownerId: item?.createdBy?._id 
+        await GoogleSignin.hasPlayServices();
+        const userInfo = await GoogleSignin.signIn();
+
+        if (!isSuccessResponse(userInfo)) {
+          console.log("⚠️ Google sign-in cancelled by user");
+          return; // early exit
+        }
+
+        const idToken = userInfo.data?.idToken;
+        if (!idToken) {
+          console.log("❌ No idToken found");
+          return; // early exit
+        }
+
+        // Call backend for authentication
+        const res = await axios.post(`${apiUrl}/api/auth/google-login`, { idToken });
+
+        if (!res?.data?.user) {
+          console.log("❌ Backend login failed");
+          return; // early exit
+        }
+
+        // Save data
+        if (res.data.user.location) dispatch(setLocationData(res.data.user.location));
+        await AsyncStorage.setItem("authToken", res.data.accessToken);
+        await AsyncStorage.setItem("userId", res.data.user._id);
+        dispatch(setUserData(res.data.user));
+
+        // Initialize push notifications (non-blocking)
+        initializePushNotifications(apiUrl)
+          .then(pushToken => console.log("Push ready:", pushToken))
+          .catch(err => console.error("Push setup error:", err.message));
+      }
+
+      // --------------------------
+      // Step 2: Check/Create Chat Room
+      // --------------------------
+      setIsCreatingRoom(true);
+
+      const checkResponse = await api.get(`${apiUrl}/api/chat/check-room`, {
+        params: { productId: item._id }
       });
-      
-      roomId = createResponse.data.roomId;
-      console.log("Created new pending room:", roomId);
+
+      let roomId;
+
+      if (checkResponse.data.exists) {
+        roomId = checkResponse.data.roomId;
+      } else {
+        const createResponse = await api.post(`${apiUrl}/api/chat/create-room`, {
+          productId: item._id,
+          productTitle: item.title || 'Product Chat',
+          ownerId: item?.createdBy?._id
+        });
+        roomId = createResponse.data.roomId;
+      }
+
+      // Navigate to chat
+      router.push({
+        pathname: '/chat/[id]',
+        params: { id: roomId }
+      });
+
+    } catch (error) {
+      console.error("❌ Error in chat/login flow:", error);
+      showToast('Failed to start chat. Please try again.');
+    } finally {
+      // Always reset loading
+      setLoading(false);
+      setIsCreatingRoom(false);
     }
-
-    // Navigate to chat
-    router.push({
-      pathname: '/chat/[id]',
-      params: { id: roomId }
-    });
-
-  } catch (error) {
-    console.error('Error creating chat room:', error);
-    showToast('Failed to start chat. Please try again.');
-  } finally {
-    setIsCreatingRoom(false);
-  }
+  });
 };
+
 
 
   const handleBackPress = () => {
@@ -449,7 +496,7 @@ useEffect(() => {
       </ScrollView>
 
       {/* Bottom Buttons */}
-    {item.createdBy._id !== user._id ? (
+    {item?.createdBy?._id !== user?._id ? (
     <View style={{
   flexDirection: 'row',
   justifyContent: 'space-between',
@@ -551,7 +598,7 @@ useEffect(() => {
       />
     </View>
   )}
-  keyExtractor={(image) => image._id} // use _id from backend
+  keyExtractor={(image) => image?._id} // use _id from backend
 />
 
 

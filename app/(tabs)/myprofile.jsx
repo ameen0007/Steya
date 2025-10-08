@@ -25,7 +25,7 @@ import { removePushTokenFromBackend } from '../../services/notificationHandler';
 import { StatusBar } from 'expo-status-bar';
 import { BeautifulLoader } from '../../componets/beatifullLoader';
 import DonationButton from '../../componets/DonationButton';
-import { useToast } from 'react-native-toast-notifications';
+
 import api from '../../services/intercepter';
 import { showToast } from '../../services/ToastService';
 import CustomAlert from '../../componets/CustomAlert '; // Import the CustomAlert
@@ -36,7 +36,7 @@ const ProfilePage = () => {
     offlineAccess: true,
   });
   
-  const toast = useToast();
+ 
   const user = useSelector((state) => state.user.userData);
   const [loading, setLoading] = useState(false);
   const [loading1, setLoading1] = useState(false);

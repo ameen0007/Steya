@@ -10,7 +10,9 @@ import { Animated } from 'react-native';
 import { preventDoubleTap } from '../../services/debounfunc';
 import { StatusBar } from 'expo-status-bar';
 const { width } = Dimensions.get('window');
-
+import ProtectedRoute from '../protectedroute';
+import { useSelector } from 'react-redux';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const mainbg = '#7A5AF8';
@@ -121,40 +123,54 @@ const handlePressOut = () => {
           }}
         />
 
-        <Tabs.Screen
-          name="explore"
-          options={{
-            tabBarButton: (props) => (
-              <Pressable
-                 onPress={() =>
-          preventDoubleTap(() => router.push('../Listingpage'))
+  
+     <Tabs.Screen
+  name="explore"
+  options={{
+    tabBarButton: (props) => {
+      const user = useSelector((state: any) => state.user.userData);
+
+
+      const handlePress = async () => {
+        const isLoggingOut = await AsyncStorage.getItem("isLoggingOut");
+
+        if (!user && isLoggingOut !== "true") {
+          router.push("/login"); // go to login if not logged in
+        } else {
+          router.push("../Listingpage"); // go to post page
         }
-                onPressIn={handlePressIn}
-                onPressOut={handlePressOut}
-                style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
-              >
-                {/* ✅ FIXED - Using animatedButtonStyle instead of inline scale.value */}
-                <Animated.View
-  style={[
-    {
-      height: 60,
-      width: 60,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: 99999,
-      backgroundColor: mainbg,
-      marginBottom: 30,
+      };
+
+      return (
+        <Pressable
+          onPress={() => preventDoubleTap(handlePress)}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+        >
+          <Animated.View
+            style={[
+              {
+                height: 60,
+                width: 60,
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 9999,
+                backgroundColor: mainbg,
+                marginBottom: 30,
+              },
+              { transform: [{ scale: scale }] },
+            ]}
+          >
+            <Ionicons name="add" color="white" size={24} />
+          </Animated.View>
+        </Pressable>
+      );
     },
-    { transform: [{ scale: scale }] }  
-  ]}
->
-                  <Ionicons name="add" color="white" size={24} />
-                </Animated.View>
-              </Pressable>
-            ),
-            tabBarIcon: () => null,
-          }}
-        />
+    tabBarIcon: () => null,
+  }}
+/>
+       
 
         <Tabs.Screen
           name="likes"
@@ -181,6 +197,7 @@ const handlePressOut = () => {
             )
           }}
         />
+
 
         <Tabs.Screen
           name="myprofile"
