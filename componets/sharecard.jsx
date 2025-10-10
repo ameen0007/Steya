@@ -31,7 +31,7 @@ const SharedRoomCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) =
       onPress={() => {
         try {
           if (!id) {
-           showToast("Missing ID", "No ID was found for this item.");
+           showToast("Missing ID");
             return;
           }
           router.push({
@@ -40,7 +40,7 @@ const SharedRoomCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) =
           });
         } catch (error) {
           console.error("Navigation error:", error);
-         showToast("Navigation Failed", "Unable to open the detail page.");
+         showToast("Navigation Failed");
         }
       }}
     >

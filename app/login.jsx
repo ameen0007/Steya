@@ -100,72 +100,93 @@ useFocusEffect(
 
 // login.js - CORRECTED FOR EAS BUILD
 
-
 const handleGoogleLogin = async () => {
   preventDoubleTap(async () => {
     try {
       console.log("🔄 Starting Google login...");
-      await GoogleSignin.hasPlayServices();
       
+      // Check Play Services
+      const hasServices = await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      console.log("✅ Google Play Services available:", hasServices);
+
+      // Sign in
       const userInfo = await GoogleSignin.signIn();
-      
-      if (isSuccessResponse(userInfo)) {
-        const idToken = userInfo.data?.idToken;
-        if (!idToken) {
-          console.log("❌ No idToken found");
-          return;
-        }
+      console.log("🔑 Google signIn result:", JSON.stringify(userInfo, null, 2));
 
-        // API call
-        console.log("🌐 Calling backend for authentication...");
-        const res = await axios.post(`${apiUrl}/api/auth/google-login`, { idToken });
-
-        // Save location
-        if (res.data.user?.location) {
-          console.log("📍 Setting location data");
-          dispatch(setLocationData(res.data.user.location));
-        }
-
-        // Save auth token and user data
-        await AsyncStorage.setItem("authToken", res.data.accessToken);
-        await AsyncStorage.setItem("userId", res.data.user._id);
-        dispatch(setUserData(res.data.user));
-        
-        console.log("✅ User authenticated successfully");
-
-        // ✅ SETUP PUSH NOTIFICATIONS AFTER LOGIN (Non-blocking)
-        // This will work perfectly after EAS build
-        console.log("📱 Initializing push notifications...");
-        initializePushNotifications(apiUrl)
-          .then(pushToken => {
-            if (pushToken) {
-              console.log("✅ Push notifications ready:", pushToken);
-            } else {
-              console.log("⚠️ Push notifications not available (user may have denied permissions)");
-            }
-          })
-          .catch(pushError => {
-            console.error("⚠️ Push notification setup error:", pushError.message);
-            // Login continues successfully even if push fails
-          });
-
-        // Navigate immediately (don't wait for push notifications)
-        if (res.data.user?.location || locationData) {
-          console.log("➡️ Navigating to home");
-          router.replace("(tabs)");
-        } else {
-          console.log("➡️ Navigating to location setup");
-          router.replace("/locationScreen");
-        }
-      } else {
-        console.log("⚠️ Google sign-in cancelled by user");
+      // Check response
+      if (!isSuccessResponse(userInfo)) {
+        console.warn("⚠️ Google sign-in cancelled or failed", JSON.stringify(userInfo, null, 2));
+        showToast("Google sign-in cancelled or failed");
+        return;
       }
+
+      // Extract idToken
+      const idToken = userInfo.data?.idToken;
+      console.log("🔐 idToken:", idToken);
+
+      if (!idToken) {
+        console.error("❌ No idToken returned from Google Sign-In");
+        showToast("Google login failed: No token received");
+        return;
+      }
+
+      // Check apiUrl
+      console.log("🌐 Backend API URL:", apiUrl);
+
+      // API call
+      console.log("🌐 Calling backend for authentication...");
+      const res = await axios.post(`${apiUrl}/api/auth/google-login`, { idToken })
+        .then(response => {
+          console.log("✅ Backend response:", JSON.stringify(response.data, null, 2));
+          return response;
+        })
+        .catch(err => {
+          console.error("❌ Axios error:", err?.toJSON ? err.toJSON() : err);
+          throw err; // rethrow to outer catch
+        });
+
+      // Save location if available
+      if (res.data.user?.location) {
+        console.log("📍 Setting location data:", res.data.user.location);
+        dispatch(setLocationData(res.data.user.location));
+      } else {
+        console.log("ℹ️ No location returned from server");
+      }
+
+      // Save auth token and user data
+      console.log("💾 Saving authToken and userId to AsyncStorage");
+      await AsyncStorage.setItem("authToken", res.data.accessToken);
+      await AsyncStorage.setItem("userId", res.data.user._id);
+      dispatch(setUserData(res.data.user));
+      
+      console.log("✅ User authenticated successfully");
+
+      // Push notifications setup
+      console.log("📱 Initializing push notifications...");
+      initializePushNotifications(apiUrl)
+        .then(pushToken => {
+          if (pushToken) console.log("✅ Push notifications ready:", pushToken);
+          else console.log("⚠️ Push notifications not available (user may have denied permissions)");
+        })
+        .catch(pushError => console.error("⚠️ Push notification setup error:", pushError.message));
+
+      // Navigation
+      if (res.data.user?.location || locationData) {
+        console.log("➡️ Navigating to home screen");
+        router.replace("(tabs)");
+      } else {
+        console.log("➡️ Navigating to location setup screen");
+        router.replace("/locationScreen");
+      }
+
     } catch (error) {
-      console.error("❌ Login error:", error.message);
-      // Show user-friendly error
+      console.error("❌ Login error caught in catch:", error);
+      console.log("🔎 Full error object:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+
+      // User-friendly messages
       if (error.response?.status === 401) {
-        showToast("Authentication failed. Please try again.")
-      } else if (error.message?.includes('network')) {
+        showToast("Authentication failed. Please try again.");
+      } else if (error.message?.toLowerCase().includes('network')) {
         showToast("Network error. Please check your connection.");
       } else {
         showToast("Login failed. Please try again.");

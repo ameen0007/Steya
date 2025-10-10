@@ -97,7 +97,7 @@ const HomeScreen = () => {
       }
     } catch (error) {
       console.error('Error toggling favorite:', error);
-      showToast('Error', error.response?.data?.message || 'Failed to update favorites');
+      showToast(error.response?.data?.message || "Failed to toggle favorite");
     }
   };
 
@@ -201,7 +201,7 @@ const HomeScreen = () => {
         return;
       }
       console.error("❌ Fetch error:", err);
-      showToast('Error', 'Failed to fetch rooms');
+      showToast('Failed to fetch rooms');
     } finally {
       // Always reset fetching flag
       isFetchingRef.current = false;

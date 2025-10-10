@@ -67,7 +67,7 @@ const DonationButton = ({
     } catch (error) {
       console.log('Payment Error:', error);
       if (error.code !== 2) {
-       showToast('Payment Failed', error.description || 'Payment was not completed. Please try again.');
+       showToast('Payment was not completed. Please try again.');
       }
       if (onError) onError(error);
     } finally {

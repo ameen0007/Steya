@@ -89,7 +89,7 @@ const FavoritesScreen = () => {
       }
     } catch (error) {
       console.error('Error removing favorite:', error);
-      showToast('Error',"Failed to remove from favorites")
+      showToast("Failed to remove from favorites")
     }
   };
 
