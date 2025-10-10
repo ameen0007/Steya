@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { FontAwesome5, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useLocation } from '../context/LocationContext';
@@ -11,7 +11,7 @@ export const LocationHeader = ({
   setActiveFilter, 
   activeFilter, 
   onApplyFilters, 
-  appliedFilters // This comes from parent as prop
+  appliedFilters // Receives from parent
 }) => {
   const user = useSelector((state) => state.user.userData);
   const filters = ['All', 'Shared Rooms', 'PG/Hostels', 'Rental Property'];
@@ -19,12 +19,7 @@ export const LocationHeader = ({
   const [scrollViewWidth, setScrollViewWidth] = useState(0);
   const isScrollable = contentWidth > scrollViewWidth;
   
-  // Remove this duplicate state declaration since we get it as prop
-  // const [appliedFilters, setAppliedFilters] = useState({});
-  
-  const [activeCategory, setActiveCategory] = useState("shared");
   const [showModal, setShowModal] = useState(false);
-  const [Onlyfilterdata, setOnlyfilterdata] = useState([]);
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
   const locationData = useSelector((state) => state.location.locationData);
 
@@ -42,29 +37,21 @@ export const LocationHeader = ({
   };
 
   // Updated handleApplyFilters function
-  const handleApplyFilters = (filters) => {
-    // Calculate active count for badge
+  const handleApplyFilters = useCallback((filters) => {
     const activeCount = Object.values(filters).filter(filter => filter.selected).length;
     setActiveFiltersCount(activeCount);
-    setOnlyfilterdata(filters); // Use this for local state if needed
     
-    // Pass filters to parent component (HomeScreen)
     if (onApplyFilters) {
       onApplyFilters(filters);
     }
-    
-    console.log("✅ Applied filters:", filters);
-  };
+  }, [onApplyFilters]);
 
- // In LocationHeader component, replace the handlechangeFilter function:
-// In LocationHeader component, fix the handlechangeFilter function:
-const handlechangeFilter = (filter) => {
-  // This should call the parent's handleFilterChange function
-  if (setActiveFilter) {
-    setActiveFilter(filter);
-  }
-};
-  const hasNotification = true; // or from redux state
+  // Fixed handlechangeFilter function
+  const handlechangeFilter = useCallback((filter) => {
+    if (setActiveFilter) {
+      setActiveFilter(filter);
+    }
+  }, [setActiveFilter]);
 
   return (
     <View style={styles.container}>
@@ -175,143 +162,137 @@ const handlechangeFilter = (filter) => {
           onClose={() => setShowModal(false)}
           activeFilter={activeFilter}
           onApplyFilters={handleApplyFilters}
-          appliedFilters={appliedFilters} // Pass the prop from parent
+          appliedFilters={appliedFilters}
         />
       </View>
     </View>
   );
 };
 
-const greybg = '#FBFAFF';
-const borderc = '#EBE7FF';
-
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    borderRadius: 20,
+    backgroundColor: '#fff',
+    paddingTop: 10,
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
   },
   leftContainer: {
     flex: 1,
-    justifyContent: 'center',
-    marginLeft: 5,
+    marginRight: 12,
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 4,
   },
   locatingText: {
-    fontSize: 17,
-    fontWeight: 'bold',
-    color: '#212121',
-    marginLeft: 7,
-    fontFamily: 'Poppins',
+    marginLeft: 8,
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
   },
   addressText: {
-    fontSize: 13,
-    color: '#757575',
-    fontFamily: 'Poppinssm',
-    letterSpacing: 0.4,
-    marginTop: 4,
-    textAlign: 'left',
-    width: '83%',
-  },
-  filterContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
-  },
-  filtersScrollContent: {
-    paddingRight: 10,
-    paddingLeft: 0,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
   },
   rightIcons: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 5,
   },
   iconButton: {
-    marginLeft: 15,
+    padding: 8,
   },
-  filterPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 5,
-    borderRadius: 20,
-    marginRight: 8,
-  },
-  selectedFilter: {
-    backgroundColor: '#7A5AF8',
-  },
-  unselectedFilter: {
-    backgroundColor: greybg,
-    borderWidth: 1,
-    borderColor: borderc,
-  },
-  insidemain: {
-    flex: 1,
-    flexDirection: "row",
-    justifyContent: 'center',
+  filterContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#7A5AF8',
-    borderRadius: 100,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  filterText: {
-    fontSize: 12,
-    color: '#212121',
-    fontFamily: 'Poppinssm',
-    fontWeight: '500',
-    letterSpacing: 0.2,
-    marginTop: 3
-  },
-  selectedFilterText: {
-    color: '#fff',
-  },
-  unselectedFilterText: {
-    color: '#212121',
-  },
-  filtermainbox: {
-    paddingLeft: 5
-  },
-  filterButton: {
-    Width: 38,
-    height: 35,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  badgeText: {
-    marginLeft: 4,
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: 'white',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
   },
   scrollWrapper: {
     flex: 1,
     position: 'relative',
   },
+  filtersScrollContent: {
+    paddingRight: 8,
+  },
+  filterPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 8,
+    borderWidth: 1.5,
+  },
+  selectedFilter: {
+    backgroundColor: '#7A5AF8',
+    borderColor: '#7A5AF8',
+  },
+  unselectedFilter: {
+    backgroundColor: '#fff',
+    borderColor: '#E5E7EB',
+  },
   filterContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+  },
+  filterIcon: {
+    marginRight: 6,
+  },
+  filterText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  selectedFilterText: {
+    color: '#fff',
+  },
+  unselectedFilterText: {
+    color: '#374151',
   },
   gradientOverlay: {
     position: 'absolute',
     right: 0,
     top: 0,
     bottom: 0,
-    width: 30,
+    width: 40,
   },
-  filterIcon: {
-    marginRight: 6,
+  filtermainbox: {
+    marginLeft: 8,
+  },
+  filterbox: {
+    position: 'relative',
+  },
+  filterButton: {
+    padding: 0,
+  },
+  insidemain: {
+    position: 'relative',
+  },
+  filtericons: {
+    backgroundColor: '#7A5AF8',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  badgeText: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#EF4444',
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    minWidth: 18,
+    textAlign: 'center',
+    overflow: 'hidden',
   },
 });

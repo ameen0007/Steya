@@ -64,9 +64,6 @@ const DonationButton = ({
         paymentData.razorpay_signature
       );
 
-      if (onSuccess) onSuccess(paymentData);
-    showToast('Success', 'Thank you for your donation! 🥰');
-
     } catch (error) {
       console.log('Payment Error:', error);
       if (error.code !== 2) {

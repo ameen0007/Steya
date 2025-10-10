@@ -76,7 +76,6 @@ const FavoritesScreen = () => {
   const removeFromFavorites = async (roomId, favoriteId) => {
          if (!user?._id) {
       // console.log("⚠️ User not logged in, skipping favorite check");
-      router.push('/login');
       return; // <-- must be inside braces
     }
     try {
@@ -123,7 +122,7 @@ const FavoritesScreen = () => {
       onToggleFavorite: toggleFavorite
     };
 
-    console.log(item.category,"item.category-----------");
+    console.log(item,"item.category-----------");
 
     let cardComponent;
     switch (item.category) {

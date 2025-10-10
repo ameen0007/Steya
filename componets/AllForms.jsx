@@ -38,6 +38,7 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL
 
 import { router, useLocalSearchParams } from 'expo-router';
 import { showToast } from '../services/ToastService';
+import { BeautifulLoader } from './beatifullLoader';
 
 const SharedRoomForm = () => {
   // ✅ Get route parameters
@@ -102,7 +103,7 @@ const SharedRoomForm = () => {
 
     } catch (error) {
       console.error('Error fetching room data:', error);
-     showToast('Error', 'Failed to load room data');
+     showToast('Failed to load room data');
     } finally {
       setLoading(false);
     }
@@ -152,6 +153,7 @@ const SharedRoomForm = () => {
   // ✅ SIMPLIFIED SUBMIT FUNCTION - Handles both create and update
 const handleSubmit = async () => {
   try {
+    setLoading(true); // 🔹 Start loading
     console.log(locationData, "location--------");
 
     // 1️⃣ Validate required fields
@@ -167,7 +169,8 @@ const handleSubmit = async () => {
     if (formData.habitPreferences && !Array.isArray(formData.habitPreferences)) errors.push("Please select at least one habit preference.");
 
     if (errors.length > 0) {
-     showToast("Validation Error", errors.join("\n"));
+      showToast("Validation Error", errors.join("\n"));
+      setLoading(false); // ❌ Stop loading if validation fails
       return;
     }
 
@@ -211,7 +214,7 @@ const handleSubmit = async () => {
     // 4️⃣ Prepare FormData
     const uploadData = new FormData();
 
-    // ✅ CRITICAL: Send existing images that should be kept (only for edit mode)
+    // ✅ Send existing images to keep (only for edit)
     if (isEdit && existingImages.length > 0) {
       uploadData.append("existingImages", JSON.stringify(existingImages));
       console.log('📤 Sending existing images to keep:', existingImages.length);
@@ -246,7 +249,7 @@ const handleSubmit = async () => {
       });
     });
 
-    // ✅ Append thumbnail if it's the first image and we have new images
+    // ✅ Append thumbnail
     if (compressedImages[0]?.thumbnail && existingImages.length === 0) {
       uploadData.append("thumbnail", {
         uri: compressedImages[0].thumbnail,
@@ -259,12 +262,6 @@ const handleSubmit = async () => {
     let res;
     if (isEdit && roomId) {
       console.log("🔄 Updating room...", roomId);
-      console.log("📤 Uploading:", {
-        existingImages: existingImages.length,
-        newImages: compressedImages.length,
-        totalImages: formData.images.length
-      });
-      
       res = await api.put(`${apiUrl}/api/update/${roomId}`, uploadData, {
         timeout: 60000,
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -280,13 +277,14 @@ const handleSubmit = async () => {
     }
 
     console.log("✅ Success:", res.data);
-    showToast(
-      "Success", 
-      isEdit ? "Your room listing has been updated!" : "Your room listing has been submitted!"
-    );
-    
-    router.back();
 
+    if (isEdit) {
+      showToast("Your room listing has been updated!");
+    } else {
+      showToast("Your room listing has been submitted!");
+    }
+
+    router.back();
   } catch (err) {
     console.error("❌ Operation failed:", err);
     let errorMessage = `Something went wrong while ${isEdit ? 'updating' : 'submitting'} your listing.`;
@@ -295,9 +293,12 @@ const handleSubmit = async () => {
     } else if (err.response?.status) {
       errorMessage = `Server error (${err.response.status}): ${err.response.data?.message || 'Unknown error'}`;
     }
-   showToast("Error", errorMessage);
+    showToast("Error", errorMessage);
+  } finally {
+    setLoading(false); // ✅ Always stop loading, success or fail
   }
 };
+
 
   // ✅ SIMPLE IMAGE REMOVAL - Just remove from local state
   const handleRemoveImage = (index) => {
@@ -489,9 +490,10 @@ const handleSubmit = async () => {
   if (loading) {
     return (
       <SafeWrapper>
-        <View style={styles.loadingContainer}>
-          <Text>Loading room data...</Text>
-        </View>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
+                    <BeautifulLoader/>
+          
+                  </View>
       </SafeWrapper>
     );
   }
@@ -603,7 +605,7 @@ const PGHostelForm = () => {
 
     } catch (error) {
       console.error('Error fetching PG/Hostel data:', error);
-      showToast('Error', 'Failed to load PG/Hostel data');
+      showToast('Failed to load PG/Hostel data');
     } finally {
       setLoading(false);
     }
@@ -668,6 +670,7 @@ const PGHostelForm = () => {
   // ✅ UPDATED SUBMIT FUNCTION - Handles both create and update
 const handleSubmit = async () => {
   try {
+    setLoading(true); // 🔹 Start loader
     console.log(locationData, "location--------");
 
     // 1️⃣ Validate required fields
@@ -707,6 +710,7 @@ const handleSubmit = async () => {
 
     if (errors.length > 0) {
       showToast("Validation Error", errors.join("\n"));
+      setLoading(false); // ❌ Stop loader if validation fails
       return;
     }
 
@@ -817,10 +821,11 @@ const handleSubmit = async () => {
     }
 
     console.log("✅ Success:", res.data);
-    showToast(
-      "Success",
-      isEdit ? "Your PG/Hostel listing has been updated!" : "Your PG/Hostel listing has been submitted!"
-    );
+    if (isEdit) {
+      showToast("Your PG/Hostel listing has been updated!");
+    } else {
+      showToast("Your PG/Hostel listing has been submitted!");
+    }
 
     // Navigate back
     router.back();
@@ -834,8 +839,11 @@ const handleSubmit = async () => {
       errorMessage = `Server error (${err.response.status}): ${err.response.data?.message || 'Unknown error'}`;
     }
     showToast("Error", errorMessage);
+  } finally {
+    setLoading(false); // ✅ Always stop loader
   }
 };
+
 
 
   // ✅ SIMPLE IMAGE REMOVAL - Just remove from local state
@@ -1074,9 +1082,10 @@ const handleSubmit = async () => {
   if (loading) {
     return (
       <SafeWrapper>
-        <View style={styles.loadingContainer}>
-          <Text>Loading PG/Hostel data...</Text>
-        </View>
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
+                    <BeautifulLoader/>
+          
+                  </View>
       </SafeWrapper>
     );
   }
@@ -1199,7 +1208,7 @@ const FlatHomeForm = () => {
 
     } catch (error) {
       console.error('Error fetching Flat/Home data:', error);
-      showToast('Error', 'Failed to load property data');
+      showToast('Failed to load property data');
     } finally {
       setLoading(false);
     }
@@ -1252,21 +1261,31 @@ const FlatHomeForm = () => {
   // ✅ UPDATED SUBMIT FUNCTION - Handles both create and update
 const handleSubmit = async () => {
   try {
+    setLoading(true); // 🔹 Start loader
     console.log(locationData, "location--------");
 
     // 1️⃣ Validate required fields
     const errors = [];
-    if (!formData.images || formData.images.length === 0) errors.push("Please select at least one image.");
-    if (!formData.title?.trim()) errors.push("Title is required.");
-    if (!formData.description?.trim()) errors.push("Description is required.");
-    if (!formData.monthlyRent || isNaN(formData.monthlyRent)) errors.push("Monthly rent is required and must be a number.");
-    if (!formData.securityDeposit || isNaN(formData.securityDeposit)) errors.push("Security deposit is required and must be a number.");
-    if (!formData.contactPhone?.trim()) errors.push("Contact phone is required.");
-    if (!formData.propertyType?.trim()) errors.push("Property type is required.");
-    if (!formData.furnishedStatus?.trim()) errors.push("Furnished status is required.");
+    if (!formData.images || formData.images.length === 0)
+      errors.push("Please select at least one image.");
+    if (!formData.title?.trim())
+      errors.push("Title is required.");
+    if (!formData.description?.trim())
+      errors.push("Description is required.");
+    if (!formData.monthlyRent || isNaN(formData.monthlyRent))
+      errors.push("Monthly rent is required and must be a number.");
+    if (!formData.securityDeposit || isNaN(formData.securityDeposit))
+      errors.push("Security deposit is required and must be a number.");
+    if (!formData.contactPhone?.trim())
+      errors.push("Contact phone is required.");
+    if (!formData.propertyType?.trim())
+      errors.push("Property type is required.");
+    if (!formData.furnishedStatus?.trim())
+      errors.push("Furnished status is required.");
 
     if (errors.length > 0) {
       showToast("Validation Error", errors.join("\n"));
+      setLoading(false); // ❌ Stop loader if validation fails
       return;
     }
 
@@ -1357,7 +1376,6 @@ const handleSubmit = async () => {
     // 5️⃣ Make API call - CREATE or UPDATE
     let res;
     if (isEdit && roomId) {
-      // UPDATE request
       console.log("🔄 Updating property...", roomId);
       console.log("📤 Uploading:", {
         existingImages: existingImages.length,
@@ -1371,7 +1389,6 @@ const handleSubmit = async () => {
         transformRequest: (data) => data,
       });
     } else {
-      // CREATE request
       console.log("🆕 Creating new property...");
       res = await api.post(`${apiUrl}/api/rooms`, uploadData, {
         timeout: 60000,
@@ -1381,10 +1398,11 @@ const handleSubmit = async () => {
     }
 
     console.log("✅ Success:", res.data);
-   showToast(
-      "Success",
-      isEdit ? "Your property listing has been updated!" : "Your property listing has been submitted!"
-    );
+    if (isEdit) {
+      showToast("Your property listing has been updated!");
+    } else {
+      showToast("Your property listing has been submitted!");
+    }
 
     // Navigate back
     router.back();
@@ -1398,8 +1416,11 @@ const handleSubmit = async () => {
       errorMessage = `Server error (${err.response.status}): ${err.response.data?.message || 'Unknown error'}`;
     }
     showToast("Error", errorMessage);
+  } finally {
+    setLoading(false); // ✅ Always stop loader
   }
 };
+
 
   // ✅ SIMPLE IMAGE REMOVAL - Just remove from local state
   const handleRemoveImage = (index) => {
@@ -1660,9 +1681,10 @@ const handleSubmit = async () => {
   if (loading) {
     return (
       <SafeWrapper>
-        <View style={styles.loadingContainer}>
-          <Text>Loading property data...</Text>
-        </View>
+           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
+                    <BeautifulLoader/>
+          
+                  </View>
       </SafeWrapper>
     );
   }

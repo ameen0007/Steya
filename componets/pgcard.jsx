@@ -37,20 +37,27 @@ const PGHostelCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) => 
       }
     >
       <View style={styles.cardContainer}>
-        {/* Top image section with distance and favorite button */}
+        {/* Top image section with overlays */}
         <View style={styles.imageContainer}>
           <Image source={{ uri: data?.thumbnail?.url }} style={styles.image} />
+          
+          {/* Top Overlay - Location and Favorite */}
           <View style={styles.topOverlay}>
+            {/* Location Badge - Left Top */}
+            <View style={styles.distanceContainer}>
+              <Ionicons name="location" size={14} color="#7A5AF8" />
+                     {data?.individualDistance && (
+              data.individualDistance === '0 m' ? (
+                <Text style={styles.distanceText}>10 meters</Text>
+              ) : (
+                <Text style={styles.distanceText}>
+                  {`Around ${data.individualDistance}`}
+                </Text>
+              )
+            )}
+            </View>
 
-            <View style={styles.distanceBadge}>
-              {activeFilter === 'All' &&
-                <View style={styles.categoryBadge}>
-                  <Ionicons name='business-sharp' size={16} color='#FF6B6B' /> 
-                </View>
-              }
-            </View> 
-
-            {/* Favorite Button */}
+            {/* Favorite Button - Right Top */}
             <TouchableOpacity 
               style={styles.favoriteButton}
               onPress={(e) => {
@@ -69,8 +76,16 @@ const PGHostelCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) => 
                 />
               )}
             </TouchableOpacity>
-
           </View>
+
+          {/* Bottom Overlay - Category */}
+          {activeFilter === 'All' && (
+            <View style={styles.bottomOverlay}>
+              <View style={styles.categoryBadge}>
+                <Ionicons name='business-sharp' size={16} color='#FF6B6B' /> 
+              </View>
+            </View>
+          )}
         </View>
 
         {/* Content section */}
@@ -94,7 +109,6 @@ const PGHostelCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) => 
           {/* Gender and price info */}
           <View style={styles.infoContainer}>
             <View style={styles.genderContainer}>
-
               <View style={styles.firstinner} >
                 <MaterialCommunityIcons
                   name={data?.pgGenderCategory === 'ladies' ? 'human-female' : 'human-male'}
@@ -134,7 +148,6 @@ const PGHostelCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) => 
                   Left
                 </Text>
               </View>
-
             </View>
 
             <Text style={styles.price}>
@@ -148,11 +161,6 @@ const PGHostelCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) => 
     </TouchableOpacity>
   );
 };
-
-const greybg = '#F4F4F4';
-const maintext = '#212121';
-const lighttext = '#757575';
-const mainbg = '#7A5AF8';
 
 const styles = StyleSheet.create({
   cardWrapper: {
@@ -177,6 +185,16 @@ const styles = StyleSheet.create({
     height: 180,
     resizeMode: 'cover',
   },
+
+  bottomOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    paddingHorizontal: 10,
+    paddingBottom: 8,
+  },
   topOverlay: {
     position: 'absolute',
     top: 0,
@@ -184,13 +202,40 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 10,
+    alignItems: 'flex-start', // Important: align to top
+    paddingHorizontal:5, // Remove horizontal padding
+    paddingVertical: 5, // Remove top padding
   },
-  date: {},
-  postedDate: {
-    fontFamily: 'Poppinssm',
-    fontSize: 10,
-    color: lighttext
+  distanceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 8, // Reduced horizontal padding
+    paddingVertical: 6, // Minimal vertical padding
+    borderRadius: 20,
+    gap: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+    marginTop: 8, // Control spacing from top here
+    marginLeft: 8, // Control spacing from left here
+  },
+  distanceText: {
+    color: '#333333',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  categoryBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    padding: 8,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
   favoriteButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
@@ -211,7 +256,7 @@ const styles = StyleSheet.create({
     paddingBottom: 10
   },
   innercon: {
-    backgroundColor: greybg,
+    backgroundColor: '#F4F4F4',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 20,
@@ -230,24 +275,12 @@ const styles = StyleSheet.create({
     fontSize: 17,
     flex: 1,
     fontWeight: 'bold',
-    color: maintext,
-  },
-  categoryBadge: {
-    backgroundColor: '#F5F5F5',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 100,
-  },
-  categoryText: {
-    color: '#555',
-    fontSize: 12,
-    fontWeight: '500',
+    color: '#212121',
   },
   description: {
     fontSize: 13,
     color: '#666',
     marginBottom: 12,
-    fontFamily: 'Poppinsssm'
   },
   infoContainer: {
     flexDirection: 'row',
@@ -261,7 +294,7 @@ const styles = StyleSheet.create({
   },
   firstinner: {
     flexDirection: 'row',
-    backgroundColor: greybg,
+    backgroundColor: '#F4F4F4',
     paddingHorizontal: 6,
     paddingVertical: 4,
     borderRadius: 20,
@@ -274,20 +307,13 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: maintext,
+    color: '#212121',
   },
-  typeContainer: {
-    marginTop: 10,
-    backgroundColor: '#EEE',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 4,
-    alignSelf: 'flex-start',
+  date: {},
+  postedDate: {
+    fontSize: 10,
+    color: '#757575'
   },
-  typeText: {
-    fontSize: 12,
-    color: '#555',
-  }
 });
 
 export default PGHostelCard;

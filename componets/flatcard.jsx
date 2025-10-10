@@ -30,19 +30,28 @@ const FlatHomeCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) => 
       activeOpacity={0.8}
     >
       <View style={styles.cardContainer}>
-        {/* Top image section with distance and favorite button */}
+        {/* Top image section with overlays */}
         <View style={styles.imageContainer}>
           <Image source={{ uri: data?.thumbnail?.url }} style={styles.image} />
+          
+          {/* Top Overlay - Location and Favorite */}
           <View style={styles.topOverlay}>
-            <View>
-              {activeFilter === 'All' &&
-                <View style={styles.categoryBadge}>
-                  <MaterialCommunityIcons name='home-city' size={16} color='#6ED5D0' />
-                </View>
-              }
+            {/* Location Badge - Left Top */}
+            <View style={styles.distanceContainer}>
+              <Ionicons name="location" size={14} color="#7A5AF8" />
+          {data?.individualDistance && (
+  data.individualDistance === '0 m' ? (
+    <Text style={styles.distanceText}>10 meters</Text>
+  ) : (
+    <Text style={styles.distanceText}>
+      {`Around ${data.individualDistance}`}
+    </Text>
+  )
+)}
+
             </View>
 
-            {/* Favorite Button */}
+            {/* Favorite Button - Right Top */}
             <TouchableOpacity 
               style={styles.favoriteButton}
               onPress={(e) => {
@@ -62,6 +71,15 @@ const FlatHomeCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) => 
               )}
             </TouchableOpacity>
           </View>
+
+          {/* Bottom Overlay - Category */}
+          {activeFilter === 'All' && (
+            <View style={styles.bottomOverlay}>
+              <View style={styles.categoryBadge}>
+                <MaterialCommunityIcons name='home-city' size={16} color='#6ED5D0' />
+              </View>
+            </View>
+          )}
         </View>
 
         {/* Content section */}
@@ -166,20 +184,50 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 10,
+    alignItems: 'flex-start',
+    paddingHorizontal: 0,
+    paddingTop: 0,
   },
-  distanceBadge: {
+  bottomOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    paddingHorizontal: 10,
+    paddingBottom: 8,
+  },
+  distanceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
     height: 24,
-    backgroundColor: greybg,
-    paddingHorizontal: 10,
-    borderRadius: 20,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    gap: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+    marginTop: 8,
+    marginLeft: 8,
   },
   distanceText: {
-    color: maintext,
+    color: '#333333',
+    fontSize: 12,
     fontWeight: '600',
-    marginLeft: 4,
+  },
+  categoryBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    padding: 8,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
   favoriteButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
@@ -194,6 +242,8 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 8,
+    marginRight: 8,
   },
   contentContainer: {
     padding: 16,
@@ -208,17 +258,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontWeight: 'bold',
     color: maintext,
-  },
-  categoryBadge: {
-    backgroundColor: '#F5F5F5',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  categoryText: {
-    color: '#555',
-    fontSize: 12,
-    fontWeight: '500',
   },
   description: {
     fontSize: 13,
@@ -270,18 +309,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: maintext,
   },
-  typeContainer: {
-    marginTop: 10,
-    backgroundColor: '#EEE',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 4,
-    alignSelf: 'flex-start',
-  },
-  typeText: {
-    fontSize: 12,
-    color: '#555',
-  }
 });
 
 export default FlatHomeCard;
