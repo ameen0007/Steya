@@ -155,7 +155,7 @@ const SharedRoomCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) =
 
 const styles = StyleSheet.create({
   cardWrapper: {
-    marginHorizontal: 12,
+    marginHorizontal: 5,
     marginVertical: 8,
   },
   cardContainer: {
@@ -169,6 +169,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 4,
     overflow: 'hidden',
+   
+    paddingBottom: 10,
   },
   imageContainer: {
     position: 'relative',
@@ -180,13 +182,13 @@ const styles = StyleSheet.create({
   },
   topOverlay: {
     position: 'absolute',
-    top: 0,
+    top:1,
     left: 0,
     right: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 10,
-    paddingVertical: 8,
+    // paddingVertical: 8,
   },
   bottomOverlay: {
     position: 'absolute',
@@ -206,8 +208,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 20,
     gap: 4,
     shadowColor: '#000',
@@ -215,6 +217,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
+    marginTop: -6, // Control spacing from top here
   },
   distanceText: {
     color: '#333333',
@@ -234,6 +237,7 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 3, // Control spacing from top here
   },
   categoryBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
@@ -310,7 +314,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 17,
     fontWeight: 'bold',
-    color: '#212121',
+    color: '#7A5AF8',
   },
   postedDate: {
     fontSize: 10,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { FlatList, View, Text, RefreshControl, StyleSheet, ActivityIndicator } from "react-native";
+import { FlatList, View, Text, RefreshControl, StyleSheet, ActivityIndicator, TouchableOpacity } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
 import { LocationHeader } from "../../componets/locationfilter";
 import SharedCard from "../../componets/sharecard";
@@ -8,9 +8,16 @@ import FlatCard from "../../componets/flatcard";
 import { SkeletonList } from "../../componets/loading";
 import SafeWrapper from "../../services/Safewrapper";
 import axios from "axios";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import api from "../../services/intercepter";
 import { showToast } from "@/services/ToastService";
+import { StatusBar } from "expo-status-bar";
+import { setUnreadStatus } from "../Redux/unreadSlice";
+
+// ✅ UPDATE CHECK IMPORTS
+import CustomUpdateDialog from '../../componets/CustomUpdateDialog';
+import { triggerPlayStoreUpdate } from '../../services/updateService';
+import * as Application from 'expo-application';
 
 const filterMap = {
   All: "all",
@@ -33,7 +40,14 @@ const HomeScreen = () => {
   const [favorites, setFavorites] = useState({});
   const [appliedFilters, setAppliedFilters] = useState({});
   const [skip, setSkip] = useState(0);
-
+  const [networkError, setNetworkError] = useState(false);
+  const dispatch = useDispatch();
+  
+  // ✅ UPDATE DIALOG STATES
+  const [showUpdateDialog, setShowUpdateDialog] = useState(false);
+  const [updateType, setUpdateType] = useState('flexible');
+  const [latestVersion, setLatestVersion] = useState('1.0.0');
+  
   const limit = 15;
   const userLat = locationData?.lat;
   const userLng = locationData?.lng;
@@ -43,7 +57,59 @@ const HomeScreen = () => {
   const abortControllerRef = useRef(null);
   const fetchTimeoutRef = useRef(null);
 
-  // Calculate approximate road distance (straight-line * 1.4 for road distance)
+  // ✅ CHECK FOR UPDATES ON APP OPEN
+  useEffect(() => {
+    const checkForUpdates = async () => {
+      try {
+        // Wait 3 seconds after HomeScreen loads
+        setTimeout(async () => {
+          const currentVersion = Application.nativeApplicationVersion || '1.0.0';
+          console.log('📱 Current app version:', currentVersion);
+          
+          try {
+            // Send current version to backend
+            const response = await axios.get(`${apiUrl}/api/app-version`, {
+              params: {
+                currentVersion: currentVersion
+              }
+            });
+            
+            if (response.data.success && response.data.hasUpdate) {
+              console.log("🔔 Update available from backend!");
+              console.log('📦 Latest version:', response.data.latestVersion);
+              
+             
+              setLatestVersion(response.data.latestVersion);
+              setUpdateType(response.data.updateType || 'flexible');
+              setShowUpdateDialog(true);
+            } else {
+              console.log("✅ App is up to date!");
+            }
+          } catch (apiError) {
+            console.log('⚠️ Backend API not available:', apiError.message);
+          
+          }
+        }, 3000);
+      } catch (error) {
+        console.log('Update check error:', error);
+      }
+    };
+
+    checkForUpdates();
+  }, [apiUrl]);
+
+  // ✅ HANDLE UPDATE ACTIONS
+  const handleUpdateNow = async () => {
+    setShowUpdateDialog(false);
+    // Trigger actual Play Store update
+    await triggerPlayStoreUpdate(updateType);
+  };
+
+  const handleUpdateLater = () => {
+    setShowUpdateDialog(false);
+  };
+
+  // Calculate approximate road distance
   const calculateRoadDistance = (straightLineDistance) => {
     const roadDistance = straightLineDistance * 1.4;
     return Math.round(roadDistance);
@@ -61,6 +127,52 @@ const HomeScreen = () => {
       return false;
     }
   };
+
+  useEffect(() => {
+    // Check for unread messages when app starts
+    const checkUnreadMessages = async () => {
+      if (!user?._id) return;
+      
+      try {
+        console.log('🔍 Checking for unread messages on app start...');
+
+        const response = await api.get(`${apiUrl}/api/chat/chatrooms`);
+        
+        const roomsData = response.data?.chatrooms || [];
+        
+        let unreadCount = 0;
+        
+        roomsData.forEach((room) => {
+          if (room && room.status === 'active' && room.hasMessages) {
+            const isFromOtherUser = room.lastMessageSender && 
+                                   room.lastMessageSender._id.toString() !== user._id.toString();
+            
+            const hasUserReadIt = room.readBy?.some(readByUser => 
+              readByUser?.toString() === user._id.toString()
+            );
+            
+            const isUnread = isFromOtherUser && !hasUserReadIt;
+            
+            if (isUnread) {
+              unreadCount++;
+            }
+          }
+        });
+        
+        console.log('🎯 App start - Unread messages found:', unreadCount);
+        
+        dispatch(setUnreadStatus({ 
+          hasUnread: unreadCount > 0, 
+          count: unreadCount 
+        }));
+        
+      } catch (error) {
+        console.log('❌ Error checking unread messages:', error);
+      }
+    };
+
+    checkUnreadMessages();
+  }, [user?._id, dispatch]);
 
   // Check favorites for all rooms
   const checkAllFavorites = async (roomList) => {
@@ -82,6 +194,11 @@ const HomeScreen = () => {
 
   // Toggle favorite from HomeScreen
   const toggleFavorite = async (roomId) => {
+    if (!user?._id){ 
+      showToast("Please log in to favorite properties");
+      return false;
+    }
+       
     try {
       const response = await api.post(`${apiUrl}/api/toggle`, {
         roomId: roomId
@@ -97,13 +214,12 @@ const HomeScreen = () => {
       }
     } catch (error) {
       console.error('Error toggling favorite:', error);
-      showToast(error.response?.data?.message || "Failed to toggle favorite");
+      showToast("Failed to toggle favorite");
     }
   };
 
   // Fetch rooms with simple pagination
   const fetchRooms = useCallback(async (reset = false) => {
-    // Check if already fetching
     if (isFetchingRef.current) {
       console.log('⏸️ Already fetching, skipping duplicate call');
       return;
@@ -114,10 +230,8 @@ const HomeScreen = () => {
       return;
     }
 
-    // Set fetching flag IMMEDIATELY
     isFetchingRef.current = true;
 
-    // Cancel any existing request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -139,6 +253,7 @@ const HomeScreen = () => {
         setSkip(0);
         setHasMore(true);
         setLoading(true);
+        setNetworkError(false);
       } else {
         setLoading(true);
       }
@@ -181,19 +296,19 @@ const HomeScreen = () => {
           return uniqueRooms;
         });
 
-        // Update skip for next fetch
         if (!reset) {
           setSkip(prev => prev + newRooms.length);
         } else {
           setSkip(newRooms.length);
         }
 
-        // Check if there are more rooms
         setHasMore(newRooms.length === limit);
 
         if (newRooms.length > 0) {
           checkAllFavorites(newRooms);
         }
+        
+        setNetworkError(false);
       }
     } catch (err) {
       if (axios.isCancel(err)) {
@@ -201,9 +316,15 @@ const HomeScreen = () => {
         return;
       }
       console.error("❌ Fetch error:", err);
-      showToast('Failed to fetch rooms');
+      
+      if (!err.response && err.message === 'Network Error') {
+        setNetworkError(true);
+        showToast('No internet connection');
+      } else {
+        setNetworkError(false);
+        showToast('Failed to fetch rooms');
+      }
     } finally {
-      // Always reset fetching flag
       isFetchingRef.current = false;
       setLoading(false);
       setInitialLoading(false);
@@ -211,27 +332,23 @@ const HomeScreen = () => {
     }
   }, [userLat, userLng, activeFilter, appliedFilters, skip, apiUrl, user]);
 
-  // Handle filter application from FilterModal
   const handleApplyFilters = useCallback((filters) => {
     console.log('🎯 Applying filters:', filters);
     setAppliedFilters(filters);
   }, []);
 
-  // Reset filters when changing main filter
   const handleFilterChange = useCallback((filter) => {
     console.log('🔄 Filter changed to:', filter);
     setActiveFilter(filter);
     setAppliedFilters({});
   }, []);
 
-  // Handle pull-to-refresh
   const handleRefresh = useCallback(() => {
     console.log('🔃 Pull to refresh triggered');
     setRefreshing(true);
     fetchRooms(true);
   }, [fetchRooms]);
 
-  // Effect to handle data fetching
   useEffect(() => {
     if (!userLat || !userLng) {
       return;
@@ -239,23 +356,19 @@ const HomeScreen = () => {
 
     console.log('🎬 Effect triggered - scheduling fetch');
     
-    // Clear any existing timeout
     if (fetchTimeoutRef.current) {
       clearTimeout(fetchTimeoutRef.current);
     }
 
-    // Abort any ongoing request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       isFetchingRef.current = false;
     }
 
-    // Debounce with timeout
     fetchTimeoutRef.current = setTimeout(() => {
       fetchRooms(true);
     }, 400);
 
-    // Cleanup function
     return () => {
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);
@@ -293,81 +406,69 @@ const HomeScreen = () => {
     }
   };
 
-  // Get skeleton type based on active filter
   const getSkeletonType = () => {
     const category = filterMap[activeFilter];
     if (category === "all") return "shared";
     return category;
   };
 
-  // Beautiful empty state with creative messages
   const EmptyState = () => {
-    const messages = [
-      {
-        emoji: "🔍",
-        title: "Ooooh! Nothing Here Yet",
-        subtitle: "We're working hard to bring properties to your area",
-        tip: "It looks like there are no rooms within 45 km of your location"
-      },
-      {
-        emoji: "🌟",
-        title: "Be the First!",
-        subtitle: "You're exploring uncharted territory",
-        tip: "No properties found within 45 km - try expanding your search area"
-      }
-    ];
-
-    // Pick a random message for variety
-    const message = messages[Math.floor(Math.random() * messages.length)];
-
     return (
       <View style={styles.emptyStateContainer}>
         <View style={styles.emptyStateContent}>
-          <View style={styles.emptyIconContainer}>
-            <Text style={styles.emptyStateIcon}>{message.emoji}</Text>
-            <View style={styles.shimmerEffect} />
+          <View style={styles.emptyIconCircle}>
+            <Ionicons name="home-outline" size={48} color="#7A5AF8" />
           </View>
           
-          <Text style={styles.emptyStateTitle}>{message.title}</Text>
-          <Text style={styles.emptyStateSubtitle}>{message.subtitle}</Text>
+          <Text style={styles.emptyStateTitle}>No Properties Found</Text>
+          <Text style={styles.emptyStateSubtitle}>
+            We couldn't find any properties within 50 km of your location
+          </Text>
           
-          <View style={styles.emptyStateDivider} />
-          
-          <View style={styles.tipContainer}>
-            <Text style={styles.tipIcon}>💡</Text>
-            <Text style={styles.tipText}>{message.tip}</Text>
-          </View>
-
-          <View style={styles.suggestionsContainer}>
-            <Text style={styles.suggestionsTitle}>What you can do:</Text>
-            <View style={styles.suggestionItem}>
-              <Text style={styles.suggestionBullet}>✨</Text>
-              <Text style={styles.suggestionText}>Try clearing your filters</Text>
+          <View style={styles.emptyActionContainer}>
+            <View style={styles.emptyActionItem}>
+              <Ionicons name="options-outline" size={20} color="#6B7280" />
+              <Text style={styles.emptyActionText}>Try adjusting filters</Text>
             </View>
-            <View style={styles.suggestionItem}>
-              <Text style={styles.suggestionBullet}>🔄</Text>
-              <Text style={styles.suggestionText}>Switch to a different category</Text>
+            <View style={styles.emptyActionItem}>
+              <Ionicons name="location-outline" size={20} color="#6B7280" />
+              <Text style={styles.emptyActionText}>Change location</Text>
             </View>
-            <View style={styles.suggestionItem}>
-              <Text style={styles.suggestionBullet}>📍</Text>
-              <Text style={styles.suggestionText}>Change your search location</Text>
-            </View>
-            <View style={styles.suggestionItem}>
-              <Text style={styles.suggestionBullet}>⏰</Text>
-              <Text style={styles.suggestionText}>Check back later for new listings</Text>
-            </View>
-          </View>
-
-          <View style={styles.workingIndicator}>
-            <View style={styles.pulseCircle} />
-            <Text style={styles.workingText}>We're actively working on it!</Text>
           </View>
         </View>
       </View>
     );
   };
 
-  // Footer loader
+  const NetworkErrorState = () => {
+    return (
+      <View style={styles.emptyStateContainer}>
+        <View style={styles.emptyStateContent}>
+          <View style={[styles.emptyIconCircle, { backgroundColor: '#FEF2F2' }]}>
+            <Ionicons name="cloud-offline-outline" size={48} color="#EF4444" />
+          </View>
+          
+          <Text style={styles.emptyStateTitle}>Connection Lost</Text>
+          <Text style={styles.emptyStateSubtitle}>
+            Please check your internet connection and try again
+          </Text>
+          
+          <TouchableOpacity 
+            style={styles.retryButton}
+            onPress={() => {
+              setNetworkError(false);
+              handleRefresh();
+            }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="refresh-outline" size={20} color="#FFFFFF" />
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
   const renderFooter = () => {
     if (!loading || initialLoading) {
       return null;
@@ -381,18 +482,9 @@ const HomeScreen = () => {
     );
   };
 
-  // Disclaimer banner component
-  const DisclaimerBanner = () => (
-    <View style={styles.disclaimerBanner}>
-      <Ionicons name="information-circle" size={18} color="#3B82F6" style={styles.disclaimerIcon} />
-      <Text style={styles.disclaimerText}>
-    Distance may be a little different from actual
-      </Text>
-    </View>
-  );
-
   return (
     <SafeWrapper>
+      <StatusBar style="dark" />
       <View style={styles.container}>
         <LocationHeader 
           setActiveFilter={handleFilterChange} 
@@ -419,12 +511,26 @@ const HomeScreen = () => {
                 tintColor="#7A5AF8"
               />
             }
-            ListHeaderComponent={rooms.length > 0 ? DisclaimerBanner : null}
-            ListEmptyComponent={EmptyState}
+            ListEmptyComponent={networkError ? NetworkErrorState : EmptyState}
             ListFooterComponent={renderFooter}
             showsVerticalScrollIndicator={false}
           />
         )}
+
+        {/* ✅ BEAUTIFUL CUSTOM UPDATE DIALOG */}
+        <CustomUpdateDialog
+          visible={showUpdateDialog}
+          version={latestVersion}
+          updateType={updateType}
+          features={[
+            '🎨 Beautiful new UI design',
+            '🚀 Faster performance',
+            '🐛 Bug fixes and improvements',
+            '✨ New features you\'ll love',
+          ]}
+          onUpdate={handleUpdateNow}
+          onLater={handleUpdateLater}
+        />
       </View>
     </SafeWrapper>
   );
@@ -440,127 +546,71 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     flexGrow: 1,
   },
-  // Enhanced Empty State Styles
   emptyStateContainer: {
     flex: 1,
     justifyContent: 'center',
-    paddingTop: 40,
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    paddingVertical: 60,
   },
   emptyStateContent: {
     alignItems: 'center',
-    paddingHorizontal: 32,
+    maxWidth: 340,
   },
-  emptyIconContainer: {
-    position: 'relative',
+  emptyIconCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#F5F3FF',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 24,
   },
-  emptyStateIcon: {
-    fontSize: 72,
-  },
-  shimmerEffect: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 50,
-  },
   emptyStateTitle: {
-    fontSize: 26,
-    fontWeight: '800',
+    fontSize: 24,
+    fontWeight: '700',
     color: '#1F2937',
-    marginBottom: 8,
+    marginBottom: 12,
     textAlign: 'center',
   },
   emptyStateSubtitle: {
     fontSize: 15,
     color: '#6B7280',
     textAlign: 'center',
-    marginBottom: 24,
     lineHeight: 22,
+    marginBottom: 32,
   },
-  emptyStateDivider: {
-    width: 80,
-    height: 4,
-    backgroundColor: '#7A5AF8',
-    borderRadius: 2,
-    marginBottom: 24,
+  emptyActionContainer: {
+    width: '100%',
+    gap: 12,
   },
-  tipContainer: {
+  emptyActionItem: {
     flexDirection: 'row',
-    backgroundColor: '#FEF3C7',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-    width: '100%',
-  },
-  tipIcon: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  tipText: {
-    flex: 1,
-    fontSize: 13,
-    color: '#92400E',
-    fontWeight: '600',
-    lineHeight: 18,
-  },
-  suggestionsContainer: {
-    width: '100%',
     backgroundColor: '#F9FAFB',
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    marginBottom: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    gap: 12,
   },
-  suggestionsTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#374151',
-    marginBottom: 16,
-  },
-  suggestionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    paddingLeft: 4,
-  },
-  suggestionBullet: {
-    fontSize: 18,
-    marginRight: 12,
-  },
-  suggestionText: {
-    flex: 1,
+  emptyActionText: {
     fontSize: 14,
     color: '#4B5563',
-    lineHeight: 20,
     fontWeight: '500',
   },
-  workingIndicator: {
+  retryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EEF2FF',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#C7D2FE',
-  },
-  pulseCircle: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
     backgroundColor: '#7A5AF8',
-    marginRight: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    gap: 8,
+    marginTop: 24,
   },
-  workingText: {
-    fontSize: 13,
-    color: '#4F46E5',
+  retryButtonText: {
+    fontSize: 15,
+    color: '#FFFFFF',
     fontWeight: '600',
   },
   footerLoader: {
@@ -573,30 +623,6 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 14,
     color: '#6B7280',
-    fontWeight: '500',
-  },
-  // Disclaimer Banner Styles
-  disclaimerBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EFF6FF',
-    borderRadius: 10,
-    padding: 7,
-    marginHorizontal: 12,
-    marginTop: 12,
-    marginBottom: 8,
-    borderLeftWidth: 3,
-    
-    borderLeftColor: '#3B82F6',
-  },
-  disclaimerIcon: {
-    marginRight: 10,
-  },
-  disclaimerText: {
-    flex: 1,
-    fontSize: 12,
-    color: '#1E40AF',
-    lineHeight: 16,
     fontWeight: '500',
   },
 });

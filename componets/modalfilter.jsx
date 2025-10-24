@@ -24,60 +24,145 @@ const filters = {
     { 
       key: 'genderPreference', 
       label: 'Gender Preference', 
-      options: ['male', 'female', 'any'] // Changed to match database
+      options: [
+        { label: 'Male Only', value: 'male' },
+        { label: 'Female Only', value: 'female' },
+        { label: 'Any Gender', value: 'any' }
+      ]
     },
     { 
       key: 'habitPreferences', 
       label: 'Habits', 
-      options: ['No Smoking', 'Fitness', 'Early Bird'] 
+      options: [
+        { label: 'Non-Smoker', value: 'Non-Smoker' },
+        { label: 'Non-Alcoholic', value: 'Non-Alcoholic' },
+        { label: 'Early Riser', value: 'Early Riser' },
+        { label: 'Night Owl', value: 'Night Owl' },
+        { label: 'Fitness Focused', value: 'Fitness Focused' },
+        { label: 'Vegetarian', value: 'Vegetarian' },
+        { label: 'Pet Friendly', value: 'Pet Friendly' },
+        { label: 'Quiet Person', value: 'Quiet Person' }
+      ]
     },
     { 
       key: 'purpose', 
       label: 'Purpose', 
-      options: ['Study', 'Job', 'Vacation'] 
+      options: [
+        { label: 'Working Professional', value: 'Working Professional' },
+        { label: 'Student', value: 'Student' },
+        { label: 'Job Seeker', value: 'Job Seeker' },
+        { label: 'Freelancer', value: 'Freelancer' }
+      ]
     },
   ],
+  
   pg: [
-    // { key: 'AvailableSpace', label: 'Available Space' },
-    { key: 'priceRange', label: 'Price Range (₹)', type: 'range', min: 0, max: 30000, step: 500 },
+    { 
+      key: 'priceRange', 
+      label: 'Price Range (₹)', 
+      type: 'range', 
+      min: 0, 
+      max: 30000, 
+      step: 500 
+    },
     { 
       key: 'pgGenderCategory', 
       label: 'Gender Category', 
-      options: ['ladies', 'gents', 'coed'] // Changed to match database
+      options: [
+        { label: 'Gents Only', value: 'gents' },
+        { label: 'Ladies Only', value: 'ladies' },
+        { label: 'Co-ed (Both)', value: 'coed' },
+      ]
     },
     { 
       key: 'roomTypesAvailable', 
       label: 'Room Types', 
-      options: ['Single', 'Double'] 
+      options: [
+        { label: 'Single Sharing', value: 'single' },
+        { label: 'Double Sharing', value: 'double' },
+        { label: 'Triple Sharing', value: 'triple' },
+        { label: 'Dormitory', value: 'dormitory' },
+      ]
     },
     { 
       key: 'mealsProvided', 
-      label: 'Facilities', 
-      options: ['Wi-Fi', 'Hot Water', 'Laundry'] 
+      label: 'Meals Provided', 
+      options: [
+        { label: 'Breakfast', value: 'breakfast' },
+        { label: 'Lunch', value: 'lunch' },
+        { label: 'Dinner', value: 'dinner' },
+      ]
+    },
+    { 
+      key: 'amenities', 
+      label: 'Amenities', 
+      options: [
+        { label: 'Wi-Fi', value: 'wifi' },
+        { label: 'Hot Water', value: 'hot_water' },
+        { label: 'Laundry', value: 'laundry' },
+        { label: 'AC Rooms', value: 'ac' },
+        { label: 'TV/Entertainment', value: 'tv' },
+        { label: 'Study Room', value: 'study_room' },
+        { label: 'Gym', value: 'gym' },
+        { label: 'Parking', value: 'parking' },
+      ]
     },
     { 
       key: 'rules', 
       label: 'Rules', 
-      options: ['No Smoking', 'No Visitors', 'Quiet Hours'] 
+      options: [
+        { label: 'No Smoking', value: 'no_smoking' },
+        { label: 'No Alcohol', value: 'no_alcohol' },
+        { label: 'No Pets', value: 'no_pet' },
+        { label: 'No Loud Music', value: 'no_loud_music' },
+        { label: 'No Opposite Gender Visitors', value: 'no_opposite_gender' },
+        { label: 'Curfew Timings', value: 'curfew' },
+      ]
     },
   ],
+  
   rental: [
-    { 
-      key: 'propertyType', 
-      label: 'Property Type', 
-      options: ['Flats', 'Apartment', 'Houses'] 
-    },
+   { 
+  key: 'propertyType', 
+  label: 'Property Type', 
+  options: [
+    { label: 'Apartment/Flat', value: 'Apartment/Flat' },  // ✅ Changed
+    { label: 'Independent House', value: 'Independent House' },  // ✅ Changed
+    { label: 'Villa', value: 'Villa' },  // ✅ Changed
+    { label: 'Duplex', value: 'Duplex' },  // ✅ Changed
+  ]
+},
     { 
       key: 'furnishedStatus', 
       label: 'Furnishing', 
-      options: ['furnished', 'semi_furnished', 'unfurnished'] // Changed to match database
+      options: [
+        // ✅ FIXED: Match form values exactly
+        { label: 'Fully Furnished', value: 'furnished' },
+        { label: 'Semi Furnished', value: 'semi_furnished' },
+        { label: 'Unfurnished', value: 'unfurnished' },
+      ]
     },
-    {
-      key: 'preferredTenant',
-      label: 'Preferred Tenant',
-      options: ['Only Family', 'Any'] // Note: Check if this matches 'tenantPreference' in database
+    { 
+      key: 'tenantPreference', // ✅ FIXED: Changed from 'preferredTenant' to match schema & form
+      label: 'Preferred Tenant', 
+      options: [
+        // ✅ FIXED: Match form values exactly
+        { label: 'Family Only', value: 'family' },
+        { label: 'Working Professionals', value: 'professionals' },
+        { label: 'Students', value: 'students' },
+        { label: 'Any', value: 'any' },
+      ]
     },
-    // 📐 Size & Layout
+    { 
+      key: 'parking', 
+      label: 'Parking', 
+      options: [
+        { label: 'Two Wheeler', value: 'two_wheeler' },
+        { label: 'Four Wheeler', value: 'four_wheeler' },
+        { label: 'Both', value: 'both' },
+        { label: 'No Parking', value: 'none' },
+      ]
+    },
     { 
       key: 'squareFeet', 
       label: 'Square Feet', 
@@ -102,7 +187,6 @@ const filters = {
       max: 5, 
       step: 1 
     },
-    // 💰 Cost Filters
     { 
       key: 'securityDeposit', 
       label: 'Security Deposit (₹)', 
@@ -121,7 +205,6 @@ const filters = {
     },
   ]
 };
-
 // Map activeFilter values to filter keys
 const filterCategoryMap = {
   'Shared Rooms': 'shared',
@@ -173,7 +256,12 @@ const FilterModal = ({ visible, onClose, activeFilter, onApplyFilters, appliedFi
         };
       } else if (filter.options) {
         initialState[filter.key] = {
-          options: filter.options.map(opt => ({ label: opt, selected: false })),
+          options: filter.options.map(opt => ({
+            // Handle both string options and {label, value} objects
+            label: typeof opt === 'string' ? opt : opt.label,
+            value: typeof opt === 'string' ? opt : opt.value,
+            selected: false
+          })),
           selected: false
         };
       } else {
@@ -184,7 +272,6 @@ const FilterModal = ({ visible, onClose, activeFilter, onApplyFilters, appliedFi
       }
     });
     setSelectedFilters(initialState);
-
   };
 
   const activeCount = useMemo(() => {
@@ -250,7 +337,7 @@ const FilterModal = ({ visible, onClose, activeFilter, onApplyFilters, appliedFi
 
   const handleReset = () => {
     initializeFilters();
-     onApplyFilters({});
+    onApplyFilters({});
   };
 
   const renderFilterItem = (filter) => {
@@ -258,8 +345,6 @@ const FilterModal = ({ visible, onClose, activeFilter, onApplyFilters, appliedFi
 
     if (!filter.type && !filter.options) {
       return (
-    
- 
         <View key={filter.key} style={styles.filterItems}>
           <Text style={styles.filterLabel}>{filter.label}</Text>
           <Switch
@@ -269,8 +354,6 @@ const FilterModal = ({ visible, onClose, activeFilter, onApplyFilters, appliedFi
             thumbColor={selectedFilters[filter.key].value ? "#fff" : "#f4f3f4"}
           />
         </View>
-        
-              
       );
     }
 
@@ -279,23 +362,28 @@ const FilterModal = ({ visible, onClose, activeFilter, onApplyFilters, appliedFi
         <View key={filter.key} style={styles.filterItem}>
           <Text style={styles.filterLabel}>{filter.label}</Text>
           <View style={styles.optionsContainer}>
-            {selectedFilters[filter.key].options.map((option, index) => (
-              <TouchableOpacity
-                key={option.label}
-                style={[
-                  styles.optionPill,
-                  option.selected && styles.selectedPill
-                ]}
-                onPress={() => handleToggleOption(filter.key, index)}
-              >
-                <Text style={[
-                  styles.optionText,
-                  option.selected && styles.selectedOptionText
-                ]}>
-                  {option.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {selectedFilters[filter.key].options.map((option, index) => {
+              // Handle both string labels and object labels
+              const displayLabel = option.label;
+              
+              return (
+                <TouchableOpacity
+                  key={`${filter.key}-${index}`}
+                  style={[
+                    styles.optionPill,
+                    option.selected && styles.selectedPill
+                  ]}
+                  onPress={() => handleToggleOption(filter.key, index)}
+                >
+                  <Text style={[
+                    styles.optionText,
+                    option.selected && styles.selectedOptionText
+                  ]}>
+                    {displayLabel}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
       );

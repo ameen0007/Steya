@@ -164,7 +164,7 @@ const PGHostelCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) => 
 
 const styles = StyleSheet.create({
   cardWrapper: {
-    marginHorizontal: 12,
+    marginHorizontal: 5,
     marginVertical: 8,
   },
   cardContainer: {
@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 8, // Reduced horizontal padding
-    paddingVertical: 6, // Minimal vertical padding
+    paddingVertical: 3, // Minimal vertical padding
     borderRadius: 20,
     gap: 4,
     shadowColor: '#000',
@@ -219,8 +219,8 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
-    marginTop: 8, // Control spacing from top here
-    marginLeft: 8, // Control spacing from left here
+    marginTop: 3, // Control spacing from top here
+    marginLeft: 3, // Control spacing from left here
   },
   distanceText: {
     color: '#333333',
@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#212121',
+    color: '#7A5AF8',
   },
   date: {},
   postedDate: {

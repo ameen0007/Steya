@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { FontAwesome5, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useLocation } from '../context/LocationContext';
@@ -35,7 +35,13 @@ export const LocationHeader = ({
       case 'Rental Property': return 'home-city'; 
     }
   };
-
+  useEffect(() => {
+    // Reset filter count and clear applied filters when switching categories
+    setActiveFiltersCount(0);
+    if (onApplyFilters) {
+      onApplyFilters({}); // Clear filters in parent
+    }
+  }, [activeFilter]);
   // Updated handleApplyFilters function
   const handleApplyFilters = useCallback((filters) => {
     const activeCount = Object.values(filters).filter(filter => filter.selected).length;
@@ -146,7 +152,7 @@ export const LocationHeader = ({
               <TouchableOpacity onPress={() => setShowModal(true)} style={styles.filterButton}>
                 <View style={styles.insidemain}>
                   <View style={styles.filtericons}>
-                    <Ionicons name="funnel" size={16} color="#fff" />
+                    <Ionicons name="funnel" size={13} color="#fff" />
                   </View>
                   {activeFiltersCount > 0 && (
                     <Text style={styles.badgeText}>{activeFiltersCount}</Text>
@@ -172,14 +178,14 @@ export const LocationHeader = ({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#fff',
-    paddingTop: 10,
+    paddingTop:2,
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingBottom: 15,
   },
   leftContainer: {
     flex: 1,
@@ -192,7 +198,7 @@ const styles = StyleSheet.create({
   },
   locatingText: {
     marginLeft: 8,
-    fontSize: 12,
+    fontSize: 13,
     color: '#6B7280',
     fontWeight: '500',
   },
@@ -211,8 +217,9 @@ const styles = StyleSheet.create({
   filterContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingHorizontal: 13,
+    paddingBottom: 13,
+    // backgroundColor: 'blue',
   },
   scrollWrapper: {
     flex: 1,
@@ -222,13 +229,16 @@ const styles = StyleSheet.create({
     paddingRight: 8,
   },
   filterPill: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 15,
     paddingVertical: 8,
     borderRadius: 20,
     marginRight: 8,
     borderWidth: 1.5,
+    alignItems: 'center',
+
   },
   selectedFilter: {
+  
     backgroundColor: '#7A5AF8',
     borderColor: '#7A5AF8',
   },
@@ -244,7 +254,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   filterText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   selectedFilterText: {
@@ -274,8 +284,8 @@ const styles = StyleSheet.create({
   },
   filtericons: {
     backgroundColor: '#7A5AF8',
-    width: 40,
-    height: 40,
+    width: 37,
+    height: 37,
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
@@ -286,9 +296,9 @@ const styles = StyleSheet.create({
     right: -5,
     backgroundColor: '#EF4444',
     color: '#fff',
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: '700',
-    paddingHorizontal: 6,
+    paddingHorizontal: 5,
     paddingVertical: 2,
     borderRadius: 10,
     minWidth: 18,

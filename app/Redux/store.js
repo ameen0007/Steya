@@ -8,10 +8,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import userReducer from './userSlice';
 import locationReducer from './LocationSlice';
-
+import chatReducer from './unreadSlice';
 const rootReducer = combineReducers({
   user: userReducer,
   location: locationReducer,
+  chat : chatReducer
 });
 
 const persistConfig = {

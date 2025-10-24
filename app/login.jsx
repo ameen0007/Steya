@@ -23,6 +23,7 @@ import { preventDoubleTap } from '../services/debounfunc';
 import { setLocationData } from './Redux/LocationSlice';
 import { initializePushNotifications } from '../services/notificationHandler';
 import { showToast } from '../services/ToastService';
+import ClickableFooter from '../componets/ClickableFooter';
 export default function Login() {
 
  const apiUrl = process.env.EXPO_PUBLIC_API_URL
@@ -116,7 +117,7 @@ const handleGoogleLogin = async () => {
       // Check response
       if (!isSuccessResponse(userInfo)) {
         console.warn("⚠️ Google sign-in cancelled or failed", JSON.stringify(userInfo, null, 2));
-        showToast("Google sign-in cancelled or failed");
+      
         return;
       }
 
@@ -296,9 +297,7 @@ const handleGoogleLogin = async () => {
 
 
     {/* Footer text */}
-    <Text style={styles.footerText}>
-    By clicking, I accept the Terms & Conditions & Privacy Policy
-    </Text>
+<ClickableFooter/>
  
 </View>
 

@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
   RefreshControl,
   Switch,
+  Share,
+  Platform,
 } from 'react-native';
 import { Ionicons, MaterialIcons, Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -40,10 +42,21 @@ export default function MyAds() {
   const [showErrorAlert, setShowErrorAlert] = useState(false);
   const [selectedAdId, setSelectedAdId] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
+  const [showRenewAlert, setShowRenewAlert] = useState(false);
+  const [renewingAdId, setRenewingAdId] = useState(null);
 
   useEffect(() => {
     fetchMyAds();
-  }, [statusFilter, categoryFilter, page]);
+  }, [page]);
+
+  useEffect(() => {
+    // Reset to page 1 when filters change
+    if (page !== 1) {
+      setPage(1);
+    } else {
+      fetchMyAds();
+    }
+  }, [statusFilter, categoryFilter]);
 
   const fetchMyAds = async () => {
     if (!user?._id) {
@@ -55,7 +68,7 @@ export default function MyAds() {
       const params = {
         page,
         limit: 10,
-        status: statusFilter,
+        status: 'all', // Always fetch all ads
         category: categoryFilter !== 'all' ? categoryFilter : undefined
       };
 
@@ -141,12 +154,12 @@ export default function MyAds() {
     });
   };
 
-  const handleDelete = (adId) => {
+  const handleSold = (adId) => {
     setSelectedAdId(adId);
     setShowDeleteAlert(true);
   };
 
-  const performDelete = async () => {
+  const performSold = async () => {
      setLoading(true);
     try {
       await api.delete(`${apiUrl}/api/posts/my-posts/${selectedAdId}`);
@@ -154,10 +167,72 @@ export default function MyAds() {
       setShowSuccessAlert(true);
        setLoading(false);
     } catch (error) {
-      console.error('Error deleting ad:', error);
-      setErrorMessage('Failed to delete ad. Please try again.');
+      console.error('Error marking as sold:', error);
+      setErrorMessage('Failed to mark ad as sold. Please try again.');
       setShowErrorAlert(true);
-       setLoading(flase);
+       setLoading(false);
+    }
+  };
+
+  const handleRenew = (adId) => {
+    setRenewingAdId(adId);
+    setShowRenewAlert(true);
+  };
+
+  const performRenew = async () => {
+    setLoading(true);
+    try {
+      const response = await api.patch(`${apiUrl}/api/posts/my-posts/${renewingAdId}/renew`);
+      
+      if (response.data.success) {
+        // Refresh the ads list to get updated data
+        await fetchMyAds();
+        setErrorMessage('Ad renewed successfully for 30 days!');
+        setShowSuccessAlert(true);
+      } else {
+        setErrorMessage('Failed to renew ad. Please try again.');
+        setShowErrorAlert(true);
+      }
+      setLoading(false);
+    } catch (error) {
+      console.error('Error renewing ad:', error);
+      setErrorMessage('Failed to renew ad. Please try again.');
+      setShowErrorAlert(true);
+      setLoading(false);
+    }
+  };
+
+  const handleShare = async (ad) => {
+    try {
+      // Construct a shareable message
+      const shareMessage = `Check out this property: ${ad.title}\n\nLocation: ${ad.location?.fullAddress}\nRent: ₹${ad.monthlyRent || ad.priceRange?.min || 'Contact'}/month\n\nCategory: ${getCategoryLabel(ad.category)}`;
+      
+      // You can add a deep link URL here if you have one
+      // const shareUrl = `https://yourapp.com/property/${ad._id}`;
+      // const fullMessage = `${shareMessage}\n\nView details: ${shareUrl}`;
+
+      const result = await Share.share({
+        message: shareMessage,
+        // url: shareUrl, // For iOS
+        title: ad.title,
+      });
+
+      if (result.action === Share.sharedAction) {
+        if (result.activityType) {
+          // Shared with activity type of result.activityType
+          console.log('Shared with activity type:', result.activityType);
+        } else {
+          // Shared successfully
+          console.log('Shared successfully');
+        }
+      } else if (result.action === Share.dismissedAction) {
+        // Dismissed
+        console.log('Share dismissed');
+      }
+    } catch (error) {
+      console.error('Error sharing:', error);
+      setErrorMessage('Failed to share ad. Please try again.');
+      setShowErrorAlert(true);
     }
   };
 
@@ -188,29 +263,74 @@ export default function MyAds() {
     });
   };
 
-  const calculateDaysLeft = (createdAt) => {
-    const created = new Date(createdAt);
-    const expiry = new Date(created);
-    expiry.setDate(created.getDate() + 30);
+  const isExpired = (expiryDate) => {
+    if (!expiryDate) return false;
+    const expiry = new Date(expiryDate);
+    const now = new Date();
+    return now > expiry;
+  };
+
+  const calculateDaysLeft = (expiryDate) => {
+    if (!expiryDate) return 0;
+    const expiry = new Date(expiryDate);
     const now = new Date();
     const daysLeft = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
     return daysLeft > 0 ? daysLeft : 0;
   };
 
-  const FilterChip = ({ label, value, active }) => (
+  const calculateDaysSinceExpiry = (expiryDate) => {
+    if (!expiryDate) return 0;
+    const expiry = new Date(expiryDate);
+    const now = new Date();
+    const daysPassed = Math.floor((now - expiry) / (1000 * 60 * 60 * 24));
+    return daysPassed;
+  };
+
+  const getFilteredAds = () => {
+    if (statusFilter === 'expired') {
+      return ads.filter(ad => isExpired(ad.expiryDate));
+    } else if (statusFilter === 'active') {
+      return ads.filter(ad => ad.isActive && !isExpired(ad.expiryDate));
+    } else if (statusFilter === 'inactive') {
+      return ads.filter(ad => !ad.isActive && !isExpired(ad.expiryDate));
+    } else if (statusFilter === 'all') {
+      // Show all non-expired ads
+      return ads.filter(ad => !isExpired(ad.expiryDate));
+    }
+    return ads;
+  };
+
+  const getFilterCounts = () => {
+    const allAds = ads.filter(ad => !isExpired(ad.expiryDate));
+    const activeAds = ads.filter(ad => ad.isActive && !isExpired(ad.expiryDate));
+    const inactiveAds = ads.filter(ad => !ad.isActive && !isExpired(ad.expiryDate));
+    const expiredAds = ads.filter(ad => isExpired(ad.expiryDate));
+
+    return {
+      all: allAds.length,
+      active: activeAds.length,
+      inactive: inactiveAds.length,
+      expired: expiredAds.length
+    };
+  };
+
+  const FilterChip = ({ label, value, active, count }) => (
     <ProtectedRoute>
     <TouchableOpacity
       style={[styles.filterChip, active && styles.filterChipActive]}
       onPress={() => setStatusFilter(value)}
     >
       <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
-        {label}
+        {label} {count !== undefined && `(${count})`}
       </Text>
     </TouchableOpacity>
     </ProtectedRoute>
   );
 
-  const StickyHeader = () => (
+  const StickyHeader = () => {
+    const counts = getFilterCounts();
+    
+    return (
      <ProtectedRoute>
     <View style={styles.stickyHeaderContainer}>
       <LinearGradient
@@ -224,18 +344,17 @@ export default function MyAds() {
         </View>
 
         <View style={styles.filterContainer}>
-          <FilterChip label="All" value="all" active={statusFilter === 'all'} />
-          <FilterChip label="Active" value="active" active={statusFilter === 'active'} />
-          <FilterChip label="Inactive" value="inactive" active={statusFilter === 'inactive'} />
-          <View style={styles.listingBadge}>
-            <Text style={styles.listingCount}>{ads.length}</Text>
-            <Text style={styles.listingLabel}>Rooms</Text>
-          </View>
+          <FilterChip label="All" value="all" active={statusFilter === 'all'} count={counts.all} />
+          <FilterChip label="Active" value="active" active={statusFilter === 'active'} count={counts.active} />
+          <FilterChip label="Paused" value="inactive" active={statusFilter === 'inactive'} count={counts.inactive} />
+          <FilterChip label="Expired" value="expired" active={statusFilter === 'expired'} count={counts.expired} />
         </View>
       </LinearGradient>
     </View>
     </ProtectedRoute>
-  );
+  )};
+
+  const filteredAds = getFilteredAds();
 
   if (loading && !refreshing) {
     return (
@@ -248,7 +367,34 @@ export default function MyAds() {
     );
   }
 
-  if (ads.length === 0) {
+  if (filteredAds.length === 0) {
+    const getEmptyMessage = () => {
+      switch(statusFilter) {
+        case 'active':
+          return {
+            title: 'No Active Ads',
+            subtitle: 'You don\'t have any active ads at the moment.'
+          };
+        case 'inactive':
+          return {
+            title: 'No Paused Ads',
+            subtitle: 'All your ads are currently active.'
+          };
+        case 'expired':
+          return {
+            title: 'No Expired Ads',
+            subtitle: 'Great! All your ads are up to date.'
+          };
+        default:
+          return {
+            title: 'No Ads Yet',
+            subtitle: 'Start posting to reach potential tenants.'
+          };
+      }
+    };
+
+    const message = getEmptyMessage();
+
     return (
        <ProtectedRoute>
       <View style={styles.container}>
@@ -263,11 +409,8 @@ export default function MyAds() {
               <Ionicons name="document-text-outline" size={50} color="white" />
             </LinearGradient>
           </View>
-          <Text style={styles.emptyTitle}>No Ads Posted Yet</Text>
-          <Text style={styles.emptySubtitle}>
-            Start by posting your first rental property or shared accommodation to reach potential tenants
-          </Text>
-          
+          <Text style={styles.emptyTitle}>{message.title}</Text>
+          <Text style={styles.emptySubtitle}>{message.subtitle}</Text>
         </View>
       </View>
       </ProtectedRoute>
@@ -288,54 +431,77 @@ export default function MyAds() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#7A5AF8']} />
         }
       >
-        {ads.map((ad, index) => {
-          const daysLeft = calculateDaysLeft(ad.createdAt);
-          const isExpiringSoon = daysLeft <= 7;
+        {filteredAds.map((ad, index) => {
+          const expired = isExpired(ad.expiryDate);
+          const daysLeft = calculateDaysLeft(ad.expiryDate);
+          const daysSinceExpiry = calculateDaysSinceExpiry(ad.expiryDate);
+          const isExpiringSoon = daysLeft <= 7 && !expired;
           
           return (
-            <View key={ad._id} style={[styles.adCard, { marginTop: index === 0 ? 20 : 16 }]}>
+            <View key={ad._id} style={[
+              styles.adCard, 
+              { marginTop: index === 0 ? 20 : 16 },
+              expired && styles.expiredCard
+            ]}>
+              {/* Expired Badge */}
+              {expired && (
+                <View style={styles.expiredBanner}>
+                  <Ionicons name="time-outline" size={16} color="white" />
+                  <Text style={styles.expiredBannerText}>
+                    EXPIRED - {daysSinceExpiry} day{daysSinceExpiry !== 1 ? 's' : ''} ago
+                  </Text>
+                </View>
+              )}
+
               {/* Card Header with Status Toggle */}
               <View style={styles.adHeader}>
                 <View style={styles.categoryTag}>
                   <Ionicons
                     name={getCategoryIcon(ad.category)}
                     size={14}
-                    color="#7A5AF8"
+                    color={expired ? "#999" : "#7A5AF8"}
                   />
-                  <Text style={styles.categoryText}>
+                  <Text style={[styles.categoryText, expired && styles.expiredText]}>
                     {getCategoryLabel(ad.category)}
                   </Text>
                 </View>
                 
-                <View style={styles.statusToggleContainer}>
-                  <Text style={[styles.statusLabel, !ad.isActive && styles.statusLabelInactive]}>
-                    {ad.isActive ? 'Active' : 'Inactive'}
-                  </Text>
-                  <Switch
-                    value={ad.isActive}
-                    onValueChange={() => toggleActiveStatus(ad._id, ad.isActive)}
-                    trackColor={{ false: '#E0E0E0', true: '#B998F5' }}
-                    thumbColor={ad.isActive ? '#7A5AF8' : '#f4f3f4'}
-                    ios_backgroundColor="#E0E0E0"
-                  />
-                </View>
+                {!expired && (
+                  <View style={styles.statusToggleContainer}>
+                    <Text style={[styles.statusLabel, !ad.isActive && styles.statusLabelInactive]}>
+                      {ad.isActive ? 'Pause' : 'Resume'}
+                    </Text>
+                    <Switch
+                      value={ad.isActive}
+                      onValueChange={() => toggleActiveStatus(ad._id, ad.isActive)}
+                      trackColor={{ false: '#E0E0E0', true: '#B998F5' }}
+                      thumbColor={ad.isActive ? '#7A5AF8' : '#f4f3f4'}
+                      ios_backgroundColor="#E0E0E0"
+                    />
+                  </View>
+                )}
               </View>
 
               {/* Image with Overlay Stats */}
               <View style={styles.imageContainer}>
-                <Image source={{ uri: ad.images?.[0]?.thumbnailUrl || ad.images?.[0]?.originalUrl }} style={styles.adImage} />
+                <Image 
+                  source={{ uri: ad.images?.[0]?.thumbnailUrl || ad.images?.[0]?.originalUrl }} 
+                  style={[styles.adImage, expired && styles.expiredImage]} 
+                />
                 
                 {/* Expiry Badge */}
-                <View style={[styles.expiryBadge, isExpiringSoon && styles.expiryBadgeWarning]}>
-                  <Ionicons 
-                    name={isExpiringSoon ? "warning" : "time-outline"} 
-                    size={12} 
-                    color={isExpiringSoon ? "#FF6B6B" : "white"} 
-                  />
-                  <Text style={[styles.expiryText, isExpiringSoon && styles.expiryTextWarning]}>
-                    {daysLeft} days left
-                  </Text>
-                </View>
+                {!expired && (
+                  <View style={[styles.expiryBadge, isExpiringSoon && styles.expiryBadgeWarning]}>
+                    <Ionicons 
+                      name={isExpiringSoon ? "warning" : "time-outline"} 
+                      size={12} 
+                      color={isExpiringSoon ? "#FF6B6B" : "white"} 
+                    />
+                    <Text style={[styles.expiryText, isExpiringSoon && styles.expiryTextWarning]}>
+                      {daysLeft} days left
+                    </Text>
+                  </View>
+                )}
 
                 {/* Views & Favorites Overlay */}
                 <View style={styles.statsOverlay}>
@@ -350,25 +516,35 @@ export default function MyAds() {
                 </View>
               </View>
 
+              {/* Expired Warning Message */}
+              {expired && (
+                <View style={styles.expiredWarning}>
+                  <Ionicons name="alert-circle" size={18} color="#FF6B6B" />
+                  <Text style={styles.expiredWarningText}>
+                    Renew within 30 days or this post will be permanently deleted
+                  </Text>
+                </View>
+              )}
+
               {/* Ad Content */}
               <View style={styles.adContent}>
-                <Text style={styles.adTitle} numberOfLines={2}>
+                <Text style={[styles.adTitle, expired && styles.expiredText]} numberOfLines={2}>
                   {ad.title}
                 </Text>
                 
                 <View style={styles.locationRow}>
-                  <Ionicons name="location" size={16} color="#7A5AF8" />
-                  <Text style={styles.locationText} numberOfLines={1}>
+                  <Ionicons name="location" size={16} color={expired ? "#999" : "#7A5AF8"} />
+                  <Text style={[styles.locationText, expired && styles.expiredText]} numberOfLines={1}>
                     {ad.location?.fullAddress}
                   </Text>
                 </View>
 
                 <View style={styles.priceRow}>
                   <View style={styles.priceContainer}>
-                    <Text style={styles.priceText}>
+                    <Text style={[styles.priceText, expired && styles.expiredText]}>
                       ₹{ad.monthlyRent || ad.priceRange?.min || 'Contact'}
                     </Text>
-                    <Text style={styles.priceLabel}>/month</Text>
+                    <Text style={[styles.priceLabel, expired && styles.expiredText]}>/month</Text>
                   </View>
                   <View style={styles.dateContainer}>
                     <Ionicons name="calendar-outline" size={12} color="#999" />
@@ -379,26 +555,51 @@ export default function MyAds() {
 
               {/* Action Buttons */}
               <View style={styles.adFooter}>
-                <TouchableOpacity
-                  style={styles.actionBtn}
-                  onPress={() => handleEdit(ad._id, ad.category)} 
-                >
-                  <Feather name="edit-2" size={16} color="#7A5AF8" />
-                  <Text style={styles.actionBtnText}>Edit</Text>
-                </TouchableOpacity>
+                {expired ? (
+                  <>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, styles.renewBtn]}
+                      onPress={() => handleRenew(ad._id)}
+                    >
+                      <Ionicons name="refresh" size={16} color="white" />
+                      <Text style={styles.renewBtnText}>Renew</Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity style={styles.actionBtn}>
-                  <Feather name="share-2" size={16} color="#2196F3" />
-                  <Text style={[styles.actionBtnText, { color: '#2196F3' }]}>Share</Text>
-                </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.actionBtn}
+                      onPress={() => handleSold(ad._id)}
+                    >
+                      <Feather name="check-circle" size={16} color="#FF6B6B" />
+                      <Text style={[styles.actionBtnText, { color: '#FF6B6B' }]}>Mark Sold</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    <TouchableOpacity
+                      style={styles.actionBtn}
+                      onPress={() => handleEdit(ad._id, ad.category)} 
+                    >
+                      <Feather name="edit-2" size={16} color="#7A5AF8" />
+                      <Text style={styles.actionBtnText}>Edit</Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.actionBtn}
-                  onPress={() => handleDelete(ad._id)}
-                >
-                  <Feather name="trash-2" size={16} color="#FF6B6B" />
-                  <Text style={[styles.actionBtnText, { color: '#FF6B6B' }]}>Delete</Text>
-                </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.actionBtn}
+                      onPress={() => handleShare(ad)}
+                    >
+                      <Feather name="share-2" size={16} color="#2196F3" />
+                      <Text style={[styles.actionBtnText, { color: '#2196F3' }]}>Share</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.actionBtn}
+                      onPress={() => handleSold(ad._id)}
+                    >
+                      <Feather name="check-circle" size={16} color="#FF6B6B" />
+                      <Text style={[styles.actionBtnText, { color: '#FF6B6B' }]}>Sold</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
             </View>
           );
@@ -410,8 +611,8 @@ export default function MyAds() {
       {/* Custom Alerts */}
       <CustomAlert
         visible={showDeleteAlert}
-        title="Delete Ad"
-        message="Are you sure you want to delete this ad permanently? This action cannot be undone."
+        title="Mark as Sold"
+        message="Are you sure you want to mark this property as sold? The post will be permanently deleted and cannot be recovered."
         buttons={[
           {
             text: 'Cancel',
@@ -419,18 +620,36 @@ export default function MyAds() {
             onPress: () => {},
           },
           {
-            text: 'Delete',
+            text: 'Confirm Sold',
             style: 'destructive',
-            onPress: performDelete,
+            onPress: performSold,
           },
         ]}
         onClose={() => setShowDeleteAlert(false)}
       />
 
       <CustomAlert
+        visible={showRenewAlert}
+        title="Renew Ad"
+        message="Renewing this ad will extend its visibility for another 30 days. Do you want to continue?"
+        buttons={[
+          {
+            text: 'Cancel',
+            style: 'cancel',
+            onPress: () => {},
+          },
+          {
+            text: 'Renew',
+            onPress: performRenew,
+          },
+        ]}
+        onClose={() => setShowRenewAlert(false)}
+      />
+
+      <CustomAlert
         visible={showSuccessAlert}
         title="Success"
-        message="Your ad has been deleted successfully."
+        message={errorMessage || "Operation completed successfully."}
         buttons={[
           {
             text: 'OK',
@@ -504,28 +723,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: 'white',
   },
-  listingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 4,
-  },
-  listingCount: {
-    fontSize: 14,
-    color: 'white',
-    fontWeight: '400',
-  },
-  listingLabel: {
-    fontSize: 14,
-    color: 'white',
-    fontWeight: '500',
-  },
   filterContainer: {
     flexDirection: 'row',
     gap: 8,
+    flexWrap: 'wrap',
   },
   filterChip: {
     paddingHorizontal: 16,
@@ -546,7 +747,7 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flex: 1,
-    marginTop: 160,
+    marginTop: 180,
   },
   scrollContent: {
     paddingHorizontal: 16,
@@ -561,6 +762,25 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
     overflow: 'hidden',
+  },
+  expiredCard: {
+    opacity: 0.8,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+  },
+  expiredBanner: {
+    backgroundColor: '#FF6B6B',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    gap: 6,
+  },
+  expiredBannerText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
   adHeader: {
     flexDirection: 'row',
@@ -595,7 +815,7 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
   },
   statusLabelInactive: {
-    color: '#999',
+    color: '#FF9800',
   },
   imageContainer: {
     position: 'relative',
@@ -607,6 +827,9 @@ const styles = StyleSheet.create({
   adImage: {
     width: '100%',
     height: 200,
+  },
+  expiredImage: {
+    opacity: 0.4,
   },
   expiryBadge: {
     position: 'absolute',
@@ -652,9 +875,26 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '600',
   },
+  expiredWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF3F3',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  expiredWarningText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#FF6B6B',
+    fontWeight: '600',
+  },
   adContent: {
     paddingHorizontal: 16,
-     fontSize: 11,
+    fontSize: 11,
   },
   adTitle: {
     fontSize: 16,
@@ -704,6 +944,9 @@ const styles = StyleSheet.create({
     color: '#999',
     fontWeight: '500',
   },
+  expiredText: {
+    color: '#999',
+  },
   adFooter: {
     flexDirection: 'row',
     paddingHorizontal: 16,
@@ -727,6 +970,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#7A5AF8',
   },
+  renewBtn: {
+    backgroundColor: '#7A5AF8',
+  },
+  renewBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'white',
+  },
   bottomSpacing: {
     height: 20,
   },
@@ -748,34 +999,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyTitle: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#1A1A1A',
-    marginBottom: 12,
+    marginBottom: 8,
     textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
     textAlign: 'center',
-    marginBottom: 40,
-    lineHeight: 24,
-    paddingHorizontal: 20,
-  },
-  createAdButton: {
-    borderRadius: 25,
-    overflow: 'hidden',
-  },
-  createAdButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    gap: 8,
-  },
-  createAdButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
+    lineHeight: 20,
   },
 });

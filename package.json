@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
+    "dev:both": "npx expo start & adb -s emulator-5554 shell am start -a android.intent.action.VIEW -d \"exp+steya://expo-development-client/?url=http%3A%2F%2F172.24.69.134%3A8081\"",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
     "ios": "expo run:ios",
@@ -23,8 +24,10 @@
     "axios": "^1.11.0",
     "date-fns": "^4.1.0",
     "expo": "~53.0.23",
+    "expo-application": "~6.1.5",
     "expo-auth-session": "~6.2.1",
     "expo-camera": "~16.1.11",
+    "expo-clipboard": "~7.1.5",
     "expo-constants": "~17.1.7",
     "expo-dev-client": "~5.2.4",
     "expo-device": "~7.1.4",
@@ -49,11 +52,12 @@
     "nativewind": "^4.1.23",
     "react": "19.0.0",
     "react-dom": "19.0.0",
-    "react-native": "0.79.5",
+    "react-native": "0.79.6",
     "react-native-gesture-handler": "~2.24.0",
     "react-native-maps": "1.20.1",
     "react-native-razorpay": "^2.3.0",
     "react-native-reanimated": "~3.17.4",
+    "react-native-rn-in-app-update": "^1.1.0",
     "react-native-safe-area-context": "^5.4.0",
     "react-native-screens": "~4.11.1",
     "react-native-svg": "15.11.2",
@@ -82,7 +86,8 @@
           "redux-devtools-expo-dev-plugin",
           "react-native-razorpay",
           "socket.io-client",
-          "react-native-toast-notifications"
+          "react-native-toast-notifications",
+          "react-native-rn-in-app-update"
         ]
       }
     }

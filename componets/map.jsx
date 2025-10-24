@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
     marginVertical: 10,
-    marginHorizontal: 16,
+    // marginHorizontal: 16,
   },
   map: {
     flex: 1,

@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  SafeAreaView,
   Modal,
   TextInput,
   Share,
@@ -24,28 +23,26 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { removePushTokenFromBackend } from '../../services/notificationHandler';
 import { StatusBar } from 'expo-status-bar';
 import { BeautifulLoader } from '../../componets/beatifullLoader';
-import DonationButton from '../../componets/DonationButton';
-
+import { DonationButton } from '../../componets/DonationButton';
 import api from '../../services/intercepter';
 import { showToast } from '../../services/ToastService';
-import CustomAlert from '../../componets/CustomAlert '; // Import the CustomAlert
+import CustomAlert from '../../componets/CustomAlert ';
+import * as Application from 'expo-application';
 
 const ProfilePage = () => {
   GoogleSignin.configure({
     webClientId: "593177901144-ttbib4ng7ff5trbq1csuhhec9m8ddmi5.apps.googleusercontent.com",
     offlineAccess: true,
   });
-  
- 
+
   const user = useSelector((state) => state.user.userData);
   const [loading, setLoading] = useState(false);
   const [loading1, setLoading1] = useState(false);
-  const [showSupportModal, setShowSupportModal] = useState(false);
   const [showBugReportModal, setShowBugReportModal] = useState(false);
   const [bugDescription, setBugDescription] = useState('');
-  const [supportAmount, setSupportAmount] = useState('');
   const dispatch = useDispatch();
-
+  const [showDonation, setShowDonation] = useState(false);
+  
   // Alert states
   const [showRateAlert, setShowRateAlert] = useState(false);
   const [showLogoutAlert, setShowLogoutAlert] = useState(false);
@@ -65,7 +62,7 @@ const ProfilePage = () => {
   };
 
   const handlePrivacyPolicy = () => {
-    const privacyUrl = 'https://yourapp.com/privacy-policy';
+    const privacyUrl = 'https://steya-landing.vercel.app/PrivacyPolicy';
     Linking.openURL(privacyUrl);
   };
 
@@ -75,7 +72,6 @@ const ProfilePage = () => {
 
   const submitBugReport = async () => {
     if (!bugDescription.trim()) {
-      showToast("Error', 'Please describe the bug you encountered");
       return;
     }
     setLoading1(true);
@@ -85,27 +81,27 @@ const ProfilePage = () => {
       if (response.data.success) {
         setShowBugReportModal(false);
         setBugDescription('');
-        showToast("Your bug report has been submitted. We'll look into it right away!");
+        showToast("Your bug report has been submitted.");
         setLoading1(false);
       } else {
         setLoading1(false);
-        showToast('Error', response.data.message || 'Failed to submit bug report');
+        showToast('Failed to submit bug report');
       }
     } catch (error) {
       setLoading1(false);
       console.error('Bug submission failed:', error);
-      showToast('Error', 'Failed to submit bug report. Please try again.');
+      showToast('Failed to submit bug report.');
     }
   };
 
   const handleSupportSteya = () => {
-    setShowSupportModal(true);
+    setShowDonation(true);
   };
 
   const handleShareProfile = async () => {
     try {
       const profileName = user?.name || `${user?.data?.user?.givenName || ''} ${user?.data?.user?.familyName || ''}`.trim() || 'User Name';
-      const profileEmail = user?.email || ''
+      const profileEmail = user?.email || '';
       const message = `Check out my profile!\nName: ${profileName}\nEmail: ${profileEmail}`;
       await Share.share({ message });
     } catch (error) {
@@ -129,7 +125,7 @@ const ProfilePage = () => {
           iconType: 'Ionicons',
           title: 'My Wishlist',
           hasNotification: false,
-             onPress: () => router.push('/favoritePage'),
+          onPress: () => router.push('/favoritePage'),
         },
       ],
     },
@@ -163,18 +159,6 @@ const ProfilePage = () => {
           title: 'Privacy Policy',
           hasNotification: false,
           onPress: handlePrivacyPolicy,
-        },
-      ],
-    },
-    {
-      section: 'Account',
-      items: [
-        {
-          icon: 'shield-checkmark-outline',
-          iconType: 'Ionicons',
-          title: 'Security',
-          hasNotification: false,
-          onPress: () => router.push('/security'),
         },
       ],
     },
@@ -212,8 +196,8 @@ const ProfilePage = () => {
   };
 
   const renderIcon = (iconName, iconType, color, size = 24) => {
-    const IconComponent = iconType === 'Ionicons' ? Ionicons : 
-                         iconType === 'MaterialIcons' ? MaterialIcons : Feather;
+    const IconComponent = iconType === 'Ionicons' ? Ionicons :
+      iconType === 'MaterialIcons' ? MaterialIcons : Feather;
     return <IconComponent name={iconName} size={size} color={color} />;
   };
 
@@ -231,17 +215,28 @@ const ProfilePage = () => {
         <Text style={styles.menuItemTitle}>{item.title}</Text>
       </View>
       <View style={styles.menuItemRight}>
-        {item.hasNotification && <View style={styles.notificationDot} />}
         <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
       </View>
     </TouchableOpacity>
   );
 
+  const renderVersionInfo = () => {
+    const version = Application.nativeApplicationVersion || '1.0.0';
+    
+    return (
+      <View style={styles.versionContainer}>
+        <Text style={styles.versionText}>
+          v{version}
+        </Text>
+      </View>
+    );
+  };
+
   return (
     <ProtectedRoute>
       {loading ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
-          <BeautifulLoader/>
+          <BeautifulLoader />
         </View>
       ) : (
         <SafeWrapper style={styles.container}>
@@ -251,7 +246,7 @@ const ProfilePage = () => {
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Profile</Text>
             <View style={styles.headerIcons}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.headerIcon}
                 onPress={handleShareProfile}
               >
@@ -261,12 +256,12 @@ const ProfilePage = () => {
           </View>
 
           <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-            {/* Profile Section */}
+            {/* Profile Section - Beautiful Vertical Centered Layout */}
             <View style={styles.profileSection}>
               <View style={styles.profileImageContainer}>
                 {user?.picture ? (
-                  <Image 
-                    source={{ uri: user?.picture }} 
+                  <Image
+                    source={{ uri: user?.picture }}
                     style={styles.profileImagePhoto}
                   />
                 ) : (
@@ -277,10 +272,10 @@ const ProfilePage = () => {
                   </View>
                 )}
                 <View style={styles.verificationBadge}>
-                  <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                  <Ionicons name="checkmark" size={18} color="#FFFFFF" />
                 </View>
               </View>
-              
+
               <View style={styles.profileInfo}>
                 <Text style={styles.profileName}>
                   {user?.name || `${user?.data?.user?.givenName || ''} ${user?.data?.user?.familyName || ''}`.trim() || 'User Name'}
@@ -325,77 +320,23 @@ const ProfilePage = () => {
                 </TouchableOpacity>
               </View>
             </View>
+
+            {/* Version Info - Compact */}
+            {renderVersionInfo()}
+
+            <View  />
           </ScrollView>
 
-          {/* Support Steya Modal */}
-          <Modal
-            visible={showSupportModal}
-            transparent={true}
-            animationType="slide"
-            onRequestClose={() => setShowSupportModal(false)}
-          >
-            <View style={styles.modalOverlay}>
-              <View style={styles.modalContent}>
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Support Steya 💜</Text>
-                  <TouchableOpacity onPress={() => setShowSupportModal(false)}>
-                    <Ionicons name="close" size={24} color="#6B7280" />
-                  </TouchableOpacity>
-                </View>
-
-                <Text style={styles.modalDescription}>
-                  Steya is completely free to use! Your support helps us cover server costs and keep the platform running smoothly for everyone.
-                </Text>
-
-                <View style={styles.amountContainer}>
-                  {['50', '100', '200', '500'].map((amount) => (
-                    <TouchableOpacity
-                      key={amount}
-                      style={[
-                        styles.amountButton,
-                        supportAmount === amount && styles.amountButtonSelected
-                      ]}
-                      onPress={() => setSupportAmount(amount)}
-                    >
-                      <Text style={[
-                        styles.amountButtonText,
-                        supportAmount === amount && styles.amountButtonTextSelected
-                      ]}>
-                        ₹{amount}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                <TextInput
-                  style={styles.customAmountInput}
-                  placeholder="Or enter custom amount"
-                  keyboardType="numeric"
-                  value={supportAmount}
-                  onChangeText={setSupportAmount}
-                />
-
-                {supportAmount ? (
-                  <DonationButton 
-                    amount={parseInt(supportAmount)} 
-                    onSuccess={() => {
-                      setShowSupportModal(false);
-                      setSupportAmount('');
-                      setShowThankYouAlert(true);
-                    }}
-                    onError={(err) => console.log('Donation error:', err)}
-                  />
-                ) : (
-                  <TouchableOpacity
-                    style={[styles.supportButton, styles.supportButtonDisabled]}
-                    disabled={true}
-                  >
-                    <Text style={styles.supportButtonText}>Enter Amount</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          </Modal>
+          {/* Donation Button */}
+          <DonationButton
+            amount={50}
+            visible={showDonation}
+            onClose={() => setShowDonation(false)}
+            onSuccess={() => {
+              setShowDonation(false);
+              setShowThankYouAlert(true);
+            }}
+          />
 
           {/* Bug Report Modal */}
           <Modal
@@ -451,14 +392,14 @@ const ProfilePage = () => {
               {
                 text: 'Cancel',
                 style: 'cancel',
-                onPress: () => {},
+                onPress: () => { },
               },
               {
                 text: 'Rate Now',
                 onPress: () => {
-                  const playStoreUrl = 'market://details?id=YOUR_PACKAGE_NAME';
+                  const playStoreUrl = 'market://details?id=com.ameen007.Steya';
                   Linking.openURL(playStoreUrl).catch(() => {
-                    Linking.openURL('https://play.google.com/store/apps/details?id=YOUR_PACKAGE_NAME');
+                    Linking.openURL('https://play.google.com/store/apps/details?id=com.ameen007.Steya');
                   });
                 },
               },
@@ -474,7 +415,7 @@ const ProfilePage = () => {
               {
                 text: 'Cancel',
                 style: 'cancel',
-                onPress: () => {},
+                onPress: () => { },
               },
               {
                 text: 'Logout',
@@ -484,26 +425,11 @@ const ProfilePage = () => {
             ]}
             onClose={() => setShowLogoutAlert(false)}
           />
-
-          <CustomAlert
-            visible={showThankYouAlert}
-            title="Thank You! 💜"
-            message="Your support means a lot to us and helps keep Steya running!"
-            buttons={[
-              {
-                text: 'You\'re Welcome',
-                onPress: () => {},
-              },
-            ]}
-            onClose={() => setShowThankYouAlert(false)}
-          />
         </SafeWrapper>
       )}
     </ProtectedRoute>
   );
 };
-
-
 
 const styles = StyleSheet.create({
   container: {
@@ -535,73 +461,89 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  // ✨ NEW - Beautiful Vertical Centered Profile Section
   profileSection: {
-    flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 20,
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 28,
     backgroundColor: '#FFFFFF',
     marginBottom: 24,
   },
   profileImageContainer: {
     position: 'relative',
+    marginBottom: 16,
   },
   profileImage: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     backgroundColor: '#E0E7FF',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: '#7A5AF8',
+    shadowColor: '#7A5AF8',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
   profileImageText: {
-    fontSize: 24,
-    fontWeight: '600',
+    fontSize: 32,
+    fontWeight: '700',
     color: '#7A5AF8',
   },
   profileImagePhoto: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    borderWidth: 2,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    borderWidth: 3,
     borderColor: '#7A5AF8',
+    shadowColor: '#7A5AF8',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
   verificationBadge: {
     position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    bottom: 0,
+    right: 0,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: '#7A5AF8',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   profileInfo: {
-    flex: 1,
-    marginLeft: 16,
+    alignItems: 'center',
   },
   profileName: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 22,
+    fontWeight: '700',
     color: '#111827',
-    marginBottom: 4,
+    marginBottom: 6,
+    textAlign: 'center',
   },
   profileEmail: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#6B7280',
-    marginBottom: 2,
+    marginBottom: 4,
+    textAlign: 'center',
   },
   profilePhone: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#6B7280',
-  },
-  shareButton: {
-    padding: 8,
+    textAlign: 'center',
   },
   menuSection: {
     marginBottom: 24,
@@ -705,41 +647,6 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 24,
   },
-  amountContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  amountButton: {
-    flex: 1,
-    paddingVertical: 12,
-    marginHorizontal: 4,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    alignItems: 'center',
-  },
-  amountButtonSelected: {
-    borderColor: '#7A5AF8',
-    backgroundColor: '#EEF2FF',
-  },
-  amountButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  amountButtonTextSelected: {
-    color: '#7A5AF8',
-  },
-  customAmountInput: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    marginBottom: 20,
-  },
   bugInput: {
     borderWidth: 1,
     borderColor: '#E5E7EB',
@@ -763,6 +670,17 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // ✨ NEW - Compact Version Info Styles
+  versionContainer: {
+    alignItems: 'center',
+    // paddingVertical: 12,
+    // marginTop: 4,
+  },
+  versionText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '400',
   },
 });
 

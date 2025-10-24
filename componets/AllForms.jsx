@@ -37,7 +37,7 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL
 
 
 import { router, useLocalSearchParams } from 'expo-router';
-import { showToast } from '../services/ToastService';
+import { showErrorToast, showToast } from '../services/ToastService';
 import { BeautifulLoader } from './beatifullLoader';
 
 const SharedRoomForm = () => {
@@ -45,8 +45,6 @@ const SharedRoomForm = () => {
   const params = useLocalSearchParams();
   const roomId = params.roomId;
   const isEdit = params.isEdit === "true";
-
-
 
   const locationData = useSelector((state) => state.location.locationData);
   const [currentStep, setCurrentStep] = useState(1);
@@ -64,7 +62,7 @@ const SharedRoomForm = () => {
     habitPreferences: [],
     purpose: [],
     contactPhone: '',
-    showPhonePublic: true,
+    showPhonePublic: false, // ✅ Changed to false (hidden by default)
     category: 'shared',
   });
 
@@ -95,7 +93,7 @@ const SharedRoomForm = () => {
         habitPreferences: room.habitPreferences || [],
         purpose: room.purpose || [],
         contactPhone: room.contactPhone || '',
-        showPhonePublic: room.showPhonePublic ?? true,
+        showPhonePublic: room.showPhonePublic ?? false,
         category: room.category || 'shared',
       });
 
@@ -109,7 +107,6 @@ const SharedRoomForm = () => {
     }
   };
 
-  // Rest of your existing state and options remain the same...
   const genderOptions = [
     { label: 'Male Only', value: 'male' },
     { label: 'Female Only', value: 'female' },
@@ -150,155 +147,183 @@ const SharedRoomForm = () => {
     }
   };
 
-  // ✅ SIMPLIFIED SUBMIT FUNCTION - Handles both create and update
-const handleSubmit = async () => {
-  try {
-    setLoading(true); // 🔹 Start loading
-    console.log(locationData, "location--------");
-
-    // 1️⃣ Validate required fields
-    const errors = [];
-    if (!formData.images || formData.images.length === 0) errors.push("Please select at least one image.");
-    if (!formData.title?.trim()) errors.push("Title is required.");
-    if (!formData.description?.trim()) errors.push("Description is required.");
-    if (!formData.monthlyRent || isNaN(formData.monthlyRent)) errors.push("Monthly rent is required and must be a number.");
-    if (!formData.roommatesWanted || isNaN(formData.roommatesWanted)) errors.push("Roommates wanted is required and must be a number.");
-    if (!formData.contactPhone?.trim()) errors.push("Contact phone is required.");
-    if (!formData.category?.trim()) errors.push("Category is required.");
-    if (formData.purpose && !Array.isArray(formData.purpose)) errors.push("Please select at least one purpose.");
-    if (formData.habitPreferences && !Array.isArray(formData.habitPreferences)) errors.push("Please select at least one habit preference.");
-
-    if (errors.length > 0) {
-      showToast("Validation Error", errors.join("\n"));
-      setLoading(false); // ❌ Stop loading if validation fails
-      return;
-    }
-
-    // 2️⃣ Separate existing and new images
-    const existingImages = formData.images.filter(img => img.startsWith('http'));
-    const newImageUris = formData.images.filter(img => !img.startsWith('http'));
-    
-    console.log(`📸 Images - Existing: ${existingImages.length}, New: ${newImageUris.length}, Total: ${formData.images.length}`);
-
-    // 3️⃣ Compress ONLY NEW images
-    const timestamp = Date.now();
-    const compressedImages = [];
-
-    for (let i = 0; i < newImageUris.length; i++) {
-      const img = newImageUris[i];
+  // ✅ VALIDATION FUNCTION - Check if current step is complete
+  const isStepValid = () => {
+    switch (currentStep) {
+      case 1:
+        // Step 1: Basic Information
+        return (
+          formData.title?.trim() !== '' &&
+          formData.description?.trim() !== '' &&
+          (formData.location !== null || (locationData?.lat && locationData?.lng))
+        );
       
-      let context = ImageManipulator.manipulate(img);
-      context.resize({ width: 1280 });
-      let result = await context.renderAsync();
-      let manip = await result.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
+      case 2:
+        // Step 2: Photos & Pricing - ✅ Realistic rent validation (₹1,000 - ₹1,00,000)
+        const rent = parseFloat(formData.monthlyRent);
+        return (
+          formData.images?.length > 0 &&
+          formData.monthlyRent?.trim() !== '' &&
+          !isNaN(rent) &&
+          rent >= 1000 &&
+          rent <= 100000 &&
+          formData.roommatesWanted >= 1
+        );
+      
+      case 3:
+        // Step 3: Preferences
+        return (
+          formData.genderPreference !== '' &&
+          formData.purpose?.length > 0
+        );
+      
+      case 4:
+        // Step 4: Contact & Review - ✅ Indian mobile number validation
+        const phone = formData.contactPhone?.trim();
+        return (
+          phone !== '' &&
+          phone.length === 10 &&
+          /^[6-9]\d{9}$/.test(phone) &&
+          formData.showPhonePublic !== undefined
+        );
+      
+      default:
+        return false;
+    }
+  };
 
-      const info = await FileSystem.getInfoAsync(manip.uri);
-      if (info.size > 1000000) {
-        const context2 = ImageManipulator.manipulate(manip.uri);
-        const result2 = await context2.renderAsync();
-        manip = await result2.saveAsync({ compress: 0.5, format: SaveFormat.JPEG });
+  // ✅ SIMPLIFIED SUBMIT FUNCTION - Handles both create and update
+  const handleSubmit = async () => {
+    try {
+      setLoading(true);
+      console.log(locationData, "location--------");
+
+      // 1️⃣ Validate required fields
+      const errors = [];
+      if (!formData.images || formData.images.length === 0) errors.push("Please select at least one image.");
+      if (!formData.title?.trim()) errors.push("Title is required.");
+      if (!formData.description?.trim()) errors.push("Description is required.");
+      if (!formData.monthlyRent || isNaN(formData.monthlyRent)) errors.push("Monthly rent is required and must be a number.");
+      if (!formData.roommatesWanted || isNaN(formData.roommatesWanted)) errors.push("Roommates wanted is required and must be a number.");
+      if (!formData.contactPhone?.trim()) errors.push("Contact phone is required.");
+      if (!formData.category?.trim()) errors.push("Category is required.");
+      if (formData.purpose && !Array.isArray(formData.purpose)) errors.push("Please select at least one purpose.");
+      if (formData.habitPreferences && !Array.isArray(formData.habitPreferences)) errors.push("Please select at least one habit preference.");
+
+      if (errors.length > 0) {
+        showErrorToast("Please fill all fields correctly.");
+        setLoading(false);
+        return;
       }
 
-      // ✅ FIRST IMAGE THUMBNAIL - Only create thumbnail for first new image
-      if (i === 0 && existingImages.length === 0) {
-        const thumbContext = ImageManipulator.manipulate(manip.uri);
-        thumbContext.resize({ width: 300 });
-        const thumbResult = await thumbContext.renderAsync();
-        const thumb = await thumbResult.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
-        manip.thumbnail = thumb.uri;
+      // 2️⃣ Separate existing and new images
+      const existingImages = formData.images.filter(img => img.startsWith('http'));
+      const newImageUris = formData.images.filter(img => !img.startsWith('http'));
+      
+      console.log(`📸 Images - Existing: ${existingImages.length}, New: ${newImageUris.length}, Total: ${formData.images.length}`);
+
+      // 3️⃣ Compress ONLY NEW images (no thumbnail creation)
+      const timestamp = Date.now();
+      const compressedImages = [];
+
+      for (let i = 0; i < newImageUris.length; i++) {
+        const img = newImageUris[i];
+        
+        // Compress the image
+        let context = ImageManipulator.manipulate(img);
+        context.resize({ width: 1280 });
+        let result = await context.renderAsync();
+        let manip = await result.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
+
+        // If still too large, compress more
+        const info = await FileSystem.getInfoAsync(manip.uri);
+        if (info.size > 1000000) {
+          const context2 = ImageManipulator.manipulate(manip.uri);
+          const result2 = await context2.renderAsync();
+          manip = await result2.saveAsync({ compress: 0.5, format: SaveFormat.JPEG });
+        }
+
+        compressedImages.push(manip);
       }
 
-      compressedImages.push(manip);
-    }
+      // 4️⃣ Prepare FormData
+      const uploadData = new FormData();
 
-    // 4️⃣ Prepare FormData
-    const uploadData = new FormData();
+      // Send existing images to keep (only for edit)
+      if (isEdit && existingImages.length > 0) {
+        uploadData.append("existingImages", JSON.stringify(existingImages));
+        console.log('📤 Sending existing images to keep:', existingImages.length);
+      }
 
-    // ✅ Send existing images to keep (only for edit)
-    if (isEdit && existingImages.length > 0) {
-      uploadData.append("existingImages", JSON.stringify(existingImages));
-      console.log('📤 Sending existing images to keep:', existingImages.length);
-    }
+      // Append normal fields
+      Object.entries(formData).forEach(([key, value]) => {
+        if (key === "images" || key === "location") return;
+        if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
+          uploadData.append(key, JSON.stringify(value));
+        } else {
+          uploadData.append(key, String(value));
+        }
+      });
 
-    // Append normal fields
-    Object.entries(formData).forEach(([key, value]) => {
-      if (key === "images" || key === "location") return;
-      if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
-        uploadData.append(key, JSON.stringify(value));
+      // Append location
+      if (locationData?.lat && locationData?.lng && locationData?.name) {
+        const geoLocation = {
+          type: "Point",
+          coordinates: [locationData.lng, locationData.lat],
+          fullAddress: locationData.name,
+        };
+        uploadData.append("location", JSON.stringify(geoLocation));
+      }
+
+      // Append NEW images (backend will create thumbnail from first image)
+      compressedImages.forEach((img, i) => {
+        uploadData.append("images", {
+          uri: img.uri,
+          name: `property_${timestamp}_${i}.jpg`,
+          type: "image/jpeg",
+        });
+      });
+
+      // 5️⃣ Make API call
+      let res;
+      if (isEdit && roomId) {
+        console.log("🔄 Updating room...", roomId);
+        res = await api.put(`${apiUrl}/api/update/${roomId}`, uploadData, {
+          timeout: 60000,
+          headers: { 'Content-Type': 'multipart/form-data' },
+          transformRequest: (data) => data,
+        });
       } else {
-        uploadData.append(key, String(value));
+        console.log("🆕 Creating new room...");
+        res = await api.post(`${apiUrl}/api/rooms`, uploadData, {
+          timeout: 60000,
+          headers: { 'Content-Type': 'multipart/form-data' },
+          transformRequest: (data) => data,
+        });
       }
-    });
 
-    // Append location
-    if (locationData?.lat && locationData?.lng && locationData?.name) {
-      const geoLocation = {
-        type: "Point",
-        coordinates: [locationData.lng, locationData.lat],
-        fullAddress: locationData.name,
-      };
-      uploadData.append("location", JSON.stringify(geoLocation));
+      console.log("✅ Success:", res.data);
+
+      if (isEdit) {
+        showToast("Your room listing has been updated!");
+      } else {
+        showToast("Your room listing has been submitted!");
+      }
+
+      router.back();
+    } catch (err) {
+      console.error("❌ Operation failed:", err);
+      let errorMessage = `Something went wrong while ${isEdit ? 'updating' : 'submitting'} your listing.`;
+      if (err.code === 'NETWORK_ERROR') {
+        errorMessage = "Network connection failed. Please check your internet connection.";
+      } else if (err.response?.status) {
+        errorMessage = `Server error (${err.response.status}): ${err.response.data?.message || 'Unknown error'}`;
+      }
+      showErrorToast(errorMessage);
+    } finally {
+      setLoading(false);
     }
-
-    // Append NEW images
-    compressedImages.forEach((img, i) => {
-      uploadData.append("images", {
-        uri: img.uri,
-        name: `property_${timestamp}_${i}.jpg`,
-        type: "image/jpeg",
-      });
-    });
-
-    // ✅ Append thumbnail
-    if (compressedImages[0]?.thumbnail && existingImages.length === 0) {
-      uploadData.append("thumbnail", {
-        uri: compressedImages[0].thumbnail,
-        name: `thumbnail_${timestamp}.jpg`,
-        type: "image/jpeg",
-      });
-    }
-
-    // 5️⃣ Make API call
-    let res;
-    if (isEdit && roomId) {
-      console.log("🔄 Updating room...", roomId);
-      res = await api.put(`${apiUrl}/api/update/${roomId}`, uploadData, {
-        timeout: 60000,
-        headers: { 'Content-Type': 'multipart/form-data' },
-        transformRequest: (data) => data,
-      });
-    } else {
-      console.log("🆕 Creating new room...");
-      res = await api.post(`${apiUrl}/api/rooms`, uploadData, {
-        timeout: 60000,
-        headers: { 'Content-Type': 'multipart/form-data' },
-        transformRequest: (data) => data,
-      });
-    }
-
-    console.log("✅ Success:", res.data);
-
-    if (isEdit) {
-      showToast("Your room listing has been updated!");
-    } else {
-      showToast("Your room listing has been submitted!");
-    }
-
-    router.back();
-  } catch (err) {
-    console.error("❌ Operation failed:", err);
-    let errorMessage = `Something went wrong while ${isEdit ? 'updating' : 'submitting'} your listing.`;
-    if (err.code === 'NETWORK_ERROR') {
-      errorMessage = "Network connection failed. Please check your internet connection.";
-    } else if (err.response?.status) {
-      errorMessage = `Server error (${err.response.status}): ${err.response.data?.message || 'Unknown error'}`;
-    }
-    showToast("Error", errorMessage);
-  } finally {
-    setLoading(false); // ✅ Always stop loading, success or fail
-  }
-};
-
+  };
 
   // ✅ SIMPLE IMAGE REMOVAL - Just remove from local state
   const handleRemoveImage = (index) => {
@@ -306,7 +331,6 @@ const handleSubmit = async () => {
     updateFormData('images', newImages);
   };
 
-  // Your existing renderStepContent function stays the same
   const renderStepContent = () => {
     switch (currentStep) {
       case 1:
@@ -319,7 +343,7 @@ const handleSubmit = async () => {
               placeholder="e.g., Shared Room near Infopark "
               required
               maxLength={100}
-               multiline 
+              multiline 
             />
 
             <InputField
@@ -340,38 +364,65 @@ const handleSubmit = async () => {
           </View>
         );
 
-      case 2:
-        return (
-          <View style={styles.stepContainer}>
-            <ImageUploadSection
-              images={formData.images}
-              onImagesChange={(value) => updateFormData('images', value)} // Simple update
-              maxImages={5}
-              required
-              isEdit={isEdit}
-            />
+case 2:
+  return (
+    <View style={styles.stepContainer}>
+      <ImageUploadSection
+        images={formData.images}
+        onImagesChange={(value) => updateFormData('images', value)}
+        maxImages={5}
+        required
+        isEdit={isEdit}
+      />
 
-            <InputField
-              label="Monthly Rent (₹)"
-              value={formData.monthlyRent}
-              onChangeText={(value) => updateFormData('monthlyRent', value)}
-              placeholder="5000"
-              keyboardType="numeric"
-              required
-            />
+      <View>
+        <InputField
+          label="Monthly Rent (₹)"
+          value={formData.monthlyRent}
+          onChangeText={(value) => updateFormData('monthlyRent', value)}
+          placeholder="5000"
+          keyboardType="numeric"
+          required
+          helperText="Enter amount between ₹1,000 - ₹1,00,000"
+        />
+        
+        {/* ✅ Show error message if rent is invalid */}
+        {formData.monthlyRent?.trim() !== '' && (() => {
+          const rent = parseFloat(formData.monthlyRent);
+          if (isNaN(rent)) {
+            return (
+              <Text style={{ color: '#EF4444', fontSize: 12, marginTop: -15,marginBottom:19, marginLeft: 4 }}>
+                Please enter a valid number
+              </Text>
+            );
+          } else if (rent < 1000) {
+            return (
+              <Text style={{ color: '#EF4444', fontSize: 12, marginTop: -15, marginBottom:19, marginLeft: 4 }}>
+                Minimum rent is ₹1,000
+              </Text>
+            );
+          } else if (rent > 100000) {
+            return (
+              <Text style={{ color: '#EF4444', fontSize: 12, marginTop: -15, marginBottom:19,marginLeft: 4 }}>
+                Maximum rent is ₹1,00,000
+              </Text>
+            );
+          }
+          return null;
+        })()}
+      </View>
 
-            <NumberPicker
-              label="Number of Roommates Wanted"
-              value={formData.roommatesWanted}
-              onValueChange={(value) => updateFormData('roommatesWanted', value)}
-              min={1}
-              max={5}
-              required
-            />
-          </View>
-        );
+      <NumberPicker
+        label="Number of Roommates Wanted"
+        value={formData.roommatesWanted}
+        onValueChange={(value) => updateFormData('roommatesWanted', value)}
+        min={1}
+        max={5}
+        required
+      />
+    </View>
+  );
 
-      // ... rest of your steps remain the same
       case 3:
         return (
           <View style={styles.stepContainer}>
@@ -409,16 +460,17 @@ const handleSubmit = async () => {
               label="Contact Phone"
               value={formData.contactPhone}
               onChangeText={(value) => updateFormData('contactPhone', value)}
-              placeholder="+91 9876543210"
+              placeholder="9876543210"
               keyboardType="phone-pad"
               required
+              helperText="Enter 10-digit mobile number"
             />
 
             <SelectionButton
               label="Phone Number Visibility"
               options={[
-                { label: 'Show ', value: true },
-                { label: 'Hide ', value: false },
+                { label: 'Show Publicly', value: true },
+                { label: 'Hide (Message to reveal)', value: false },
               ]}
               selectedValue={formData.showPhonePublic}
               onSelect={(value) => updateFormData('showPhonePublic', value)}
@@ -472,7 +524,6 @@ const handleSubmit = async () => {
     }
   };
 
-  // Update the header title based on mode
   const getHeaderTitle = () => {
     return isEdit ? "Edit Shared Room" : "Shared Room Listing";
   };
@@ -490,10 +541,9 @@ const handleSubmit = async () => {
   if (loading) {
     return (
       <SafeWrapper>
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
-                    <BeautifulLoader/>
-          
-                  </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
+          <BeautifulLoader/>
+        </View>
       </SafeWrapper>
     );
   }
@@ -518,18 +568,31 @@ const handleSubmit = async () => {
           </ScrollView>
         </KeyboardAvoidingView>
 
+        {/* ✅ UPDATED BUTTON CONTAINER WITH VALIDATION */}
         <View style={styles.buttonContainer}>
           {currentStep > 1 && (
-            <TouchableOpacity style={styles.secondaryButton} onPress={handlePrevious}>
+            <TouchableOpacity 
+              style={styles.secondaryButton} 
+              onPress={handlePrevious}
+            >
               <Text style={styles.secondaryButtonText}>Previous</Text>
             </TouchableOpacity>
           )}
 
+          {/* Next/Submit button - Grey when invalid, Blue when valid */}
           <TouchableOpacity
-            style={[styles.primaryButton, currentStep === 1 && styles.fullWidthButton]}
-            onPress={currentStep === totalSteps ? handleSubmit : handleNext}
+            style={[
+              styles.primaryButton, 
+              currentStep === 1 && styles.fullWidthButton,
+              !isStepValid() && styles.disabledButton
+            ]}
+            onPress={isStepValid() ? (currentStep === totalSteps ? handleSubmit : handleNext) : null}
+            disabled={!isStepValid()}
           >
-            <Text style={styles.primaryButtonText}>
+            <Text style={[
+              styles.primaryButtonText,
+              !isStepValid() && styles.disabledButtonText
+            ]}>
               {currentStep === totalSteps ? (isEdit ? 'Update Listing' : 'Submit Listing') : 'Next'}
             </Text>
           </TouchableOpacity>
@@ -564,7 +627,7 @@ const PGHostelForm = () => {
     amenities: [],
     rules: [],
     contactPhone: '',
-    showPhonePublic: true,
+    showPhonePublic: false, // ✅ Changed to false (hidden by default)
     category: 'pg_hostel',
   });
 
@@ -597,7 +660,7 @@ const PGHostelForm = () => {
         amenities: room.amenities || [],
         rules: room.rules || [],
         contactPhone: room.contactPhone || '',
-        showPhonePublic: room.showPhonePublic ?? true,
+        showPhonePublic: room.showPhonePublic ?? false,
         category: room.category || 'pg_hostel',
       });
 
@@ -611,7 +674,6 @@ const PGHostelForm = () => {
     }
   };
 
-  // Your existing options remain the same...
   const genderCategoryOptions = [
     { label: 'Gents Only', value: 'gents' },
     { label: 'Ladies Only', value: 'ladies' },
@@ -667,184 +729,215 @@ const PGHostelForm = () => {
     }
   };
 
+  // ✅ VALIDATION FUNCTION - Check if current step is complete
+  const isStepValid = () => {
+    switch (currentStep) {
+      case 1:
+        // Step 1: Basic Information
+        return (
+          formData.title?.trim() !== '' &&
+          formData.description?.trim() !== '' &&
+          (formData.location !== null || (locationData?.lat && locationData?.lng))
+        );
+      
+      case 2:
+        // Step 2: Photos & Pricing - ✅ Realistic validation
+        const minPrice = parseFloat(formData.priceRange?.min);
+        const maxPrice = parseFloat(formData.priceRange?.max);
+        const space = parseFloat(formData.availableSpace);
+        
+        return (
+          formData.images?.length > 0 &&
+          formData.availableSpace?.trim() !== '' &&
+          !isNaN(space) &&
+          space >= 1 &&
+          space <= 100 &&
+          !isNaN(minPrice) &&
+          !isNaN(maxPrice) &&
+          minPrice >= 1000 &&
+          maxPrice <= 100000 &&
+          minPrice <= maxPrice
+        );
+      
+      case 3:
+        // Step 3: Facilities & Services
+        return (
+          formData.pgGenderCategory !== '' &&
+          formData.roomTypesAvailable?.length > 0
+        );
+      
+      case 4:
+        // Step 4: Rules & Contact - ✅ Indian mobile number validation
+        const phone = formData.contactPhone?.trim();
+        return (
+          phone !== '' &&
+          phone.length === 10 &&
+          /^[6-9]\d{9}$/.test(phone) &&
+          formData.showPhonePublic !== undefined
+        );
+      
+      default:
+        return false;
+    }
+  };
+
   // ✅ UPDATED SUBMIT FUNCTION - Handles both create and update
-const handleSubmit = async () => {
-  try {
-    setLoading(true); // 🔹 Start loader
-    console.log(locationData, "location--------");
+  const handleSubmit = async () => {
+    try {
+      setLoading(true);
+      console.log(locationData, "location--------");
 
-    // 1️⃣ Validate required fields
-    const errors = [];
+      // 1️⃣ Validate required fields
+      const errors = [];
 
-    if (!formData.images || formData.images.length === 0)
-      errors.push("Please select at least one image.");
+      if (!formData.images || formData.images.length === 0)
+        errors.push("Please select at least one image.");
 
-    if (!formData.title?.trim())
-      errors.push("Title is required.");
+      if (!formData.title?.trim())
+        errors.push("Title is required.");
 
-    if (!formData.description?.trim())
-      errors.push("Description is required.");
+      if (!formData.description?.trim())
+        errors.push("Description is required.");
 
-    if (!formData.availableSpace || isNaN(formData.availableSpace))
-      errors.push("Available space is required and must be a number.");
+      if (!formData.availableSpace || isNaN(formData.availableSpace))
+        errors.push("Available space is required and must be a number.");
 
-    if (!formData.contactPhone?.trim())
-      errors.push("Contact phone is required.");
+      if (!formData.contactPhone?.trim())
+        errors.push("Contact phone is required.");
 
-    if (!formData.pgGenderCategory?.trim())
-      errors.push("Gender category is required.");
+      if (!formData.pgGenderCategory?.trim())
+        errors.push("Gender category is required.");
 
-    if (formData.roomTypesAvailable && !Array.isArray(formData.roomTypesAvailable))
-      errors.push("Please select at least one room type.");
+      if (formData.roomTypesAvailable && !Array.isArray(formData.roomTypesAvailable))
+        errors.push("Please select at least one room type.");
 
-    // ✅ Price range validation
-    const minPrice = parseFloat(formData.priceRange?.min);
-    const maxPrice = parseFloat(formData.priceRange?.max);
+      // ✅ Price range validation
+      const minPrice = parseFloat(formData.priceRange?.min);
+      const maxPrice = parseFloat(formData.priceRange?.max);
 
-    if (isNaN(minPrice) || isNaN(maxPrice))
-      errors.push("Price range min and max must be numbers.");
-    else if (minPrice < 0 || maxPrice < 0)
-      errors.push("Price range values cannot be negative.");
-    else if (minPrice > maxPrice)
-      errors.push("Price range min cannot be greater than max.");
+      if (isNaN(minPrice) || isNaN(maxPrice))
+        errors.push("Price range min and max must be numbers.");
+      else if (minPrice < 0 || maxPrice < 0)
+        errors.push("Price range values cannot be negative.");
+      else if (minPrice > maxPrice)
+        errors.push("Price range min cannot be greater than max.");
 
-    if (errors.length > 0) {
-      showToast("Validation Error", errors.join("\n"));
-      setLoading(false); // ❌ Stop loader if validation fails
-      return;
-    }
-
-    // 2️⃣ Separate existing and new images
-    const existingImages = formData.images.filter(img => img.startsWith('http'));
-    const newImageUris = formData.images.filter(img => !img.startsWith('http'));
-    
-    console.log(`📸 Images - Existing: ${existingImages.length}, New: ${newImageUris.length}, Total: ${formData.images.length}`);
-
-    // 3️⃣ Compress ONLY NEW images
-    const timestamp = Date.now();
-    const compressedImages = [];
-
-    for (let i = 0; i < newImageUris.length; i++) {
-      const img = newImageUris[i];
-
-      let context = ImageManipulator.manipulate(img);
-      context.resize({ width: 1280 });
-      let result = await context.renderAsync();
-      let manip = await result.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
-
-      const info = await FileSystem.getInfoAsync(manip.uri);
-      if (info.size > 1000000) {
-        const context2 = ImageManipulator.manipulate(manip.uri);
-        const result2 = await context2.renderAsync();
-        manip = await result2.saveAsync({ compress: 0.5, format: SaveFormat.JPEG });
+      if (errors.length > 0) {
+        showErrorToast("Please fill all fields correctly.");
+        setLoading(false);
+        return;
       }
 
-      // ✅ FIRST IMAGE THUMBNAIL - Only create thumbnail for first new image
-      if (i === 0 && existingImages.length === 0) {
-        const thumbContext = ImageManipulator.manipulate(manip.uri);
-        thumbContext.resize({ width: 300 });
-        const thumbResult = await thumbContext.renderAsync();
-        const thumb = await thumbResult.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
-        manip.thumbnail = thumb.uri;
+      // 2️⃣ Separate existing and new images
+      const existingImages = formData.images.filter(img => img.startsWith('http'));
+      const newImageUris = formData.images.filter(img => !img.startsWith('http'));
+      
+      console.log(`📸 Images - Existing: ${existingImages.length}, New: ${newImageUris.length}, Total: ${formData.images.length}`);
+
+      // 3️⃣ Compress ONLY NEW images (no thumbnail creation)
+      const timestamp = Date.now();
+      const compressedImages = [];
+
+      for (let i = 0; i < newImageUris.length; i++) {
+        const img = newImageUris[i];
+
+        let context = ImageManipulator.manipulate(img);
+        context.resize({ width: 1280 });
+        let result = await context.renderAsync();
+        let manip = await result.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
+
+        const info = await FileSystem.getInfoAsync(manip.uri);
+        if (info.size > 1000000) {
+          const context2 = ImageManipulator.manipulate(manip.uri);
+          const result2 = await context2.renderAsync();
+          manip = await result2.saveAsync({ compress: 0.5, format: SaveFormat.JPEG });
+        }
+
+        compressedImages.push(manip);
       }
 
-      compressedImages.push(manip);
-    }
+      // 4️⃣ Prepare FormData
+      const uploadData = new FormData();
 
-    // 4️⃣ Prepare FormData
-    const uploadData = new FormData();
+      // Send existing images that should be kept (only for edit mode)
+      if (isEdit && existingImages.length > 0) {
+        uploadData.append("existingImages", JSON.stringify(existingImages));
+        console.log('📤 Sending existing images to keep:', existingImages.length);
+      }
 
-    // ✅ Send existing images that should be kept (only for edit mode)
-    if (isEdit && existingImages.length > 0) {
-      uploadData.append("existingImages", JSON.stringify(existingImages));
-      console.log('📤 Sending existing images to keep:', existingImages.length);
-    }
+      // Append normal fields (EXCLUDING images and location)
+      Object.entries(formData).forEach(([key, value]) => {
+        if (key === "images" || key === "location") return;
 
-    // Append normal fields (EXCLUDING images and location)
-    Object.entries(formData).forEach(([key, value]) => {
-      if (key === "images" || key === "location") return;
+        // Handle mealsProvided separately to prevent nested string arrays
+        if (key === "mealsProvided") {
+          uploadData.append(key, JSON.stringify(value || []));
+        } else if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
+          uploadData.append(key, JSON.stringify(value));
+        } else {
+          uploadData.append(key, String(value));
+        }
+      });
 
-      // ✅ FIX: Handle mealsProvided separately to prevent nested string arrays
-      if (key === "mealsProvided") {
-        uploadData.append(key, JSON.stringify(value || []));
-      } else if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
-        uploadData.append(key, JSON.stringify(value));
+      // Append location ONLY if we have valid locationData
+      if (locationData?.lat && locationData?.lng && locationData?.name) {
+        const geoLocation = {
+          type: "Point",
+          coordinates: [locationData.lng, locationData.lat],
+          fullAddress: locationData.name,
+        };
+        uploadData.append("location", JSON.stringify(geoLocation));
+      }
+
+      // Append NEW images (backend will create thumbnail from first image)
+      compressedImages.forEach((img, i) => {
+        uploadData.append("images", {
+          uri: img.uri,
+          name: `property_${timestamp}_${i}.jpg`,
+          type: "image/jpeg",
+        });
+      });
+
+      // 5️⃣ Make API call - CREATE or UPDATE
+      let res;
+      if (isEdit && roomId) {
+        console.log("🔄 Updating PG/Hostel...", roomId);
+        res = await api.put(`${apiUrl}/api/update/${roomId}`, uploadData, {
+          timeout: 60000,
+          headers: { 'Content-Type': 'multipart/form-data' },
+          transformRequest: (data) => data,
+        });
       } else {
-        uploadData.append(key, String(value));
+        console.log("🆕 Creating new PG/Hostel...");
+        res = await api.post(`${apiUrl}/api/rooms`, uploadData, {
+          timeout: 60000,
+          headers: { 'Content-Type': 'multipart/form-data' },
+          transformRequest: (data) => data,
+        });
       }
-    });
 
-    // Append location ONLY if we have valid locationData
-    if (locationData?.lat && locationData?.lng && locationData?.name) {
-      const geoLocation = {
-        type: "Point",
-        coordinates: [locationData.lng, locationData.lat],
-        fullAddress: locationData.name,
-      };
-      uploadData.append("location", JSON.stringify(geoLocation));
+      console.log("✅ Success:", res.data);
+      if (isEdit) {
+        showToast("Your PG/Hostel listing has been updated!");
+      } else {
+        showToast("Your PG/Hostel listing has been submitted!");
+      }
+
+      router.back();
+
+    } catch (err) {
+      console.error("❌ Operation failed:", err);
+      let errorMessage = `Something went wrong while ${isEdit ? 'updating' : 'submitting'} your listing.`;
+      if (err.code === 'NETWORK_ERROR') {
+        errorMessage = "Network connection failed. Please check your internet connection.";
+      } else if (err.response?.status) {
+        errorMessage = `Server error (${err.response.status}): ${err.response.data?.message || 'Unknown error'}`;
+      }
+      showErrorToast(errorMessage);
+    } finally {
+      setLoading(false);
     }
-
-    // Append NEW images
-    compressedImages.forEach((img, i) => {
-      uploadData.append("images", {
-        uri: img.uri,
-        name: `property_${timestamp}_${i}.jpg`,
-        type: "image/jpeg",
-      });
-    });
-
-    // ✅ Append thumbnail if it's the first image and we have new images
-    if (compressedImages[0]?.thumbnail && existingImages.length === 0) {
-      uploadData.append("thumbnail", {
-        uri: compressedImages[0].thumbnail,
-        name: `thumbnail_${timestamp}.jpg`,
-        type: "image/jpeg",
-      });
-    }
-
-    // 5️⃣ Make API call - CREATE or UPDATE
-    let res;
-    if (isEdit && roomId) {
-      console.log("🔄 Updating PG/Hostel...", roomId);
-      res = await api.put(`${apiUrl}/api/update/${roomId}`, uploadData, {
-        timeout: 60000,
-        headers: { 'Content-Type': 'multipart/form-data' },
-        transformRequest: (data) => data,
-      });
-    } else {
-      console.log("🆕 Creating new PG/Hostel...", uploadData);
-      res = await api.post(`${apiUrl}/api/rooms`, uploadData, {
-        timeout: 60000,
-        headers: { 'Content-Type': 'multipart/form-data' },
-        transformRequest: (data) => data,
-      });
-    }
-
-    console.log("✅ Success:", res.data);
-    if (isEdit) {
-      showToast("Your PG/Hostel listing has been updated!");
-    } else {
-      showToast("Your PG/Hostel listing has been submitted!");
-    }
-
-    // Navigate back
-    router.back();
-
-  } catch (err) {
-    console.error("❌ Operation failed:", err);
-    let errorMessage = `Something went wrong while ${isEdit ? 'updating' : 'submitting'} your listing.`;
-    if (err.code === 'NETWORK_ERROR') {
-      errorMessage = "Network connection failed. Please check your internet connection.";
-    } else if (err.response?.status) {
-      errorMessage = `Server error (${err.response.status}): ${err.response.data?.message || 'Unknown error'}`;
-    }
-    showToast("Error", errorMessage);
-  } finally {
-    setLoading(false); // ✅ Always stop loader
-  }
-};
-
-
+  };
 
   // ✅ SIMPLE IMAGE REMOVAL - Just remove from local state
   const handleRemoveImage = (index) => {
@@ -852,7 +945,6 @@ const handleSubmit = async () => {
     updateFormData('images', newImages);
   };
 
-  // Your existing renderStepContent function with minor updates
   const renderStepContent = () => {
     switch (currentStep) {
       case 1:
@@ -864,7 +956,7 @@ const handleSubmit = async () => {
               onChangeText={(value) => updateFormData('title', value)}
               placeholder="e.g., Tech Stay Gents Hostel - Opposite Infopark"
               required
-                multiline
+              multiline
               maxLength={100}
             />
 
@@ -886,66 +978,165 @@ const handleSubmit = async () => {
           </View>
         );
 
-      case 2:
-        return (
-          <View style={styles.stepContainer}>
-            <ImageUploadSection
-              images={formData.images}
-              onImagesChange={(value) => updateFormData('images', value)}
-              maxImages={8}
-              required
-              isEdit={isEdit}
-            />
+ case 2:
+return (
+  <View style={styles.stepContainer}>
+    <ImageUploadSection
+      images={formData.images}
+      onImagesChange={(value) => updateFormData('images', value)}
+      maxImages={8}
+      required
+      isEdit={isEdit}
+    />
 
-            <InputField
-              label="Available Space (Number of beds/rooms)"
-              value={formData.availableSpace}
-              onChangeText={(value) => updateFormData('availableSpace', value)}
-              placeholder="6"
-              keyboardType="numeric"
-              required
-            />
+    {/* ✅ Available Space with validation */}
+    <View>
+      <InputField
+        label="Available Space (Number of beds/rooms)"
+        value={formData.availableSpace}
+        onChangeText={(value) => updateFormData('availableSpace', value)}
+        placeholder="6"
+        keyboardType="numeric"
+        required
+        helperText="Enter number between 1 - 100"
+      />
+      
+      {/* Show error message if space is invalid */}
+      {formData.availableSpace?.trim() !== '' && (() => {
+        const space = parseFloat(formData.availableSpace);
+        if (isNaN(space)) {
+          return (
+            <Text style={{ color: '#EF4444', fontSize: 12, marginTop: -10, marginBottom: 19, marginLeft: 4 }}>
+              Please enter a valid number
+            </Text>
+          );
+        } else if (space < 1) {
+          return (
+            <Text style={{ color: '#EF4444', fontSize: 12, marginTop: -10, marginBottom: 19, marginLeft: 4 }}>
+              Minimum space is 1
+            </Text>
+          );
+        } else if (space > 100) {
+          return (
+            <Text style={{ color: '#EF4444', fontSize: 12, marginTop: -10, marginBottom: 19, marginLeft: 4 }}>
+              Maximum space is 100
+            </Text>
+          );
+        }
+        return null;
+      })()}
+    </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>
-                Price Range (₹/month) <Text style={styles.required}>*</Text>
+    {/* ✅ Price Range with validation */}
+    <View style={styles.inputContainer}>
+      <Text style={styles.inputLabel}>
+        Price Range (₹/month) <Text style={styles.required}>*</Text>
+      </Text>
+      
+      <View style={styles.priceRangeContainer}>
+        <View style={styles.priceInputContainer}>
+          <Text style={styles.priceLabel}>Min</Text>
+          <TextInput
+            style={styles.priceInput}
+            value={formData.priceRange.min?.toString() || ''}
+            onChangeText={(text) => updateFormData('priceRange', {
+              ...formData.priceRange,
+              min: parseInt(text) || 0
+            })}
+            placeholder="5000"
+            keyboardType="numeric"
+            placeholderTextColor="#999999"
+          />
+        </View>
+
+        <Text style={styles.priceSeparator}>to</Text>
+
+        <View style={styles.priceInputContainer}>
+          <Text style={styles.priceLabel}>Max</Text>
+          <TextInput
+            style={styles.priceInput}
+            value={formData.priceRange.max?.toString() || ''}
+            onChangeText={(text) => updateFormData('priceRange', {
+              ...formData.priceRange,
+              max: parseInt(text) || 0
+            })}
+            placeholder="7000"
+            keyboardType="numeric"
+            placeholderTextColor="#999999"
+          />
+        </View>
+      </View>
+
+      {/* Show error messages for price range */}
+      {(() => {
+        const minPrice = parseFloat(formData.priceRange?.min);
+        const maxPrice = parseFloat(formData.priceRange?.max);
+        const minStr = formData.priceRange?.min?.toString() || '';
+        const maxStr = formData.priceRange?.max?.toString() || '';
+
+        // Only validate if user has entered something meaningful (not empty or default 0)
+        const hasMinInput = minStr !== '' && minStr !== '0';
+        const hasMaxInput = maxStr !== '' && maxStr !== '0';
+
+        if (hasMinInput || hasMaxInput) {
+          // Check if both are valid numbers
+          if ((hasMinInput && isNaN(minPrice)) || (hasMaxInput && isNaN(maxPrice))) {
+            return (
+              <Text style={{ color: '#EF4444', fontSize: 12, marginTop: 4, marginLeft: 4 }}>
+                Please enter valid numbers
               </Text>
-              <View style={styles.priceRangeContainer}>
-                <View style={styles.priceInputContainer}>
-                  <Text style={styles.priceLabel}>Min</Text>
-                  <TextInput
-                    style={styles.priceInput}
-                    value={formData.priceRange.min?.toString() || ''}
-                    onChangeText={(text) => updateFormData('priceRange', {
-                      ...formData.priceRange,
-                      min: parseInt(text) || 0
-                    })}
-                    placeholder="5000"
-                    keyboardType="numeric"
-                    placeholderTextColor="#999999"
-                  />
-                </View>
-
-                <Text style={styles.priceSeparator}>to</Text>
-
-                <View style={styles.priceInputContainer}>
-                  <Text style={styles.priceLabel}>Max</Text>
-                  <TextInput
-                    style={styles.priceInput}
-                    value={formData.priceRange.max?.toString() || ''}
-                    onChangeText={(text) => updateFormData('priceRange', {
-                      ...formData.priceRange,
-                      max: parseInt(text) || 0
-                    })}
-                    placeholder="7000"
-                    keyboardType="numeric"
-                    placeholderTextColor="#999999"
-                  />
-                </View>
-              </View>
-            </View>
-          </View>
-        );
+            );
+          }
+          
+          // ✅ Check MIN price: must be between ₹1,000 - ₹1,00,000
+          if (hasMinInput && minPrice < 1000) {
+            return (
+              <Text style={{ color: '#EF4444', fontSize: 12, marginTop: 4, marginLeft: 4 }}>
+                Minimum price should be at least ₹1,000
+              </Text>
+            );
+          }
+          
+          if (hasMinInput && minPrice > 100000) {
+            return (
+              <Text style={{ color: '#EF4444', fontSize: 12, marginTop: 4, marginLeft: 4 }}>
+                Minimum price cannot exceed ₹1,00,000
+              </Text>
+            );
+          }
+          
+          // ✅ Check MAX price: must be between ₹1,000 - ₹1,00,000
+          if (hasMaxInput && maxPrice < 1000) {
+            return (
+              <Text style={{ color: '#EF4444', fontSize: 12, marginTop: 4, marginLeft: 4 }}>
+                Maximum price should be at least ₹1,000
+              </Text>
+            );
+          }
+          
+          if (hasMaxInput && maxPrice > 100000) {
+            return (
+              <Text style={{ color: '#EF4444', fontSize: 12, marginTop: 4, marginLeft: 4 }}>
+                Maximum price cannot exceed ₹1,00,000
+              </Text>
+            );
+          }
+          
+          // ✅ Check if min > max (only if both are entered and valid)
+          if (hasMinInput && hasMaxInput && minPrice > maxPrice) {
+            return (
+              <Text style={{ color: '#EF4444', fontSize: 12, marginTop: 4, marginLeft: 4 }}>
+                Minimum price cannot be greater than maximum price
+              </Text>
+            );
+          }
+        }
+        
+        return null;
+      })()}
+    </View>
+  </View>
+);
 
       case 3:
         return (
@@ -1000,15 +1191,17 @@ const handleSubmit = async () => {
               label="Contact Phone"
               value={formData.contactPhone}
               onChangeText={(value) => updateFormData('contactPhone', value)}
+              placeholder="9876543210"
               keyboardType="phone-pad"
               required
+              helperText="Enter 10-digit mobile number"
             />
 
             <SelectionButton
               label="Phone Number Visibility"
               options={[
-                { label: 'Show ', value: true },
-                { label: 'Hide ', value: false },
+                { label: 'Show Publicly', value: true },
+                { label: 'Hide (Message to reveal)', value: false },
               ]}
               selectedValue={formData.showPhonePublic}
               onSelect={(value) => updateFormData('showPhonePublic', value)}
@@ -1064,7 +1257,6 @@ const handleSubmit = async () => {
     }
   };
 
-  // Update the header title based on mode
   const getHeaderTitle = () => {
     return isEdit ? "Edit PG/Hostel" : "PG/Hostel Listing";
   };
@@ -1082,10 +1274,9 @@ const handleSubmit = async () => {
   if (loading) {
     return (
       <SafeWrapper>
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
-                    <BeautifulLoader/>
-          
-                  </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
+          <BeautifulLoader/>
+        </View>
       </SafeWrapper>
     );
   }
@@ -1110,18 +1301,31 @@ const handleSubmit = async () => {
           </ScrollView>
         </KeyboardAvoidingView>
 
+        {/* ✅ UPDATED BUTTON CONTAINER WITH VALIDATION */}
         <View style={styles.buttonContainer}>
           {currentStep > 1 && (
-            <TouchableOpacity style={styles.secondaryButton} onPress={handlePrevious}>
+            <TouchableOpacity 
+              style={styles.secondaryButton} 
+              onPress={handlePrevious}
+            >
               <Text style={styles.secondaryButtonText}>Previous</Text>
             </TouchableOpacity>
           )}
 
+          {/* Next/Submit button - Grey when invalid, Blue when valid */}
           <TouchableOpacity
-            style={[styles.primaryButton, currentStep === 1 && styles.fullWidthButton]}
-            onPress={currentStep === totalSteps ? handleSubmit : handleNext}
+            style={[
+              styles.primaryButton, 
+              currentStep === 1 && styles.fullWidthButton,
+              !isStepValid() && styles.disabledButton
+            ]}
+            onPress={isStepValid() ? (currentStep === totalSteps ? handleSubmit : handleNext) : null}
+            disabled={!isStepValid()}
           >
-            <Text style={styles.primaryButtonText}>
+            <Text style={[
+              styles.primaryButtonText,
+              !isStepValid() && styles.disabledButtonText
+            ]}>
               {currentStep === totalSteps ? (isEdit ? 'Update Listing' : 'Submit Listing') : 'Next'}
             </Text>
           </TouchableOpacity>
@@ -1131,7 +1335,6 @@ const handleSubmit = async () => {
   );
 };
 
-// File: FlatHomeForm.js
 
 const FlatHomeForm = () => {
   // ✅ Get route parameters
@@ -1162,7 +1365,7 @@ const FlatHomeForm = () => {
     tenantPreference: '',
     parking: '',
     contactPhone: '',
-    showPhonePublic: true,
+    showPhonePublic: false, // ✅ Changed to false (hidden by default)
     category: 'flat_home',
   });
 
@@ -1200,7 +1403,7 @@ const FlatHomeForm = () => {
         tenantPreference: room.tenantPreference || '',
         parking: room.parking || '',
         contactPhone: room.contactPhone || '',
-        showPhonePublic: room.showPhonePublic ?? true,
+        showPhonePublic: room.showPhonePublic ?? false,
         category: room.category || 'flat_home',
       });
 
@@ -1214,13 +1417,12 @@ const FlatHomeForm = () => {
     }
   };
 
-  // Your existing options remain the same...
-  const propertyTypeOptions = [
-    { label: 'Apartment/Flat', value: 'flat' },
-    { label: 'Independent House', value: 'house' },
-    { label: 'Villa', value: 'villa' },
-    { label: 'Duplex', value: 'duplex' },
-  ];
+const propertyTypeOptions = [
+  { label: 'Apartment/Flat', value: 'Apartment/Flat' },  // ✅ Changed from 'flat'
+  { label: 'Independent House', value: 'Independent House' },  // ✅ Changed from 'house'
+  { label: 'Villa', value: 'Villa' },  // ✅ Changed from 'villa'
+  { label: 'Duplex', value: 'Duplex' },  // ✅ Changed from 'duplex'
+];
 
   const furnishedOptions = [
     { label: 'Fully Furnished', value: 'furnished' },
@@ -1258,169 +1460,204 @@ const FlatHomeForm = () => {
     }
   };
 
-  // ✅ UPDATED SUBMIT FUNCTION - Handles both create and update
-const handleSubmit = async () => {
-  try {
-    setLoading(true); // 🔹 Start loader
-    console.log(locationData, "location--------");
-
-    // 1️⃣ Validate required fields
-    const errors = [];
-    if (!formData.images || formData.images.length === 0)
-      errors.push("Please select at least one image.");
-    if (!formData.title?.trim())
-      errors.push("Title is required.");
-    if (!formData.description?.trim())
-      errors.push("Description is required.");
-    if (!formData.monthlyRent || isNaN(formData.monthlyRent))
-      errors.push("Monthly rent is required and must be a number.");
-    if (!formData.securityDeposit || isNaN(formData.securityDeposit))
-      errors.push("Security deposit is required and must be a number.");
-    if (!formData.contactPhone?.trim())
-      errors.push("Contact phone is required.");
-    if (!formData.propertyType?.trim())
-      errors.push("Property type is required.");
-    if (!formData.furnishedStatus?.trim())
-      errors.push("Furnished status is required.");
-
-    if (errors.length > 0) {
-      showToast("Validation Error", errors.join("\n"));
-      setLoading(false); // ❌ Stop loader if validation fails
-      return;
-    }
-
-    // 2️⃣ Separate existing and new images
-    const existingImages = formData.images.filter(img => img.startsWith('http'));
-    const newImageUris = formData.images.filter(img => !img.startsWith('http'));
-    
-    console.log(`📸 Images - Existing: ${existingImages.length}, New: ${newImageUris.length}, Total: ${formData.images.length}`);
-
-    // 3️⃣ Compress ONLY NEW images
-    const timestamp = Date.now();
-    const compressedImages = [];
-
-    for (let i = 0; i < newImageUris.length; i++) {
-      const img = newImageUris[i];
-
-      let context = ImageManipulator.manipulate(img);
-      context.resize({ width: 1280 });
-      let result = await context.renderAsync();
-      let manip = await result.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
-
-      const info = await FileSystem.getInfoAsync(manip.uri);
-      if (info.size > 1000000) {
-        const context2 = ImageManipulator.manipulate(manip.uri);
-        const result2 = await context2.renderAsync();
-        manip = await result2.saveAsync({ compress: 0.5, format: SaveFormat.JPEG });
-      }
-
-      // ✅ FIRST IMAGE THUMBNAIL - Only create thumbnail for first new image
-      if (i === 0 && existingImages.length === 0) {
-        const thumbContext = ImageManipulator.manipulate(manip.uri);
-        thumbContext.resize({ width: 300 });
-        const thumbResult = await thumbContext.renderAsync();
-        const thumb = await thumbResult.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
-        manip.thumbnail = thumb.uri;
-      }
-
-      compressedImages.push(manip);
-    }
-
-    // 4️⃣ Prepare FormData
-    const uploadData = new FormData();
-
-    // ✅ CRITICAL: Send existing images that should be kept (only for edit mode)
-    if (isEdit && existingImages.length > 0) {
-      uploadData.append("existingImages", JSON.stringify(existingImages));
-      console.log('📤 Sending existing images to keep:', existingImages.length);
-    }
-
-    // Append normal fields (EXCLUDING images and location)
-    Object.entries(formData).forEach(([key, value]) => {
-      if (key === "images" || key === "location") return;
-      if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
-        uploadData.append(key, JSON.stringify(value));
-      } else {
-        uploadData.append(key, String(value));
-      }
-    });
-
-    // Append location ONLY if we have valid locationData
-    if (locationData?.lat && locationData?.lng && locationData?.name) {
-      const geoLocation = {
-        type: "Point",
-        coordinates: [locationData.lng, locationData.lat],
-        fullAddress: locationData.name,
-      };
-      uploadData.append("location", JSON.stringify(geoLocation));
-    }
-
-    // Append NEW images
-    compressedImages.forEach((img, i) => {
-      uploadData.append("images", {
-        uri: img.uri,
-        name: `property_${timestamp}_${i}.jpg`,
-        type: "image/jpeg",
-      });
-    });
-
-    // ✅ Append thumbnail if it's the first image and we have new images
-    if (compressedImages[0]?.thumbnail && existingImages.length === 0) {
-      uploadData.append("thumbnail", {
-        uri: compressedImages[0].thumbnail,
-        name: `thumbnail_${timestamp}.jpg`,
-        type: "image/jpeg",
-      });
-    }
-
-    // 5️⃣ Make API call - CREATE or UPDATE
-    let res;
-    if (isEdit && roomId) {
-      console.log("🔄 Updating property...", roomId);
-      console.log("📤 Uploading:", {
-        existingImages: existingImages.length,
-        newImages: compressedImages.length,
-        totalImages: formData.images.length
-      });
+  // ✅ VALIDATION FUNCTION - Check if current step is complete
+  const isStepValid = () => {
+    switch (currentStep) {
+      case 1:
+        // Step 1: Basic Information
+        return (
+          formData.title?.trim() !== '' &&
+          formData.description?.trim() !== '' &&
+          (formData.location !== null || (locationData?.lat && locationData?.lng))
+        );
       
-      res = await api.put(`${apiUrl}/api/update/${roomId}`, uploadData, {
-        timeout: 60000,
-        headers: { 'Content-Type': 'multipart/form-data' },
-        transformRequest: (data) => data,
+      case 2:
+        // Step 2: Photos & Property Type
+        return (
+          formData.images?.length > 0 &&
+          formData.propertyType !== '' &&
+          formData.furnishedStatus !== ''
+        );
+      
+      case 3:
+        // Step 3: Pricing & Specifications - ✅ Realistic validation
+        const rent = parseFloat(formData.monthlyRent);
+        const deposit = parseFloat(formData.securityDeposit);
+        const area = parseFloat(formData.squareFeet);
+        
+        return (
+          formData.monthlyRent?.trim() !== '' &&
+          !isNaN(rent) &&
+          rent >= 1000 &&
+          rent <= 300000 &&
+          (formData.securityDeposit?.trim() === '' || 
+            (!isNaN(deposit) && deposit >= 0 && deposit <= 500000)) &&
+          (formData.squareFeet?.trim() === '' || 
+            (!isNaN(area) && area >= 0 && area <= 5000)) &&
+          formData.bedrooms >= 1 &&
+          formData.bathrooms >= 1
+        );
+      
+      case 4:
+        // Step 4: Additional Details - ✅ Indian mobile number validation
+        const phone = formData.contactPhone?.trim();
+        return (
+          formData.tenantPreference !== '' &&
+          formData.parking !== '' &&
+          phone !== '' &&
+          phone.length === 10 &&
+          /^[6-9]\d{9}$/.test(phone) &&
+          formData.showPhonePublic !== undefined
+        );
+      
+      default:
+        return false;
+    }
+  };
+
+  // ✅ UPDATED SUBMIT FUNCTION - Handles both create and update
+  const handleSubmit = async () => {
+    try {
+      setLoading(true);
+      console.log(locationData, "location--------");
+
+      // 1️⃣ Validate required fields
+      const errors = [];
+      if (!formData.images || formData.images.length === 0)
+        errors.push("Please select at least one image.");
+      if (!formData.title?.trim())
+        errors.push("Title is required.");
+      if (!formData.description?.trim())
+        errors.push("Description is required.");
+      if (!formData.monthlyRent || isNaN(formData.monthlyRent))
+        errors.push("Monthly rent is required and must be a number.");
+      if (formData.securityDeposit && isNaN(formData.securityDeposit))
+        errors.push("Security deposit must be a number.");
+      if (!formData.contactPhone?.trim())
+        errors.push("Contact phone is required.");
+      if (!formData.propertyType?.trim())
+        errors.push("Property type is required.");
+      if (!formData.furnishedStatus?.trim())
+        errors.push("Furnished status is required.");
+
+      if (errors.length > 0) {
+        showErrorToast("Please fill all fields correctly.");
+        setLoading(false);
+        return;
+      }
+
+      // 2️⃣ Separate existing and new images
+      const existingImages = formData.images.filter(img => img.startsWith('http'));
+      const newImageUris = formData.images.filter(img => !img.startsWith('http'));
+      
+      console.log(`📸 Images - Existing: ${existingImages.length}, New: ${newImageUris.length}, Total: ${formData.images.length}`);
+
+      // 3️⃣ Compress ONLY NEW images (no thumbnail creation)
+      const timestamp = Date.now();
+      const compressedImages = [];
+
+      for (let i = 0; i < newImageUris.length; i++) {
+        const img = newImageUris[i];
+
+        let context = ImageManipulator.manipulate(img);
+        context.resize({ width: 1280 });
+        let result = await context.renderAsync();
+        let manip = await result.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
+
+        const info = await FileSystem.getInfoAsync(manip.uri);
+        if (info.size > 1000000) {
+          const context2 = ImageManipulator.manipulate(manip.uri);
+          const result2 = await context2.renderAsync();
+          manip = await result2.saveAsync({ compress: 0.5, format: SaveFormat.JPEG });
+        }
+
+        compressedImages.push(manip);
+      }
+
+      // 4️⃣ Prepare FormData
+      const uploadData = new FormData();
+
+      // Send existing images that should be kept (only for edit mode)
+      if (isEdit && existingImages.length > 0) {
+        uploadData.append("existingImages", JSON.stringify(existingImages));
+        console.log('📤 Sending existing images to keep:', existingImages.length);
+      }
+
+      // Append normal fields (EXCLUDING images and location)
+      Object.entries(formData).forEach(([key, value]) => {
+        if (key === "images" || key === "location") return;
+        if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
+          uploadData.append(key, JSON.stringify(value));
+        } else {
+          uploadData.append(key, String(value));
+        }
       });
-    } else {
-      console.log("🆕 Creating new property...");
-      res = await api.post(`${apiUrl}/api/rooms`, uploadData, {
-        timeout: 60000,
-        headers: { 'Content-Type': 'multipart/form-data' },
-        transformRequest: (data) => data,
+
+      // Append location ONLY if we have valid locationData
+      if (locationData?.lat && locationData?.lng && locationData?.name) {
+        const geoLocation = {
+          type: "Point",
+          coordinates: [locationData.lng, locationData.lat],
+          fullAddress: locationData.name,
+        };
+        uploadData.append("location", JSON.stringify(geoLocation));
+      }
+
+      // Append NEW images (backend will create thumbnail from first image)
+      compressedImages.forEach((img, i) => {
+        uploadData.append("images", {
+          uri: img.uri,
+          name: `property_${timestamp}_${i}.jpg`,
+          type: "image/jpeg",
+        });
       });
+
+      // 5️⃣ Make API call - CREATE or UPDATE
+      let res;
+      if (isEdit && roomId) {
+        console.log("🔄 Updating property...", roomId);
+        console.log("📤 Uploading:", {
+          existingImages: existingImages.length,
+          newImages: compressedImages.length,
+          totalImages: formData.images.length
+        });
+        
+        res = await api.put(`${apiUrl}/api/update/${roomId}`, uploadData, {
+          timeout: 60000,
+          headers: { 'Content-Type': 'multipart/form-data' },
+          transformRequest: (data) => data,
+        });
+      } else {
+        console.log("🆕 Creating new property...");
+        res = await api.post(`${apiUrl}/api/rooms`, uploadData, {
+          timeout: 60000,
+          headers: { 'Content-Type': 'multipart/form-data' },
+          transformRequest: (data) => data,
+        });
+      }
+
+      console.log("✅ Success:", res.data);
+      if (isEdit) {
+        showToast("Your property listing has been updated!");
+      } else {
+        showToast("Your property listing has been submitted!");
+      }
+
+      router.back();
+
+    } catch (err) {
+      console.error("❌ Operation failed:", err);
+      let errorMessage = `Something went wrong while ${isEdit ? 'updating' : 'submitting'} your listing.`;
+      if (err.code === 'NETWORK_ERROR') {
+        errorMessage = "Network connection failed. Please check your internet connection.";
+      } else if (err.response?.status) {
+        errorMessage = `Server error (${err.response.status}): ${err.response.data?.message || 'Unknown error'}`;
+      }
+      showErrorToast(errorMessage);
+    } finally {
+      setLoading(false);
     }
-
-    console.log("✅ Success:", res.data);
-    if (isEdit) {
-      showToast("Your property listing has been updated!");
-    } else {
-      showToast("Your property listing has been submitted!");
-    }
-
-    // Navigate back
-    router.back();
-
-  } catch (err) {
-    console.error("❌ Operation failed:", err);
-    let errorMessage = `Something went wrong while ${isEdit ? 'updating' : 'submitting'} your listing.`;
-    if (err.code === 'NETWORK_ERROR') {
-      errorMessage = "Network connection failed. Please check your internet connection.";
-    } else if (err.response?.status) {
-      errorMessage = `Server error (${err.response.status}): ${err.response.data?.message || 'Unknown error'}`;
-    }
-    showToast("Error", errorMessage);
-  } finally {
-    setLoading(false); // ✅ Always stop loader
-  }
-};
-
+  };
 
   // ✅ SIMPLE IMAGE REMOVAL - Just remove from local state
   const handleRemoveImage = (index) => {
@@ -1428,32 +1665,31 @@ const handleSubmit = async () => {
     updateFormData('images', newImages);
   };
 
-  // Your existing renderStepContent function with minor updates
   const renderStepContent = () => {
     switch (currentStep) {
       case 1:
         return (
           <View style={styles.stepContainer}>
-      <InputField
-  label="Property Title"
-  value={formData.title}
-   multiline
-  onChangeText={(value) => updateFormData('title', value)}
-  placeholder="e.g., 2BHK Fully Furnished Flat near Kakkanad"
-  required
-  maxLength={100}
+            <InputField
+              label="Property Title"
+              value={formData.title}
+              multiline
+              onChangeText={(value) => updateFormData('title', value)}
+              placeholder="e.g., 2BHK Fully Furnished Flat near Kakkanad"
+              required
+              maxLength={100}
+            />
 
-/>
-
-<InputField
-  label="Description"
-  value={formData.description}
-  multiline
-  onChangeText={(value) => updateFormData('description', value)}
-  placeholder="Describe your property, location advantages, and amenities..."
-  required
-  maxLength={500}
-/>
+            <InputField
+              label="Description"
+              value={formData.description}
+              multiline
+              onChangeText={(value) => updateFormData('description', value)}
+              placeholder="Describe your property, location advantages, and amenities..."
+              required
+              maxLength={500}
+            />
+            
             <LocationSection
               locationData={formData.location}
               onLocationChange={(value) => updateFormData('location', value)}
@@ -1491,67 +1727,154 @@ const handleSubmit = async () => {
           </View>
         );
 
-      case 3:
-        return (
-          <View style={styles.stepContainer}>
-            <InputField
-              label="Monthly Rent (₹)"
-              value={formData.monthlyRent}
-              onChangeText={(value) => updateFormData('monthlyRent', value)}
-              placeholder="12000"
-              keyboardType="numeric"
+     case 3:
+  return (
+    <View style={styles.stepContainer}>
+      {/* ✅ Monthly Rent with validation */}
+      <View>
+        <InputField
+          label="Monthly Rent (₹)"
+          value={formData.monthlyRent}
+          onChangeText={(value) => updateFormData('monthlyRent', value)}
+          placeholder="12000"
+          keyboardType="numeric"
+          required
+          helperText="Enter amount between ₹1,000 - ₹3,00,000"
+        />
+        
+        {/* Show error message if rent is invalid */}
+        {formData.monthlyRent?.trim() !== '' && (() => {
+          const rent = parseFloat(formData.monthlyRent);
+          if (isNaN(rent)) {
+            return (
+              <Text style={{ color: '#EF4444', fontSize: 12, marginTop: -10, marginBottom: 19, marginLeft: 4 }}>
+                Please enter a valid number
+              </Text>
+            );
+          } else if (rent < 1000) {
+            return (
+              <Text style={{ color: '#EF4444', fontSize: 12, marginTop: -10, marginBottom: 19, marginLeft: 4 }}>
+                Minimum rent is ₹1,000
+              </Text>
+            );
+          } else if (rent > 300000) {
+            return (
+              <Text style={{ color: '#EF4444', fontSize: 12, marginTop: -10, marginBottom: 19, marginLeft: 4 }}>
+                Maximum rent is ₹3,00,000
+              </Text>
+            );
+          }
+          return null;
+        })()}
+      </View>
+
+      {/* ✅ Security Deposit with validation (Optional field) */}
+      <View>
+        <InputField
+          label="Security Deposit (₹)"
+          value={formData.securityDeposit}
+          onChangeText={(value) => updateFormData('securityDeposit', value)}
+          placeholder="15000"
+          keyboardType="numeric"
+          helperText="Optional: Max ₹5,00,000"
+        />
+        
+        {/* Show error message if deposit is invalid (only if entered) */}
+        {formData.securityDeposit?.trim() !== '' && (() => {
+          const deposit = parseFloat(formData.securityDeposit);
+          if (isNaN(deposit)) {
+            return (
+              <Text style={{ color: '#EF4444', fontSize: 12, marginTop: -10, marginBottom: 19, marginLeft: 4 }}>
+                Please enter a valid number
+              </Text>
+            );
+          } else if (deposit < 0) {
+            return (
+              <Text style={{ color: '#EF4444', fontSize: 12, marginTop: -10, marginBottom: 19, marginLeft: 4 }}>
+                Deposit cannot be negative
+              </Text>
+            );
+          } else if (deposit > 500000) {
+            return (
+              <Text style={{ color: '#EF4444', fontSize: 12, marginTop: -10, marginBottom: 19, marginLeft: 4 }}>
+                Maximum deposit is ₹5,00,000
+              </Text>
+            );
+          }
+          return null;
+        })()}
+      </View>
+
+      {/* ✅ Area (Square Feet) with validation (Optional field) */}
+      <View>
+        <InputField
+          label="Area (Square Feet)"
+          value={formData.squareFeet}
+          onChangeText={(value) => updateFormData('squareFeet', value)}
+          placeholder="950"
+          keyboardType="numeric"
+          helperText="Optional: Max 5,000 sq ft"
+        />
+        
+        {/* Show error message if area is invalid (only if entered) */}
+        {formData.squareFeet?.trim() !== '' && (() => {
+          const area = parseFloat(formData.squareFeet);
+          if (isNaN(area)) {
+            return (
+              <Text style={{ color: '#EF4444', fontSize: 12, marginTop: -10, marginBottom: 19, marginLeft: 4 }}>
+                Please enter a valid number
+              </Text>
+            );
+          } else if (area < 0) {
+            return (
+              <Text style={{ color: '#EF4444', fontSize: 12, marginTop: -10, marginBottom: 19, marginLeft: 4 }}>
+                Area cannot be negative
+              </Text>
+            );
+          } else if (area > 5000) {
+            return (
+              <Text style={{ color: '#EF4444', fontSize: 12, marginTop: -10, marginBottom: 19, marginLeft: 4 }}>
+                Maximum area is 5,000 sq ft
+              </Text>
+            );
+          }
+          return null;
+        })()}
+      </View>
+
+      <View style={styles.roomDetailsContainer}>
+        <ScrollView horizontal>
+          <View style={styles.horizontalContainer}>
+            <NumberPicker
+              label="Bedrooms"
+              value={formData.bedrooms}
+              onValueChange={(value) => updateFormData('bedrooms', value)}
+              min={1}
+              max={10}
               required
             />
-
-            <InputField
-              label="Security Deposit (₹)"
-              value={formData.securityDeposit}
-              onChangeText={(value) => updateFormData('securityDeposit', value)}
-              placeholder="15000"
-              keyboardType="numeric"
+            <View style={styles.separator} />
+            <NumberPicker
+              label="Bathrooms"
+              value={formData.bathrooms}
+              onValueChange={(value) => updateFormData('bathrooms', value)}
+              min={1}
+              max={10}
+              required
             />
-
-            <InputField
-              label="Area (Square Feet)"
-              value={formData.squareFeet}
-              onChangeText={(value) => updateFormData('squareFeet', value)}
-              placeholder="950"
-              keyboardType="numeric"
+            <View style={styles.separator} />
+            <NumberPicker
+              label="Balconies"
+              value={formData.balconies}
+              onValueChange={(value) => updateFormData('balconies', value)}
+              min={0}
+              max={5}
             />
-
-            <View style={styles.roomDetailsContainer}>
-              <ScrollView horizontal>
-                <View style={styles.horizontalContainer}>
-                  <NumberPicker
-                    label="Bedrooms"
-                    value={formData.bedrooms}
-                    onValueChange={(value) => updateFormData('bedrooms', value)}
-                    min={1}
-                    max={10}
-                    required
-                  />
-                  <View style={styles.separator} />
-                  <NumberPicker
-                    label="Bathrooms"
-                    value={formData.bathrooms}
-                    onValueChange={(value) => updateFormData('bathrooms', value)}
-                    min={1}
-                    max={10}
-                    required
-                  />
-                  <View style={styles.separator} />
-                  <NumberPicker
-                    label="Balconies"
-                    value={formData.balconies}
-                    onValueChange={(value) => updateFormData('balconies', value)}
-                    min={0}
-                    max={5}
-                  />
-                </View>
-              </ScrollView>
-            </View>
           </View>
-        );
+        </ScrollView>
+      </View>
+    </View>
+  );
 
       case 4:
         return (
@@ -1598,16 +1921,17 @@ const handleSubmit = async () => {
               label="Contact Phone"
               value={formData.contactPhone}
               onChangeText={(value) => updateFormData('contactPhone', value)}
-              placeholder="+91 9876543210"
+              placeholder="9876543210"
               keyboardType="phone-pad"
               required
+              helperText="Enter 10-digit mobile number"
             />
 
             <SelectionButton
               label="Phone Number Visibility"
               options={[
-                { label: 'Hide ', value: false },
-                { label: 'Show ', value: true },
+                { label: 'Show Publicly', value: true },
+                { label: 'Hide (Message to reveal)', value: false },
               ]}
               selectedValue={formData.showPhonePublic}
               onSelect={(value) => updateFormData('showPhonePublic', value)}
@@ -1663,7 +1987,6 @@ const handleSubmit = async () => {
     }
   };
 
-  // Update the header title based on mode
   const getHeaderTitle = () => {
     return isEdit ? "Edit Property" : "Property Listing";
   };
@@ -1681,10 +2004,9 @@ const handleSubmit = async () => {
   if (loading) {
     return (
       <SafeWrapper>
-           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
-                    <BeautifulLoader/>
-          
-                  </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
+          <BeautifulLoader/>
+        </View>
       </SafeWrapper>
     );
   }
@@ -1709,18 +2031,31 @@ const handleSubmit = async () => {
           </ScrollView>
         </KeyboardAvoidingView>
 
+        {/* ✅ UPDATED BUTTON CONTAINER WITH VALIDATION */}
         <View style={styles.buttonContainer}>
           {currentStep > 1 && (
-            <TouchableOpacity style={styles.secondaryButton} onPress={handlePrevious}>
+            <TouchableOpacity 
+              style={styles.secondaryButton} 
+              onPress={handlePrevious}
+            >
               <Text style={styles.secondaryButtonText}>Previous</Text>
             </TouchableOpacity>
           )}
 
+          {/* Next/Submit button - Grey when invalid, Blue when valid */}
           <TouchableOpacity
-            style={[styles.primaryButton, currentStep === 1 && styles.fullWidthButton]}
-            onPress={currentStep === totalSteps ? handleSubmit : handleNext}
+            style={[
+              styles.primaryButton, 
+              currentStep === 1 && styles.fullWidthButton,
+              !isStepValid() && styles.disabledButton
+            ]}
+            onPress={isStepValid() ? (currentStep === totalSteps ? handleSubmit : handleNext) : null}
+            disabled={!isStepValid()}
           >
-            <Text style={styles.primaryButtonText}>
+            <Text style={[
+              styles.primaryButtonText,
+              !isStepValid() && styles.disabledButtonText
+            ]}>
               {currentStep === totalSteps ? (isEdit ? 'Update Listing' : 'Submit Listing') : 'Next'}
             </Text>
           </TouchableOpacity>
@@ -1782,7 +2117,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   stepContainer: {
-
     paddingTop: 20,
     paddingBottom: 20,
   },
@@ -1837,6 +2171,14 @@ const styles = StyleSheet.create({
   },
   fullWidthButton: {
     flex: 2,
+  },
+  // ✅ NEW: Disabled button styles for form validation
+  disabledButton: {
+    backgroundColor: '#CCCCCC',
+    opacity: 0.6,
+  },
+  disabledButtonText: {
+    color: '#999999',
   },
   summaryContainer: {
     backgroundColor: '#F8F8FF',

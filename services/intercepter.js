@@ -8,10 +8,24 @@ const api = axios.create({
   timeout: 10000,
 });
 
-// ✅ Request interceptor to always attach token
+// Track if we're currently refreshing to prevent race conditions
+let isRefreshing = false;
+let refreshSubscribers = [];
+
+// Queue failed requests while refreshing
+const subscribeTokenRefresh = (cb) => {
+  refreshSubscribers.push(cb);
+};
+
+const onRefreshed = (token) => {
+  refreshSubscribers.forEach((cb) => cb(token));
+  refreshSubscribers = [];
+};
+
+// ✅ Request interceptor
 api.interceptors.request.use(
   async (config) => {
-    const token = await AsyncStorage.getItem("authToken"); // must match storage key
+    const token = await AsyncStorage.getItem("authToken");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -20,38 +34,68 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// ✅ Response interceptor for token refresh
+// ✅ Response interceptor with proper queue handling
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // Avoid infinite retry
+    // Only handle 401 errors and prevent retry loops
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
-      const userId = await AsyncStorage.getItem("userId");
-      console.log("Retrying with refresh token for userId:", userId);
+      if (isRefreshing) {
+        // If already refreshing, queue this request
+        return new Promise((resolve) => {
+          subscribeTokenRefresh((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            resolve(api(originalRequest));
+          });
+        });
+      }
 
-      if (!userId) return Promise.reject(error);
+      isRefreshing = true;
 
       try {
+        const userId = await AsyncStorage.getItem("userId");
+        
+        if (!userId) {
+          throw new Error("No userId found");
+        }
+
+        console.log("🔄 Refreshing token for userId:", userId);
+
+        // Use base axios (not api instance) to avoid interceptor loop
         const res = await axios.post(`${apiUrl}/api/auth/refresh`, { userId });
-        console.log("Refresh response:", res.data);
 
         const newAccessToken = res.data.accessToken;
-        if (!newAccessToken) throw new Error("No accessToken returned from refresh");
+        
+        if (!newAccessToken) {
+          throw new Error("No accessToken returned");
+        }
 
-        // Update AsyncStorage
+        // Update storage
         await AsyncStorage.setItem("authToken", newAccessToken);
-        console.log("Updated authToken in AsyncStorage");
+        console.log("✅ Token refreshed successfully");
 
-        // Attach new token and retry original request
+        // Update original request and notify queued requests
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        onRefreshed(newAccessToken);
+
         return api(originalRequest);
+
       } catch (refreshErr) {
-        console.error("Refresh failed:", refreshErr);
-        // Optional: logout user if refresh fails
+        console.error("❌ Refresh failed:", refreshErr.message);
+        
+        // Clear auth data on refresh failure
+        await AsyncStorage.multiRemove(["authToken", "userId"]);
+        
+        // Optional: Navigate to login screen here
+        // navigation.navigate('Login');
+        
+        return Promise.reject(refreshErr);
+      } finally {
+        isRefreshing = false;
       }
     }
 

@@ -151,7 +151,7 @@ const mainbg = '#7A5AF8';
 
 const styles = StyleSheet.create({
   cardWrapper: {
-    marginHorizontal: 12,
+    marginHorizontal: 5,
     marginVertical: 8,
   },
   cardContainer: {
@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: maintext,
+    color: '#7A5AF8',
   },
 });
 

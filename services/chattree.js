@@ -117,7 +117,7 @@ export const conversationTree = {
   INQUIRER_CONTACT: {
     role: 'inquirer',
     options: [
-      { id: 'share_my_contact', text: 'Sure: +91 98765 12345', next: 'AFTER_INQUIRER_CONTACT' },
+      { id: 'share_my_contact', text: 'Sure', next: 'AFTER_INQUIRER_CONTACT' },
       { id: 'privacy_concern', text: 'Can we finalize here first?', next: 'BOOKING_PROCESS' }
     ]
   },

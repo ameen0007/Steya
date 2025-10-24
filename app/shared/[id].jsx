@@ -244,7 +244,7 @@ const handleChatPress  = async () => {
     } catch (error) {
       console.error('❌ Error toggling favorite:', error);
       console.error('❌ Error response:', error.response?.data);
-      showToast('Error', 'Failed to update favorite status');
+      showToast('Failed to update favorite status');
     } finally {
       setIsFavoriteLoading(false);
     }
@@ -262,13 +262,13 @@ const handleChatPress  = async () => {
       }
     } catch (error) {
       console.error('Error sharing:', error);
-      showToast('Error', 'Failed to share');
+      showToast('Failed to share');
     }
   };
 
   const handleReportSubmit = async () => {
     if (!reportReason) {
-      showToast('Error', 'Please select a reason for reporting');
+      showToast('Please select a reason for reporting');
       return;
     }
 
@@ -280,14 +280,14 @@ const handleChatPress  = async () => {
         description: reportDescription
       });
 
-      showToast('Success', 'Room reported successfully. Our team will review it shortly.');
+      showToast('Room reported successfully.');
       setIsReportModalVisible(false);
       setReportReason('');
       setReportDescription('');
     } catch (error) {
       console.error('Error reporting room:', error);
       const errorMessage = error.response?.data?.message || 'Failed to report room';
-      showToast('Error', errorMessage);
+    
     } finally {
       setIsSubmittingReport(false);
     }
@@ -487,38 +487,49 @@ const makePhoneCall = (phoneNumber) => {
 
               <Text style={styles.sectionTitle}>Posted By</Text>
 
-              <View style={styles.postedByContainer}>
-                <Image
-                  source={{ uri: item?.createdBy?.picture }}
-                  style={styles.profileImage}
-                />
-                <View style={styles.posterInfo}>
-                  <Text style={styles.posterName}>{item?.createdBy?.name}</Text>
-                  <Text style={styles.postedDate}>
-                    {new Date(item.createdAt).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: '2-digit',
-                    })}
-                  </Text>
-                </View>
-              </View>
+<TouchableOpacity
+  style={styles.postedByContainer}
+  onPress={() => {
+    if (item.createdBy._id !== user?._id) {
+      router.push(`/Profile/${item?.createdBy._id}`);
+    }
+  }}
+  disabled={item.createdBy._id === user?._id}
+  activeOpacity={item.createdBy._id === user?._id ? 1 : 0.7}
+>
+  <Image
+    source={{ uri: item?.createdBy?.picture }}
+    style={styles.profileImage}
+  />
+  <View style={styles.posterInfo}>
+    <View style={styles.posterNameRow}>
+      <Text style={styles.posterName} numberOfLines={1}>
+        {item?.createdBy?.name}
+      </Text>
+      {item.createdBy._id !== user?._id && (
+        <View style={styles.chevronContainer}>
+          <Ionicons 
+            name="chevron-forward" 
+            size={16} 
+            color="#7A5AF8"
+          />
+        </View>
+      )}
+    </View>
+    <View style={styles.postedDateRow}>
+      <Ionicons name="time-outline" size={12} color="#999" />
+      <Text style={styles.postedDate}>
+        Posted {new Date(item.createdAt).toLocaleDateString('en-US', {
+          month: 'short',
+          day: '2-digit',
+          year: 'numeric'
+        })}
+      </Text>
+    </View>
+  </View>
+</TouchableOpacity>
             </View>
 
-            {/* Action Buttons Row - Share & Report */}
-            <View style={styles.actionButtonsRow}>
-              <TouchableOpacity onPress={handleShare} style={styles.actionButton}>
-                <Feather name="share-2" size={20} color="#7A5AF8" />
-                <Text style={styles.actionButtonText}>Share</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => setIsReportModalVisible(true)}
-                style={styles.actionButton}
-              >
-                <Feather name="flag" size={20} color="#FF6B6B" />
-                <Text style={[styles.actionButtonText, { color: '#FF6B6B' }]}>Report</Text>
-              </TouchableOpacity>
-            </View>
 
             {/* Top Navigation */}
             <View style={{
@@ -590,11 +601,23 @@ const makePhoneCall = (phoneNumber) => {
               </View>
             </View>
 
-            <StaticMap
-              latitude={item?.location?.coordinates[1]}
-              longitude={item?.location?.coordinates[0]}
-              placeName={item?.location?.fullAddress}
-            />
+        <View style={styles.mapSection}>
+  <Text style={styles.sectionTitle}>Location</Text>
+  
+  {/* Tap to Navigate Hint */}
+  <View style={styles.mapTapHint}>
+    <Ionicons name="arrow-down-circle-outline" size={16} color="#7A5AF8" />
+    <Text style={styles.mapTapHintText}>
+      Tap map below to navigate
+    </Text>
+  </View>
+
+  <StaticMap
+    latitude={item?.location?.coordinates[1]}
+    longitude={item?.location?.coordinates[0]}
+    placeName={item?.location?.fullAddress}
+  />
+</View>
           </ScrollView>
 
           {item.createdBy._id !== user?._id ? (
@@ -943,33 +966,55 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#333',
   },
-  postedByContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FBFAFF',
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#EBE7FF',
-  },
-  profileImage: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-  },
-  posterInfo: {
-    marginLeft: 12,
-  },
-  posterName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#333',
-  },
-  postedDate: {
-    fontSize: 12,
-    color: '#777',
-    marginTop: 2,
-  },
+ postedByContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#FBFAFF',
+  padding: 14,
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: '#EBE7FF',
+  marginBottom: 16,
+},
+profileImage: {
+  width: 48,
+  height: 48,
+  borderRadius: 24,
+  borderWidth: 2,
+  borderColor: '#EBE7FF',
+},
+posterInfo: {
+  flex: 1,
+  marginLeft: 12,
+  justifyContent: 'center',
+},
+posterNameRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 4,
+},
+posterName: {
+  fontSize: 16,
+  fontWeight: '600',
+  color: '#333',
+  lineHeight: 20, // Important for alignment
+},
+chevronContainer: {
+  marginLeft: 4,
+  justifyContent: 'center',
+  alignItems: 'center',
+  height: 20, // Match the text lineHeight
+},
+postedDateRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 4,
+},
+postedDate: {
+  fontSize: 13,
+  color: '#999',
+  marginLeft: 2,
+},
   actionButtonsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -1113,6 +1158,28 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: 'white',
   },
+  mapSection: {
+  marginHorizontal: 14,
+  marginBottom: 16,
+},
+mapTapHint: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: '#F5F3FF',
+  paddingVertical: 8,
+  paddingHorizontal: 12,
+  borderRadius: 8,
+  marginBottom: 10,
+  borderWidth: 1,
+  borderColor: '#EBE7FF',
+},
+mapTapHintText: {
+  fontSize: 13,
+  color: '#7A5AF8',
+  marginLeft: 6,
+  fontWeight: '500',
+},
 });
 
 export default DetailsPage;

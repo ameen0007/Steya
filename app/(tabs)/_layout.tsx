@@ -13,6 +13,7 @@ const { width } = Dimensions.get('window');
 import ProtectedRoute from '../protectedroute';
 import { useSelector } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const mainbg = '#7A5AF8';
@@ -97,31 +98,54 @@ const handlePressOut = () => {
           }}
         />
 
-        <Tabs.Screen
-          name="add"
-          options={{
-            tabBarIcon: ({ focused }) => (
+  <Tabs.Screen
+  name="add"
+  options={{
+    tabBarIcon: ({ focused }) => {
+      // ADD THIS LINE - Get unread status from Redux
+ const { hasUnread } = useSelector((state: any) => state.chat);
+
+      
+      return (
+        <View style={{
+          alignItems: "center",
+          marginTop: 3,
+          width: width / 5
+        }}>
+          <View style={{ position: 'relative' }}>
+            <Ionicons
+              name={focused ? "chatbox-ellipses" : "chatbox-ellipses-outline"}
+              color={focused ? mainbg : "gray"}
+              size={24}
+            />
+            
+            {/* ADD THIS RED DOT */}
+            {hasUnread && (
               <View style={{
-                alignItems: "center",
-                marginTop: 3,
-                width: width / 5
-              }}>
-                <Ionicons
-                  name={focused ? "chatbox-ellipses" : "chatbox-ellipses-outline"}
-                  color={focused ? mainbg : "gray"}
-                  size={24}
-                />
-                <Text style={{
-                  color: focused ? mainbg : "gray",
-                  fontSize: 10,
-                  fontFamily: "Poppinssm"
-                }}>
-                  Chat
-                </Text>
-              </View>
-            )
-          }}
-        />
+                position: 'absolute',
+                top: -3,
+                right: -3,
+                backgroundColor: '#FF3B30',
+                borderRadius: 5,
+                width: 10,
+                height: 10,
+                borderWidth: 1.5,
+                borderColor: '#FFFFFF'
+              }} />
+            )}
+          </View>
+          <Text style={{
+            color: focused ? mainbg : "gray",
+            fontSize: 10,
+            fontFamily: "Poppinssm"
+          }}>
+            Chat
+          </Text>
+        </View>
+      );
+    }
+  }}
+/>
 
   
      <Tabs.Screen

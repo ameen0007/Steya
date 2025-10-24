@@ -12,6 +12,7 @@
       "supportsTablet": true
     },
     "android": {
+   
       "runtimeVersion": "1.0.0",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/applogo.png",
@@ -27,7 +28,7 @@
         "WRITE_EXTERNAL_STORAGE"
       ],
       "package": "com.ameen007.Steya",
-      "googleServicesFile": "./google-services.json"   
+      "googleServicesFile": "./google-services.json"
     },
     "androidNavigationBar": {
       "barStyle": "light-content",
