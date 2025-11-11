@@ -19,7 +19,7 @@ import { setLocationData } from '../Redux/LocationSlice';
 import { setUserData } from '../Redux/userSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { initializePushNotifications } from '../../services/notificationHandler';
-
+import { Animated } from 'react-native';
 export default function PgHostelDetails() {
   const user = useSelector((state) => state.user.userData);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
@@ -35,7 +35,8 @@ export default function PgHostelDetails() {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [initialImageIndex, setInitialImageIndex] = useState(0);
   const dispatch = useDispatch();
-
+const [imageLoaded, setImageLoaded] = useState(false);
+const shimmerAnimation = useRef(new Animated.Value(0)).current;
   // NEW STATE FOR REPORT MODAL
   const [isReportModalVisible, setIsReportModalVisible] = useState(false);
   const [reportReason, setReportReason] = useState('');
@@ -67,6 +68,30 @@ export default function PgHostelDetails() {
       console.error("❌ Error incrementing view count:", error);
     }
   };
+
+  useEffect(() => {
+  if (!imageLoaded) {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmerAnimation, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shimmerAnimation, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }
+}, [imageLoaded]);
+
+const translateX = shimmerAnimation.interpolate({
+  inputRange: [0, 1],
+  outputRange: [-350, 350],
+});
 
   useEffect(() => {
     const fetchRoomData = async () => {
@@ -339,42 +364,63 @@ Download the app to view more details!`;
         <SafeWrapper>
           <ScrollView>
             {/* Image Carousel */}
-            <FlatList
-              data={item?.images}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={(image) => image?._id}
-              onMomentumScrollEnd={(e) => {
-                const index = Math.floor(e.nativeEvent.contentOffset.x / width);
-                setCurrentImage(index);
-              }}
-              renderItem={({ item: image, index }) => (
-                <View style={{ width, justifyContent: 'center', alignItems: 'center' }}>
-                  <TouchableOpacity activeOpacity={0.9} onPress={() => openImageModal(index)}>
-                    <TopFadeGradient /> 
-                    <Image 
-                      source={{ uri: image.originalUrl }}
-                      style={{ width, height: 250 }} 
-                      resizeMode="cover" 
-                    />
-                    <View style={{
-                      position: 'absolute',
-                      bottom: 10,
-                      right: 10,
-                      backgroundColor: '#0009',
-                      paddingHorizontal: 10,
-                      paddingVertical: 5,
-                      borderRadius: 12
-                    }}>
-                      <Text style={{ color: 'white', fontSize: 12 }}>
-                        {index === currentImage ? currentImage + 1 : index + 1}/{item?.images.length}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              )}
+         <FlatList
+  data={item?.images}
+  horizontal
+  pagingEnabled
+  showsHorizontalScrollIndicator={false}
+  keyExtractor={(image) => image?._id}
+  onMomentumScrollEnd={(e) => {
+    const index = Math.floor(e.nativeEvent.contentOffset.x / width);
+    setCurrentImage(index);
+  }}
+  renderItem={({ item: image, index }) => (
+    <View style={{ width, justifyContent: 'center', alignItems: 'center' }}>
+      <TouchableOpacity activeOpacity={0.9} onPress={() => openImageModal(index)}>
+        {/* SHIMMER SKELETON - ADD THIS */}
+        {!imageLoaded && (
+          <View style={styles.skeletonImage}>
+            <Animated.View 
+              style={[
+                styles.shimmer,
+                {
+                  transform: [{ translateX }],
+                },
+              ]} 
             />
+          </View>
+        )}
+        
+        <TopFadeGradient /> 
+        <Image 
+          source={{ uri: image.originalUrl }}
+          style={[
+            { width, height: 250 },
+            !imageLoaded && styles.hiddenImage // ADD THIS
+          ]} 
+          resizeMode="cover"
+          onLoad={() => setImageLoaded(true)} // ADD THIS
+          onError={() => setImageLoaded(true)} // ADD THIS
+        />
+        
+        <View style={{
+          position: 'absolute',
+          bottom: 10,
+          right: 10,
+          backgroundColor: '#0009',
+          paddingHorizontal: 10,
+          paddingVertical: 5,
+          borderRadius: 12
+        }}>
+          <Text style={{ color: 'white', fontSize: 12 }}>
+            {index === currentImage ? currentImage + 1 : index + 1}/{item?.images.length}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    </View>
+  )}
+/>
+
 
             {/* PG Info */}
             <View style={styles.container}>
@@ -749,7 +795,7 @@ Download the app to view more details!`;
                   <View style={{ width, justifyContent: 'center', alignItems: 'center' }}>
                     <Image 
                       source={{ uri: image.originalUrl }}
-                      style={{ width, height: 400 }} 
+                      style={{ width,  height: '100%' }} 
                       resizeMode="contain" 
                     />
                   </View>
@@ -873,6 +919,24 @@ const lighttext = '#757575';
 const mainbg = '#7A5AF8';
 
 const styles = StyleSheet.create({
+  skeletonImage: {
+  width: width,
+  height: 250,
+  backgroundColor: '#E8E4F3',
+  overflow: 'hidden',
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  zIndex: 1,
+},
+shimmer: {
+  width: '100%',
+  height: '100%',
+  backgroundColor: 'rgba(255, 255, 255, 0.3)',
+},
+hiddenImage: {
+  opacity: 0,
+},
   chatDisabled: {
     paddingVertical: 10,
     paddingHorizontal: 16,

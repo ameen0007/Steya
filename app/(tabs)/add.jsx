@@ -58,6 +58,7 @@ export default function Add() {
   }, [user?._id]);
 
   const fetchRooms = useCallback(async (silent = false) => {
+    if (!user?._id) return;
     try {
       if (!silent) setError(null);
       
@@ -290,110 +291,119 @@ export default function Add() {
     const isUnread = isFromOtherUser && !hasUserReadIt;
 
     return (
-      <TouchableOpacity
-        style={[
-          styles.chatItem,
-          isUnread && styles.chatItemUnread,
-          isDeleted && styles.chatItemDeleted
-        ]}
-        activeOpacity={isDeleted ? 1 : 0.7}
-        onPress={() => handleChatPress(item)}
-        disabled={isDeleted}
-      >
-        <View style={styles.avatarWrapper}>
-          {otherUser?.picture ? (
-            <Image
-              source={{ uri: otherUser.picture }}
-              style={[
-                styles.avatar,
-                isDeleted && styles.avatarDeleted
-              ]}
-            />
-          ) : (
-            <View style={[
-              styles.avatarPlaceholder,
-              isDeleted && styles.avatarPlaceholderDeleted
-            ]}>
-              <Text style={[
-                styles.avatarText,
-                isDeleted && styles.avatarTextDeleted
+      <View style={styles.chatItemWrapper}>
+        <TouchableOpacity
+          style={[
+            styles.chatItem,
+            isUnread && styles.chatItemUnread,
+            isDeleted && styles.chatItemDeleted
+          ]}
+          activeOpacity={isDeleted ? 1 : 0.7}
+          onPress={() => handleChatPress(item)}
+          disabled={isDeleted}
+        >
+          <View style={styles.avatarWrapper}>
+            {otherUser?.picture ? (
+              <Image
+                source={{ uri: otherUser.picture }}
+                style={[
+                  styles.avatar,
+                  isDeleted && styles.avatarDeleted
+                ]}
+              />
+            ) : (
+              <View style={[
+                styles.avatarPlaceholder,
+                isDeleted && styles.avatarPlaceholderDeleted
               ]}>
-                {(otherUser.name?.charAt(0) || 'U').toUpperCase()}
-              </Text>
-            </View>
-          )}
-          {isUnread && <View style={styles.unreadIndicator} />}
-          {isDeleted && (
-            <View style={styles.expiredBadge}>
-              <Ionicons name="close-circle" size={20} color="#FFFFFF" />
-            </View>
-          )}
-        </View>
-
-        <View style={styles.chatContent}>
-          <View style={styles.topRow}>
-            <Text 
-              style={[
-                styles.userName,
-                isUnread && styles.userNameUnread,
-                isDeleted && styles.userNameDeleted
-              ]} 
-              numberOfLines={1}
-            >
-              {otherUser.name || 'Unknown User'}
-            </Text>
-            {!isDeleted && (
-              <Text style={[styles.timestamp, isUnread && styles.timestampUnread]}>
-                {formatTime(item.lastMessageAt || item.updatedAt)}
-              </Text>
+                <Text style={[
+                  styles.avatarText,
+                  isDeleted && styles.avatarTextDeleted
+                ]}>
+                  {(otherUser.name?.charAt(0) || 'U').toUpperCase()}
+                </Text>
+              </View>
+            )}
+            {isUnread && <View style={styles.unreadIndicator} />}
+            {isDeleted && (
+              <View style={styles.expiredBadge}>
+                <Ionicons name="close-circle" size={20} color="#FFFFFF" />
+              </View>
             )}
           </View>
 
-          {isDeleted ? (
-            <View style={styles.expiredContainer}>
-              <View style={styles.expiredBanner}>
-                <View style={styles.expiredIconWrapper}>
-                  <Ionicons name="alert-circle" size={16} color="#EF4444" />
+          <View style={styles.chatContent}>
+            <View style={styles.topRow}>
+              <Text 
+                style={[
+                  styles.userName,
+                  isUnread && styles.userNameUnread,
+                  isDeleted && styles.userNameDeleted
+                ]} 
+                numberOfLines={1}
+              >
+                {otherUser.name || 'Unknown User'}
+              </Text>
+              {!isDeleted && (
+                <Text style={[styles.timestamp, isUnread && styles.timestampUnread]}>
+                  {formatTime(item.lastMessageAt || item.updatedAt)}
+                </Text>
+              )}
+            </View>
+
+            {isDeleted ? (
+              <View style={styles.expiredContainer}>
+                <View style={styles.expiredBanner}>
+                  <View style={styles.expiredIconWrapper}>
+                    <Ionicons name="alert-circle" size={16} color="#EF4444" />
+                  </View>
+                  <View style={styles.expiredTextWrapper}>
+                    <Text style={styles.expiredTitle}>This property has been sold or expired.</Text>
+                    <Text style={styles.expiredSubtitle}>
+                      Chat will be deleted in {daysLeft} {daysLeft === 1 ? 'day' : 'days'}.
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.expiredTextWrapper}>
-                  <Text style={styles.expiredTitle}>This property has been sold or expired.</Text>
-                  <Text style={styles.expiredSubtitle}>
-                    Chat will be deleted in {daysLeft} {daysLeft === 1 ? 'day' : 'days'}.
+              </View>
+            ) : (
+              <>
+                <View style={styles.productRow}>
+                  <View style={styles.productBadge}>
+                    <Ionicons name="cube-outline" size={12} color="#7A5AF8" />
+                  </View>
+                  <Text style={styles.productName} numberOfLines={1}>
+                    {item.name || 'Product Inquiry'}
                   </Text>
                 </View>
-              </View>
-            </View>
-          ) : (
-            <>
-              <View style={styles.productRow}>
-                <View style={styles.productBadge}>
-                  <Ionicons name="cube-outline" size={12} color="#7A5AF8" />
-                </View>
-                <Text style={styles.productName} numberOfLines={1}>
-                  {item.name || 'Product Inquiry'}
-                </Text>
-              </View>
 
-              <View style={styles.messageRow}>
-                <Text 
-                  style={[
-                    styles.lastMessage,
-                    isUnread && styles.lastMessageUnread
-                  ]} 
-                  numberOfLines={1}
-                >
-                  {item.lastMessage || 'No messages yet'}
-                </Text>
-                {isUnread && (
-                  <View style={styles.unreadBadge}>
-                    <View style={styles.unreadDot} />
-                  </View>
-                )}
-              </View>
-            </>
-          )}
-        </View>
-      </TouchableOpacity>
+                <View style={styles.messageRow}>
+                  <Text 
+                    style={[
+                      styles.lastMessage,
+                      isUnread && styles.lastMessageUnread
+                    ]} 
+                    numberOfLines={1}
+                  >
+                    {item.lastMessage || 'No messages yet'}
+                  </Text>
+                  {isUnread && (
+                    <View style={styles.unreadBadge}>
+                      <View style={styles.unreadDot} />
+                    </View>
+                  )}
+                </View>
+              </>
+            )}
+          </View>
+        </TouchableOpacity>
+        
+        {/* ✨ BEAUTIFUL SEPARATOR - Only show if not last item */}
+        {index < rooms.length - 1 && (
+          <View style={styles.separatorContainer}>
+            <View style={styles.separator} />
+          </View>
+        )}
+      </View>
     );
   };
 
@@ -494,24 +504,43 @@ export default function Add() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: '#F9FAFB',
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FAFAFA',
+    backgroundColor: '#F9FAFB',
     paddingHorizontal: 32,
+  },
+  // ✨ NEW - Chat Item Wrapper
+  chatItemWrapper: {
+    backgroundColor: '#FFFFFF',
+  },
+  chatItem: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#FFFFFF',
   },
   chatItemUnread: {
     backgroundColor: '#F8F7FF',
-    borderLeftWidth: 4,
+    borderLeftWidth: 3,
     borderLeftColor: '#7A5AF8',
   },
   chatItemDeleted: {
     backgroundColor: '#FEF2F2',
-    borderLeftWidth: 4,
+    borderLeftWidth: 3,
     borderLeftColor: '#FCA5A5',
+  },
+  // ✨ NEW - Beautiful Separator Styles
+  separatorContainer: {
+    paddingLeft: 90, // Aligns with text, not avatar
+    backgroundColor: '#FFFFFF',
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
   },
   unreadIndicator: {
     position: 'absolute',
@@ -707,13 +736,6 @@ const styles = StyleSheet.create({
   },
   emptyList: {
     flexGrow: 1,
-  },
-  chatItem: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
-    marginBottom: 1,
   },
   avatarWrapper: {
     position: 'relative',

@@ -183,8 +183,8 @@ const SharedRoomForm = () => {
         return (
           phone !== '' &&
           phone.length === 10 &&
-          /^[6-9]\d{9}$/.test(phone) &&
-          formData.showPhonePublic !== undefined
+          /^[6-9]\d{9}$/.test(phone) 
+          // formData.showPhonePublic !== undefined
         );
       
       default:
@@ -223,28 +223,33 @@ const SharedRoomForm = () => {
       console.log(`📸 Images - Existing: ${existingImages.length}, New: ${newImageUris.length}, Total: ${formData.images.length}`);
 
       // 3️⃣ Compress ONLY NEW images (no thumbnail creation)
-      const timestamp = Date.now();
-      const compressedImages = [];
+    const timestamp = Date.now();
+const compressedImages = [];
 
-      for (let i = 0; i < newImageUris.length; i++) {
-        const img = newImageUris[i];
-        
-        // Compress the image
-        let context = ImageManipulator.manipulate(img);
-        context.resize({ width: 1280 });
-        let result = await context.renderAsync();
-        let manip = await result.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
+for (let i = 0; i < newImageUris.length; i++) {
+  const img = newImageUris[i];
+  
+  // ✅ CORRECT WAY - Don't specify height, let it auto-calculate
+  let context = ImageManipulator.manipulate(img);
+  let result = await context.renderAsync();
+  let manip = await result.saveAsync({ 
+    compress: 0.7, 
+    format: SaveFormat.JPEG 
+  });
 
-        // If still too large, compress more
-        const info = await FileSystem.getInfoAsync(manip.uri);
-        if (info.size > 1000000) {
-          const context2 = ImageManipulator.manipulate(manip.uri);
-          const result2 = await context2.renderAsync();
-          manip = await result2.saveAsync({ compress: 0.5, format: SaveFormat.JPEG });
-        }
+  // Check size and compress more if needed
+  const info = await FileSystem.getInfoAsync(manip.uri);
+  if (info.size > 1000000) {
+    const context2 = ImageManipulator.manipulate(manip.uri);
+    const result2 = await context2.renderAsync();
+    manip = await result2.saveAsync({ 
+      compress: 0.5, 
+      format: SaveFormat.JPEG 
+    });
+  }
 
-        compressedImages.push(manip);
-      }
+  compressedImages.push(manip);
+}
 
       // 4️⃣ Prepare FormData
       const uploadData = new FormData();
@@ -310,7 +315,7 @@ const SharedRoomForm = () => {
         showToast("Your room listing has been submitted!");
       }
 
-      router.back();
+      router.push('/(tabs)/likes')
     } catch (err) {
       console.error("❌ Operation failed:", err);
       let errorMessage = `Something went wrong while ${isEdit ? 'updating' : 'submitting'} your listing.`;
@@ -772,8 +777,8 @@ const PGHostelForm = () => {
         return (
           phone !== '' &&
           phone.length === 10 &&
-          /^[6-9]\d{9}$/.test(phone) &&
-          formData.showPhonePublic !== undefined
+          /^[6-9]\d{9}$/.test(phone) 
+          // formData.showPhonePublic !== undefined
         );
       
       default:
@@ -923,7 +928,8 @@ const PGHostelForm = () => {
         showToast("Your PG/Hostel listing has been submitted!");
       }
 
-      router.back();
+    
+      router.push('/(tabs)/likes')
 
     } catch (err) {
       console.error("❌ Operation failed:", err);
@@ -1506,8 +1512,8 @@ const propertyTypeOptions = [
           formData.parking !== '' &&
           phone !== '' &&
           phone.length === 10 &&
-          /^[6-9]\d{9}$/.test(phone) &&
-          formData.showPhonePublic !== undefined
+          /^[6-9]\d{9}$/.test(phone) 
+          // formData.showPhonePublic !== undefined
         );
       
       default:
@@ -1643,7 +1649,8 @@ const propertyTypeOptions = [
         showToast("Your property listing has been submitted!");
       }
 
-      router.back();
+     
+      router.push('/(tabs)/likes')
 
     } catch (err) {
       console.error("❌ Operation failed:", err);

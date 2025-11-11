@@ -1,12 +1,39 @@
 import { router } from 'expo-router';
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator, Animated } from 'react-native';
 import { Ionicons, MaterialIcons, MaterialCommunityIcons, FontAwesome5, FontAwesome6 } from '@expo/vector-icons';
 
 const FlatHomeCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) => {
   const [loading, setLoading] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const shimmerAnimation = useRef(new Animated.Value(0)).current;
 
   const id = data._id;
+
+  // Shimmer animation effect
+  useEffect(() => {
+    if (!imageLoaded) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(shimmerAnimation, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(shimmerAnimation, {
+            toValue: 0,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    }
+  }, [imageLoaded]);
+
+  const translateX = shimmerAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-350, 350],
+  });
 
   // Toggle favorite - calls parent function
   const toggleFavorite = async () => {
@@ -32,30 +59,49 @@ const FlatHomeCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) => 
       <View style={styles.cardContainer}>
         {/* Top image section with overlays */}
         <View style={styles.imageContainer}>
-          <Image source={{ uri: data?.thumbnail?.url }} style={styles.image} />
+          {!imageLoaded && (
+            <View style={styles.skeletonImage}>
+              <Animated.View 
+                style={[
+                  styles.shimmer,
+                  {
+                    transform: [{ translateX }],
+                  },
+                ]} 
+              />
+            </View>
+          )}
+          <Image 
+            source={{ uri: data?.thumbnail?.url }} 
+            style={[
+              styles.image,
+              !imageLoaded && styles.hiddenImage
+            ]}
+            onLoad={() => setImageLoaded(true)}
+            onError={() => setImageLoaded(true)}
+          />
           
           {/* Top Overlay - Location and Favorite */}
           <View style={styles.topOverlay}>
             {/* Location Badge - Left Top */}
             <View style={styles.distanceContainer}>
               <Ionicons name="location" size={14} color="#7A5AF8" />
-          {data?.individualDistance && (
-  data.individualDistance === '0 m' ? (
-    <Text style={styles.distanceText}>10 meters</Text>
-  ) : (
-    <Text style={styles.distanceText}>
-      {`Around ${data.individualDistance}`}
-    </Text>
-  )
-)}
-
+              {data?.individualDistance && (
+                data.individualDistance === '0 m' ? (
+                  <Text style={styles.distanceText}>10 meters</Text>
+                ) : (
+                  <Text style={styles.distanceText}>
+                    {`Around ${data.individualDistance}`}
+                  </Text>
+                )
+              )}
             </View>
 
             {/* Favorite Button - Right Top */}
             <TouchableOpacity 
               style={styles.favoriteButton}
               onPress={(e) => {
-                e.stopPropagation(); // Prevent card navigation
+                e.stopPropagation();
                 toggleFavorite();
               }}
               disabled={loading}
@@ -127,9 +173,7 @@ const FlatHomeCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) => 
               )}
 
               <Text style={styles.tenantText}>
-                {
-                  data?.tenantPreference === 'family' ? 'Only For ' : 'For '
-                }
+                {data?.tenantPreference === 'family' ? 'Only For ' : 'For '}
                 {data?.tenantPreference.charAt(0).toUpperCase() + data?.tenantPreference.slice(1)}
               </Text>
             </View>
@@ -150,6 +194,25 @@ const lighttext = '#757575';
 const mainbg = '#7A5AF8';
 
 const styles = StyleSheet.create({
+  skeletonImage: {
+    width: '100%',
+    height: 180,
+    backgroundColor: '#E8E4F3',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    overflow: 'hidden',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+  },
+  shimmer: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  hiddenImage: {
+    opacity: 0,
+  },
   cardWrapper: {
     marginHorizontal: 5,
     marginVertical: 8,
@@ -170,7 +233,7 @@ const styles = StyleSheet.create({
   postedDate: {
     fontFamily: 'Poppinssm',
     fontSize: 10,
-    color: lighttext
+    color: lighttext,
   },
   image: {
     width: '100%',
@@ -263,7 +326,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#666',
     marginBottom: 12,
-    fontFamily: 'Poppinsssm'
+    fontFamily: 'Poppinsssm',
   },
   detailsContainer: {
     flexDirection: 'row',

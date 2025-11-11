@@ -43,6 +43,11 @@ const ProfilePage = () => {
   const dispatch = useDispatch();
   const [showDonation, setShowDonation] = useState(false);
   
+  // ✅ NEW - Contact Us States
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [contactMessage, setContactMessage] = useState('');
+  const [contactSubject, setContactSubject] = useState('');
+  
   // Alert states
   const [showRateAlert, setShowRateAlert] = useState(false);
   const [showLogoutAlert, setShowLogoutAlert] = useState(false);
@@ -91,6 +96,44 @@ const ProfilePage = () => {
       setLoading1(false);
       console.error('Bug submission failed:', error);
       showToast('Failed to submit bug report.');
+    }
+  };
+
+  // ✅ NEW - Contact Us Handler
+  const handleContactUs = () => {
+    setShowContactModal(true);
+  };
+
+  // ✅ NEW - Submit Contact Form
+  const submitContactForm = async () => {
+    if (!contactSubject.trim() || !contactMessage.trim()) {
+      showToast("Please fill in all fields");
+      return;
+    }
+    
+    setLoading1(true);
+    try {
+      const response = await api.post('/api/contact/submit', {
+        subject: contactSubject,
+        message: contactMessage,
+        userEmail: user?.email,
+        userName: user?.name || `${user?.data?.user?.givenName || ''} ${user?.data?.user?.familyName || ''}`.trim()
+      });
+
+      if (response.data.success) {
+        setShowContactModal(false);
+        setContactSubject('');
+        setContactMessage('');
+        showToast("Your message has been sent. We'll get back to you soon!");
+        setLoading1(false);
+      } else {
+        setLoading1(false);
+        showToast('Failed to send message');
+      }
+    } catch (error) {
+      setLoading1(false);
+      console.error('Contact form submission failed:', error);
+      showToast('Failed to send message.');
     }
   };
 
@@ -152,6 +195,14 @@ const ProfilePage = () => {
           title: 'Report a Bug',
           hasNotification: false,
           onPress: handleBugReport,
+        },
+        // ✅ NEW - Contact Us
+        {
+          icon: 'mail-outline',
+          iconType: 'Ionicons',
+          title: 'Contact Us',
+          hasNotification: false,
+          onPress: handleContactUs,
         },
         {
           icon: 'shield-checkmark-outline',
@@ -324,7 +375,7 @@ const ProfilePage = () => {
             {/* Version Info - Compact */}
             {renderVersionInfo()}
 
-            <View  />
+            <View style={{ height: 20 }} />
           </ScrollView>
 
           {/* Donation Button */}
@@ -377,6 +428,61 @@ const ProfilePage = () => {
                     <ActivityIndicator color="#fff" />
                   ) : (
                     <Text style={styles.supportButtonText}>Submit Report</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+
+          {/* ✅ NEW - Contact Us Modal */}
+          <Modal
+            visible={showContactModal}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={() => setShowContactModal(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Contact Us 📧</Text>
+                  <TouchableOpacity onPress={() => setShowContactModal(false)}>
+                    <Ionicons name="close" size={24} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.modalDescription}>
+                  Have a question or feedback? We'd love to hear from you!
+                </Text>
+
+                <TextInput
+                  style={styles.contactSubjectInput}
+                  placeholder="Subject"
+                  value={contactSubject}
+                  onChangeText={setContactSubject}
+                />
+
+                <TextInput
+                  style={styles.bugInput}
+                  placeholder="Your message..."
+                  multiline
+                  numberOfLines={6}
+                  value={contactMessage}
+                  onChangeText={setContactMessage}
+                  textAlignVertical="top"
+                />
+
+                <TouchableOpacity
+                  style={[
+                    styles.supportButton,
+                    (!contactSubject.trim() || !contactMessage.trim()) && styles.supportButtonDisabled
+                  ]}
+                  onPress={submitContactForm}
+                  disabled={!contactSubject.trim() || !contactMessage.trim()}
+                >
+                  {loading1 ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.supportButtonText}>Send Message</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -461,7 +567,6 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  // ✨ NEW - Beautiful Vertical Centered Profile Section
   profileSection: {
     alignItems: 'center',
     paddingHorizontal: 24,
@@ -647,6 +752,16 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 24,
   },
+  // ✅ NEW - Contact Subject Input
+  contactSubjectInput: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    marginBottom: 12,
+  },
   bugInput: {
     borderWidth: 1,
     borderColor: '#E5E7EB',
@@ -671,11 +786,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  // ✨ NEW - Compact Version Info Styles
   versionContainer: {
     alignItems: 'center',
-    // paddingVertical: 12,
-    // marginTop: 4,
   },
   versionText: {
     fontSize: 12,

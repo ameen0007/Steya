@@ -87,7 +87,8 @@
           "react-native-razorpay",
           "socket.io-client",
           "react-native-toast-notifications",
-          "react-native-rn-in-app-update"
+          "react-native-rn-in-app-update",
+          "react-native-cashfree-pg-sdk"
         ]
       }
     }

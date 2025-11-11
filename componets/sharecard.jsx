@@ -1,17 +1,43 @@
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-  View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator 
+  View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator, Animated 
 } from 'react-native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { showToast } from '@/services/ToastService';
 
 const SharedRoomCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) => {
   const [loading, setLoading] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const shimmerAnimation = useRef(new Animated.Value(0)).current;
 
   const id = data._id;
 
-  // Toggle favorite - now calls parent function
+  // Shimmer animation effect
+  useEffect(() => {
+    if (!imageLoaded) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(shimmerAnimation, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(shimmerAnimation, {
+            toValue: 0,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    }
+  }, [imageLoaded]);
+
+  const translateX = shimmerAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-350, 350],
+  });
+
   const toggleFavorite = async () => {
     try {
       setLoading(true);
@@ -22,7 +48,6 @@ const SharedRoomCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) =
       setLoading(false);
     }
   };
-  console.log("Data in card:", data?.individualDistance);
 
   return (
     <TouchableOpacity
@@ -45,28 +70,47 @@ const SharedRoomCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) =
       }}
     >
       <View style={styles.cardContainer}>
-        {/* Top image section */}
+        {/* Top image section with skeleton */}
         <View style={styles.imageContainer}>
-          <Image source={{ uri: data?.thumbnail?.url }} style={styles.image} />
+          {!imageLoaded && (
+            <View style={styles.skeletonImage}>
+              <Animated.View 
+                style={[
+                  styles.shimmer,
+                  {
+                    transform: [{ translateX }],
+                  },
+                ]} 
+              />
+            </View>
+          )}
+          <Image 
+            source={{ uri: data?.thumbnail?.url }} 
+            style={[
+              styles.image, 
+              !imageLoaded && styles.hiddenImage
+            ]}
+            onLoad={() => setImageLoaded(true)}
+            onError={() => setImageLoaded(true)}
+          />
           
           {/* Top Overlay - Distance and Favorite */}
           <View style={styles.topOverlay}>
             <View style={styles.distanceBadge}>
               <View style={styles.distanceContainer}>
                 <Ionicons name="location" size={14} color="#7A5AF8" />
-                    {data?.individualDistance && (
-             data.individualDistance === '0 m' ? (
-               <Text style={styles.distanceText}>10 meters</Text>
-             ) : (
-               <Text style={styles.distanceText}>
-                 {`Around ${data.individualDistance}`}
-               </Text>
-             )
-           )}
+                {data?.individualDistance && (
+                  data.individualDistance === '0 m' ? (
+                    <Text style={styles.distanceText}>10 meters</Text>
+                  ) : (
+                    <Text style={styles.distanceText}>
+                      {`Around ${data.individualDistance}`}
+                    </Text>
+                  )
+                )}
               </View>
             </View>
 
-            {/* Favorite Button */}
             <TouchableOpacity 
               style={styles.favoriteButton}
               onPress={(e) => {
@@ -87,7 +131,6 @@ const SharedRoomCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) =
             </TouchableOpacity>
           </View>
           
-          {/* Bottom Overlay - Category Badge */}
           {activeFilter === 'All' && (
             <View style={styles.bottomOverlay}>
               <View style={styles.categoryBadge}>
@@ -113,7 +156,6 @@ const SharedRoomCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) =
             {data?.description}
           </Text>
 
-          {/* Preferences row */}
           <View style={styles.preferencesContainer}>
             <View style={styles.roommateInfo}>
               <Text style={styles.needText}>Need</Text>
@@ -154,6 +196,25 @@ const SharedRoomCard = ({ data, activeFilter, isFavorited, onToggleFavorite }) =
 };
 
 const styles = StyleSheet.create({
+  skeletonImage: {
+    width: '100%',
+    height: 180,
+    backgroundColor: '#E8E4F3',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    overflow: 'hidden',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+  },
+  shimmer: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  hiddenImage: {
+    opacity: 0,
+  },
   cardWrapper: {
     marginHorizontal: 5,
     marginVertical: 8,
@@ -169,7 +230,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 4,
     overflow: 'hidden',
-   
     paddingBottom: 10,
   },
   imageContainer: {
@@ -182,13 +242,12 @@ const styles = StyleSheet.create({
   },
   topOverlay: {
     position: 'absolute',
-    top:1,
+    top: 1,
     left: 0,
     right: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 10,
-    // paddingVertical: 8,
   },
   bottomOverlay: {
     position: 'absolute',
@@ -217,7 +276,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
-    marginTop: -6, // Control spacing from top here
+    marginTop: -6,
   },
   distanceText: {
     color: '#333333',
@@ -237,7 +296,7 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 3, // Control spacing from top here
+    marginTop: 3,
   },
   categoryBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
@@ -252,7 +311,7 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: 12,
     flex: 1,
-    paddingBottom: 0
+    paddingBottom: 0,
   },
   headerRow: {
     flexDirection: 'row',
@@ -281,12 +340,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    justifyContent: 'center'
+    justifyContent: 'center',
   },
   needText: {
     fontSize: 13,
     color: '#757575',
-    paddingTop: 3
+    paddingTop: 3,
   },
   countBadge: {
     backgroundColor: '#F4F4F4',
@@ -318,7 +377,7 @@ const styles = StyleSheet.create({
   },
   postedDate: {
     fontSize: 10,
-    color: '#757575'
+    color: '#757575',
   },
 });
 

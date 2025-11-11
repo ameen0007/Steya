@@ -12,7 +12,7 @@ import { StatusBar } from 'expo-status-bar';
 import axios from 'axios';
 import SkeletonLoader from '../../componets/individualloader';
 const apiUrl = process.env.EXPO_PUBLIC_API_URL;
-
+import { Animated } from 'react-native';
 import api from '../../services/intercepter';
 import { useDispatch, useSelector } from 'react-redux';
 import { showToast } from '@/services/ToastService';
@@ -44,7 +44,8 @@ const DetailsPage = () => {
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
   const [isFavoriteLoading, setIsFavoriteLoading] = useState(false);
   const user = useSelector((state) => state.user.userData);
-
+const [imageLoaded, setImageLoaded] = useState(false);
+const shimmerAnimation = useRef(new Animated.Value(0)).current;
   const dispatch = useDispatch();
 
   const incrementViewCount = async () => {
@@ -101,6 +102,31 @@ const DetailsPage = () => {
     }
   }, [id]);
 
+ useEffect(() => {
+  if (!imageLoaded) {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmerAnimation, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shimmerAnimation, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }
+}, [imageLoaded]);
+
+const translateX = shimmerAnimation.interpolate({
+  inputRange: [0, 1],
+  outputRange: [-350, 350],
+});
+
+    
   // Check if room is favorited
 useEffect(() => {
   const checkFavorite = async () => {
@@ -356,54 +382,62 @@ const makePhoneCall = (phoneNumber) => {
       ) : (
         <SafeWrapper>
           <ScrollView>
-            <FlatList
-              data={item?.images}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={(img, index) => img?._id || index.toString()}
-              onMomentumScrollEnd={(e) => {
-                const index = Math.floor(e.nativeEvent.contentOffset.x / width);
-                setCurrentImage(index);
-              }}
-              renderItem={({ item: img, index }) => (
-                <View
-                  style={{
-                    width,
-                    justifyContent: "center",
-                    alignItems: "center"
-                  }}
-                >
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={() => openImageModal(index)}
-                  >
-                    <Image
-                      source={{ uri: img.originalUrl }}
-                      style={{ width, height: 250 }}
-                      resizeMode="cover"
-                    />
-                    <TopFadeGradient />
-
-                    <View
-                      style={{
-                        position: "absolute",
-                        bottom: 10,
-                        right: 10,
-                        backgroundColor: "#0009",
-                        paddingHorizontal: 10,
-                        paddingVertical: 5,
-                        borderRadius: 12
-                      }}
-                    >
-                      <Text style={{ color: "white", fontSize: 12 }}>
-                        {index + 1}/{item.images.length}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              )}
+        <FlatList
+  data={item?.images}
+  horizontal
+  pagingEnabled
+  showsHorizontalScrollIndicator={false}
+  keyExtractor={(image) => image?._id}
+  onMomentumScrollEnd={(e) => {
+    const index = Math.floor(e.nativeEvent.contentOffset.x / width);
+    setCurrentImage(index);
+  }}
+  renderItem={({ item: image, index }) => (
+    <View style={{ width, justifyContent: 'center', alignItems: 'center' }}>
+      <TouchableOpacity activeOpacity={0.9} onPress={() => openImageModal(index)}>
+        {/* SHIMMER SKELETON - ADD THIS */}
+        {!imageLoaded && (
+          <View style={styles.skeletonImage}>
+            <Animated.View 
+              style={[
+                styles.shimmer,
+                {
+                  transform: [{ translateX }],
+                },
+              ]} 
             />
+          </View>
+        )}
+        
+        <TopFadeGradient /> 
+        <Image 
+          source={{ uri: image.originalUrl }}
+          style={[
+            { width, height: 250 },
+            !imageLoaded && styles.hiddenImage // ADD THIS
+          ]} 
+          resizeMode="cover"
+          onLoad={() => setImageLoaded(true)} // ADD THIS
+          onError={() => setImageLoaded(true)} // ADD THIS
+        />
+        
+        <View style={{
+          position: 'absolute',
+          bottom: 10,
+          right: 10,
+          backgroundColor: '#0009',
+          paddingHorizontal: 10,
+          paddingVertical: 5,
+          borderRadius: 12
+        }}>
+          <Text style={{ color: 'white', fontSize: 12 }}>
+            {index === currentImage ? currentImage + 1 : index + 1}/{item?.images.length}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    </View>
+  )}
+/>
 
             <View style={styles.container}>
               <View style={styles.rowBetween}>
@@ -712,7 +746,7 @@ const makePhoneCall = (phoneNumber) => {
                 }}
                 renderItem={({ item }) => (
                   <View style={{ width, justifyContent: "center", alignItems: "center" }}>
-                    <Image source={{ uri: item }} style={{ width, height: 400 }} resizeMode="contain" />
+                    <Image source={{ uri: item }} style={{ width, height: '100%' }} resizeMode="contain" />
                   </View>
                 )}
                 keyExtractor={(item, index) => index.toString()}
@@ -834,6 +868,24 @@ const lighttext = '#757575';
 const mainbg = '#7A5AF8';
 
 const styles = StyleSheet.create({
+  skeletonImage: {
+  width: width,
+  height: 250,
+  backgroundColor: '#E8E4F3',
+  overflow: 'hidden',
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  zIndex: 1,
+},
+shimmer: {
+  width: '100%',
+  height: '100%',
+  backgroundColor: 'rgba(255, 255, 255, 0.3)',
+},
+hiddenImage: {
+  opacity: 0,
+},
   chatDisabled: {
     paddingVertical: 10,
     paddingHorizontal: 16,
